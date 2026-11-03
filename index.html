@@ -234,6 +234,15 @@ textarea.inp{min-height:110px;font-family:var(--mono);font-size:12px}
 .ltab.on{background:var(--panel2);color:var(--acc);box-shadow:0 0 0 1px var(--line2)}
 .lnote{color:var(--ink2);font-size:12.5px;margin:14px 0 0}
 .ws{display:flex;flex-direction:column;gap:1px;font-size:12px} .ws b{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip{display:inline-flex;gap:3px;align-items:center}
+.ms{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.strip.big{gap:6px;flex-wrap:wrap}
+.msb{min-width:44px;padding:5px 0;text-align:center;font:700 11px var(--sans);color:#04111c;border-radius:7px;text-transform:uppercase;letter-spacing:.04em}
+.msb[style*="dashed"]{color:var(--muted)}
+#anTabs{position:sticky;top:-22px;background:var(--bg);z-index:5;padding-top:4px}
+.pbar{padding:12px 16px;margin-bottom:4px;border-color:var(--line2);background:linear-gradient(90deg,rgba(34,211,238,.08),var(--panel))}
+.pb-lab{font-weight:800;font-size:15px}
+.sech{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin:6px 0 12px;display:flex;align-items:center;gap:8px}
 </style>
 </head>
 <body>
@@ -440,7 +449,9 @@ async function parse(file){
       net:num(tag(totals,'NetTotal')),tax:num(tag(totals,'TaxPayable')),gross:num(tag(totals,'GrossTotal')),
       hasTotals: totals!=='', l0:R.lines.length, ln:0, hasRefs:false, wht:0};
     const wh=blocks(body,'WithholdingTax'); for(const w of wh){ d.wht+=num(tag(w,'WithholdingTaxAmount')); }
-    if(sec==='PY'){ d.payMech=tag(body,'PaymentMechanism'); }
+    if(sec==='PY'){ d.payMech=tag(body,'PaymentMechanism'); d.pay=blocks(body,'PaymentMethod').map(b=>[tag(b,'PaymentMechanism')||'?',num(tag(b,'PaymentAmount'))]); }
+    else if(totals){ const pb=blocks(totals,'Payment'); if(pb.length) d.pay=pb.map(b=>[tag(b,'PaymentMechanism')||'?',num(tag(b,'PaymentAmount'))]); }
+    if(sec==='WD'||sec==='MG'){ d.wt=type; }
     if(li>=0){
       const end= ti<0? body.length : ti;
       const lb=body.substring(li,end);
@@ -590,7 +601,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.4.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -925,6 +936,22 @@ function analyse(){
   add('A05','info','Dias sem vendas','Dias do período sem qualquer documento de venda (encerramento, férias ou falha de exportação?).',miss);
   const ncv=SI.filter(d=>active(d)&&d.type==='NC').reduce((s,d)=>s+d.net,0), salesv=SI.filter(d=>active(d)&&d.type!=='NC').reduce((s,d)=>s+d.net,0);
   add('A06','warn','Peso elevado de notas de crédito','As notas de crédito representam mais de 5% das vendas do período.', salesv&&ncv/salesv>0.05?[{m:`${eur(ncv)} em notas de crédito (${(ncv/salesv*100).toFixed(1).replace('.',',')}% das vendas)`,v:r2(ncv)}]:[]);
+  // ---------- Documentos de conferência, preços, ofertas ----------
+  const WDdocs=docs.filter(d=>d.sec==='WD'); const wdOpen=WDdocs.filter(d=>d.status==='N');
+  add('A07','warn','Documentos de conferência por faturar','Consultas de mesa, notas de encomenda, orçamentos ou pró-formas que continuam em aberto (estado N) — confirmar se foram ou vão ser faturados. A AT controla especialmente as consultas de mesa não convertidas em fatura.', wdOpen.map(d=>({d:d.i,m:`${d.type} — ${DOC_TYPES[d.type]||''} · ${custName(d)}`,v:d.gross||d.net})));
+  const pst={}; for(const d of SI){ if(!active(d)||d.type==='NC') continue; for(let k=d.l0;k<d.l0+d.ln;k++){ const L=lines[k]; if(!L.p||L.q<=0) continue; const x=pst[L.p]||(pst[L.p]={code:L.p,desc:lineDesc(L),min:Infinity,max:-Infinity,n:0,set:new Set(),zero:0,zeroQ:0,q:0,base:0,disc:0});
+      x.n++; x.q+=L.q; x.base+=L.amt; x.disc+=L.disc||0; if(L.up<=0){ x.zero++; x.zeroQ+=L.q; continue; } x.min=Math.min(x.min,L.up); x.max=Math.max(x.max,L.up); x.set.add(Math.round(L.up*10000)); } }
+  A.prices=Object.values(pst).filter(x=>x.n).map(x=>({code:x.code,desc:x.desc,n:x.n,q:r2(x.q),base:r2(x.base),pm:x.q?x.base/x.q:0,min:isFinite(x.min)?x.min:0,max:isFinite(x.max)?x.max:0,np:x.set.size,amp:isFinite(x.min)&&x.min>0?(x.max-x.min)/x.min*100:0,zero:x.zero,zeroQ:x.zeroQ,disc:r2(x.disc),open:x.set.size>15}));
+  add('A08','info','Artigos vendidos a preço zero (ofertas)','Linhas com preço unitário zero dentro de documentos de venda — ofertas, brindes ou erros de preço.', li(L=>{ const d=docs[L.d]; return active(d)&&d.type!=='NC'&&L.q>0&&L.up===0&&L.tt!=='NS'?{m:`${lineDesc(L)} — ${n2(L.q)} un.`}:null; }));
+  add('A09','info','Grandes variações de preço no mesmo artigo','Artigos vendidos com preços unitários que variam mais de 50% dentro do período (promoções, preços por cliente ou erros de preço). Excluem-se os artigos de preço aberto (ex.: "Diversos", balança), que têm muitos preços diferentes por natureza.', A.prices.filter(x=>!x.open&&x.np>1&&x.amp>50&&x.n>=3).sort((a,b)=>b.amp-a.amp).map(x=>({m:`${x.desc} — de ${n2(x.min)} a ${n2(x.max)} € (${x.np} preços diferentes)`,v:r2(x.amp)})));
+  // meios de pagamento
+  const pay={}, payBad=[]; for(const d of docs){ if(!d.pay||!d.pay.length||d.status==='A') continue; if(d.sec==='SI'&&!active(d)) continue;
+    const sum=d.pay.reduce((s,p)=>s+p[1],0); const ok=Math.abs(sum-d.gross)<=0.011;
+    if(!ok&&d.sec==='SI'&&(sum<d.gross-0.011||sum-d.gross>500)) payBad.push({d:d.i,m:`Pago ${n2(sum)} € · total do documento ${n2(d.gross)} €`,v:r2(sum-d.gross)});
+    for(const [m,a] of d.pay){ const k=(d.sec==='PY'?'PY':'SI')+'|'+m; const x=pay[k]||(pay[k]={src:d.sec==='PY'?'Recibos':'Faturas (pronto pagamento)',m,n:0,v:0}); x.n++; x.v+= ok? a : (sum>0? d.gross*(a/sum) : d.gross/d.pay.length); } }
+  payBad.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  add('P01','warn','Valor pago incoerente com o total do documento','O valor registado no pagamento (PaymentAmount) é inferior ao total do documento ou excede-o em mais de 500 € — valores impossíveis como troco, normalmente um erro de registo (por exemplo, um código de barras lido para o campo do valor pago). Diferenças pequenas (valor entregue pelo cliente com troco) são normais e não são assinaladas. Nas análises de meios de pagamento é sempre usado o total do documento.', payBad);
+  A.pay=Object.values(pay).map(x=>({...x,v:r2(x.v)})).sort((a,b)=>b.v-a.v);
   // ---------- Pontuação ----------
   let pen=0; for(const r of A.rules) if(r.n) pen+=SEV[r.sev].w + (r.sev==='crit'?Math.min(12,Math.log10(r.n+1)*6):r.sev==='err'?Math.min(6,Math.log10(r.n+1)*3):0);
   A.score=Math.max(0,Math.round(100-pen)); A.status= A.counts.crit? 'crit' : A.score>=85? 'ok' : 'warn';
@@ -962,7 +989,7 @@ async function loadFile(file,progEl){
     const R=await parseFile(file,onP);
     if(!R.header||!R.header.TaxRegistrationNumber){ throw new Error('Não parece um ficheiro SAF-T PT válido (cabeçalho não encontrado).'); }
     S.R=R; S.file=file; S.patches={}; S.fixLog=[]; S.dp={}; S.analysedAt=new Date().toISOString(); S.docsView=null;
-    analyse(); S.loadMs=Math.round(performance.now()-t0); try{ buildCubes(); saveCubes(); }catch(e){ console.error(e); } S.evo=null;
+    analyse(); S.loadMs=Math.round(performance.now()-t0); try{ buildCubes(); saveCubes(); }catch(e){ console.error(e); } S.evo=null; S.ctx=null;
     renderAll(); toast(`${ico('check')} ${esc(R.header.CompanyName)} — ${n0(R.docs.length)} documentos lidos em ${(S.loadMs/1000).toFixed(1)} s`,'ok');
     // recuperar dados gravados (DP e correções) se o mesmo ficheiro já foi analisado
     let prev=null; if(S.cloud.on){ prev=await cloudGetSummary(fileTag()); if(prev){ S.dp=prev.dp||{}; } }
@@ -1746,7 +1773,7 @@ async function pdfEvol(){ const E=S.evo; if(!E) return; const cubes=await loadCu
 
 /* =====================  ANÁLISES: operadores + Benford  ===================== */
 const _anBase=RENDER.analises;
-RENDER.analises=function(){ _anBase(); const el=$('#v-analises'), A=S.A; const box=document.createElement('div'); box.className='grid g2'; box.style.marginTop='16px';
+function anAuditoria(el){ const A=S.A; const box=document.createElement('div'); box.className='grid g2'; box.style.marginTop='16px';
   box.innerHTML=`<div class="card"><h3>${ico('users')} Por operador / posto <span class="r hint">SourceID</span></h3><div id="aOps"></div></div>
    <div class="card"><h3>${ico('scale')} Lei de Benford — 1.º dígito dos totais <span class="r"><span class="badge ${A.benford.n<300?'b-info':A.benford.mad>0.015?'b-warn':'b-ok'}">${esc(A.benford.verdict)}</span></span></h3><div id="aBen"></div></div>`;
   el.appendChild(box);
@@ -1757,6 +1784,482 @@ RENDER.analises=function(){ _anBase(); const el=$('#v-analises'), A=S.A; const b
   $('#aBen').innerHTML=`<div class="row" style="gap:16px;font-size:12px;margin-bottom:4px"><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:var(--bar);display:inline-block"></i>Observado</span><span class="row" style="gap:6px"><i style="width:14px;height:3px;background:var(--gold);display:inline-block"></i>Esperado (Benford)</span><span class="sp"></span><span class="hint mono">MAD ${B.mad.toFixed(4).replace('.',',')} · n=${n0(B.n)}</span></div><div class="chart"><svg viewBox="0 0 ${W} ${H}" height="${H}">${g}${b}</svg></div><div class="hint">Referência (Nigrini): MAD até 0,006 conformidade próxima · até 0,012 aceitável · até 0,015 marginal · acima disso, não conformidade.</div>`;
   $$('#aBen .hit').forEach(r=>{ const k=+r.dataset.k; r.onmousemove=e=>tipOn(e,`Dígito <b>${k}</b><br>Observado: <b>${(B.obs[k]*100).toFixed(1).replace('.',',')}%</b><br>Esperado: <b>${(B.exp[k]*100).toFixed(1).replace('.',',')}%</b>`); r.onmouseleave=tipOff; });
 };
+
+/* =====================  MULTI-EMPRESA — organizado por EMPRESA  ===================== */
+const MECH={NU:'Numerário',CC:'Cartão de crédito',CD:'Cartão de débito',MB:'Referência MB',TB:'Transferência bancária',CH:'Cheque',CI:'Crédito documentário',CO:'Cheque/cartão oferta',CS:'Compensação de saldos',DE:'Dinheiro eletrónico',LC:'Letra comercial',PR:'Permuta de bens',TR:'Ticket restaurante',OU:'Outros meios','?':'Não indicado'};
+const ST_COL={ok:'var(--good)',warn:'var(--warn)',crit:'var(--crit)'};
+function covers(h,ym){ const a=ym+'-01', b=ymAdd(ym,1)+'-01'; return (h.start||'')<b && (h.end||'')>=a; }
+function monthOf(h){ return (h.start||'').slice(0,7)===(h.end||'').slice(0,7)? (h.start||'').slice(0,7) : null; }
+function groupCompanies(H){ const m=new Map();
+  for(const h of H){ const g=m.get(h.nif)||{nif:h.nif,empresa:h.empresa,list:[]}; g.list.push(h); if((h.end||'')>=(g.lastEnd||'')){ g.lastEnd=h.end; g.empresa=h.empresa; } m.set(h.nif,g); }
+  for(const g of m.values()){ g.list.sort((a,b)=>(b.end||'').localeCompare(a.end||'')||(a.start||'').localeCompare(b.start||'')); g.last=g.list[0]; g.prev=g.list.find(x=>x!==g.last&&monthOf(x)&&monthOf(g.last)&&monthOf(x)===ymAdd(monthOf(g.last),-1)); g.corr=g.list.reduce((s,h)=>s+(h.correcoes||[]).length,0); }
+  return [...m.values()]; }
+function monthCell(g,ym){ const hs=g.list.filter(h=>covers(h,ym)); if(!hs.length) return null; return hs.find(h=>monthOf(h)===ym)||hs[0]; }
+function strip(g,year){ let h=''; for(let i=1;i<=12;i++){ const ym=year+'-'+String(i).padStart(2,'0'); const c=monthCell(g,ym);
+    h+=`<i class="ms" data-n="${g.nif}" data-ym="${ym}" style="background:${c?ST_COL[c.estado]:'var(--bg2)'};${c?'':'border:1px dashed var(--line2)'}" title="${MESES_L[i-1]} ${year}: ${c?STATUS_TXT[c.estado]+' · pontuação '+c.score+' · '+eur(c.vendas):'sem análise'}"></i>`; }
+  return `<span class="strip">${h}</span>`; }
+RENDER.historico=async function(){ const el=$('#v-historico');
+  if(!S.cloud.on){ el.innerHTML=`<div class="card hero-empty" style="min-height:40vh"><div>${ico('cloud')}<h2>Multi-empresa</h2><p>Mostra todas as empresas do gabinete, cada uma com os seus meses, a partir de qualquer posto. Fica disponível com a ligação à nuvem.</p></div></div>`; return; }
+  if(S.hisCo) return fichaEmpresa(S.hisCo);
+  el.innerHTML=`<div class="card"><div class="empty">${ico('cloud')} A carregar empresas…</div></div>`;
+  try{ if(!S.history.length||S.historyDirty) await cloudLoadHistory(); }catch(e){ el.innerHTML=`<div class="card"><b class="st-crit">Erro ao ler a nuvem:</b> ${esc(e.message)}</div>`; return; }
+  const G=groupCompanies(S.history); const allYm=[...new Set(S.history.map(monthOf).filter(Boolean))].sort();
+  const f=S.hisF2||(S.hisF2={q:'',ym:allYm[allYm.length-1]||today().slice(0,7),est:''}); const year=f.ym.slice(0,4);
+  const yms=[...new Set([...allYm,f.ym])].sort().reverse();
+  const stOf=g=>{ const c=monthCell(g,f.ym); return c?c.estado:'none'; };
+  const cnt={ok:0,warn:0,crit:0,none:0}; G.forEach(g=>cnt[stOf(g)]++);
+  el.innerHTML=`<div class="grid g6">${kpi('Empresas',n0(G.length),'no espaço')}${kpi('Prontas · '+ymLabel(f.ym),n0(cnt.ok),'sem problemas')}${kpi('Rever avisos',n0(cnt.warn),ymLabel(f.ym))}${kpi('Bloqueadas',n0(cnt.crit),'erros críticos')}${kpi('Sem análise',n0(cnt.none),'falta carregar o SAF-T')}${kpi('Análises guardadas',n0(S.history.length),'todas as empresas')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('layers')} Empresas <span class="r hint">uma linha por empresa · clique para abrir a ficha com todos os meses</span></h3>
+   <div class="toolbar"><input class="inp grow" id="gQ" placeholder="Pesquisar empresa ou NIF…" value="${esc(f.q)}">
+    <label class="fld">Mês de controlo<select class="inp" id="gM">${yms.map(y=>`<option value="${y}" ${y===f.ym?'selected':''}>${ymLabel(y)}</option>`).join('')}</select></label>
+    <label class="fld">Estado nesse mês<select class="inp" id="gE"><option value="">Todos</option><option value="none" ${f.est==='none'?'selected':''}>Sem análise (por fazer)</option><option value="crit" ${f.est==='crit'?'selected':''}>Bloqueado</option><option value="warn" ${f.est==='warn'?'selected':''}>Rever avisos</option><option value="ok" ${f.est==='ok'?'selected':''}>Pronto</option></select></label>
+    <span class="sp"></span><button class="btn" id="gR">${ico('undo')} Atualizar</button><button class="btn" id="gCsv">${ico('down')} Excel</button></div><div id="gT"></div>
+    <div class="row hint" style="margin-top:10px;gap:14px"><span class="row" style="gap:5px"><i class="ms" style="background:var(--good)"></i>Pronto</span><span class="row" style="gap:5px"><i class="ms" style="background:var(--warn)"></i>Rever avisos</span><span class="row" style="gap:5px"><i class="ms" style="background:var(--crit)"></i>Bloqueado</span><span class="row" style="gap:5px"><i class="ms" style="background:var(--bg2);border:1px dashed var(--line2)"></i>Sem análise</span></div></div>`;
+  const q=norm(f.q).trim(); const rows=G.filter(g=>(!q||norm(g.empresa+' '+g.nif).includes(q))&&(!f.est||stOf(g)===f.est));
+  const cols=[{k:'empresa',l:'Empresa',html:g=>`<b>${esc(g.empresa)}</b><div class="hint mono">${esc(g.nif)}</div>`},
+    {k:'mes',l:ymLabel(f.ym),v:g=>({crit:0,warn:1,none:2,ok:3})[stOf(g)],html:g=>{ const c=monthCell(g,f.ym); return c?`<span class="badge ${c.estado==='ok'?'b-ok':c.estado==='warn'?'b-warn':'b-crit'}">${c.score} · ${STATUS_TXT[c.estado].split(' —')[0]}</span>`:'<span class="badge b-info">por fazer</span>'; }},
+    {k:'strip',l:'Ano '+year,v:g=>g.list.filter(h=>(h.start||'').startsWith(year)).length,html:g=>strip(g,year)},
+    {k:'vendas',l:'Vendas (mês)',num:1,v:g=>{ const c=monthCell(g,f.ym); return c?c.vendas:null; },f:v=>v==null?'—':n2(v)},
+    {k:'delta',l:'Δ mês ant.',num:1,v:g=>{ const c=monthCell(g,f.ym), p=monthCell(g,ymAdd(f.ym,-1)); return c&&p?pctChg(c.vendas,p.vendas):null; },html:g=>{ const c=monthCell(g,f.ym), p=monthCell(g,ymAdd(f.ym,-1)); return c&&p?deltaHtml(c.vendas,p.vendas):'<span class="muted">—</span>'; }},
+    {k:'al',l:'Alertas',v:g=>{ const c=monthCell(g,f.ym); return c?c.alertas.crit*1e6+c.alertas.err*1e3+c.alertas.warn:-1; },html:g=>{ const c=monthCell(g,f.ym); return c?['crit','err','warn'].map(s=>c.alertas[s]?`<span class="badge ${SEV[s].c}">${c.alertas[s]}</span>`:'').join(' ')||'<span class="muted">0</span>':''; }},
+    {k:'dp',l:'DP',html:g=>{ const c=monthCell(g,f.ym); return c?dpStatus(c):''; }},
+    {k:'n',l:'Meses',num:1,v:g=>g.list.length,f:n0},{k:'up',l:'Atualizado',v:g=>g.list.reduce((m,h)=>h.atualizadoEm>m?h.atualizadoEm:m,''),f:v=>v?new Date(v).toLocaleDateString('pt-PT'):''}];
+  S.gT=table($('#gT'),Object.assign(S.gT?{_st:S.gT._st}:{sort:'mes',dir:1},{size:100,rows,cols,onRow:g=>{ S.hisCo=g.nif; RENDER.historico(); }}));
+  const rr=()=>RENDER.historico(); let tm; $('#gQ').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ f.q=e.target.value; rr(); setTimeout(()=>{ const i=$('#gQ'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); },250); };
+  $('#gM').onchange=e=>{ f.ym=e.target.value; rr(); }; $('#gE').onchange=e=>{ f.est=e.target.value; rr(); }; $('#gR').onclick=()=>{ S.historyDirty=true; rr(); };
+  $('#gCsv').onclick=()=>csvDownload(`AuditNux_empresas_${f.ym}.csv`,[{label:'Empresa',k:'empresa'},{label:'NIF',k:'nif'},{label:'Estado '+f.ym,v:g=>{ const c=monthCell(g,f.ym); return c?STATUS_TXT[c.estado]:'Sem análise'; }},{label:'Pontuação',v:g=>{ const c=monthCell(g,f.ym); return c?c.score:''; }},{label:'Vendas',v:g=>{ const c=monthCell(g,f.ym); return c?c.vendas:''; }},{label:'IVA',v:g=>{ const c=monthCell(g,f.ym); return c?c.iva:''; }},{label:'Meses analisados',v:g=>g.list.length}],rows);
+};
+function fichaEmpresa(nif){ const el=$('#v-historico'); const g=groupCompanies(S.history).find(x=>x.nif===nif); if(!g){ S.hisCo=null; return RENDER.historico(); }
+  const years=[...new Set(g.list.map(h=>(h.start||'').slice(0,4)))].sort().reverse(); const yr=years[0];
+  const ytd=g.list.filter(h=>monthOf(h)&&h.start.startsWith(yr)); const tot=ytd.reduce((s,h)=>s+h.vendas,0), totIva=ytd.reduce((s,h)=>s+h.iva,0);
+  el.innerHTML=`<div class="toolbar"><button class="btn" id="fBack">‹ Todas as empresas</button><span class="sp"></span><button class="btn pri" id="fEvo">${ico('chart')} Evolução & comparativos</button></div>
+   <div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">${esc(g.empresa)}</h2><div class="hint mono">NIF ${esc(g.nif)}</div></div><div class="gauge">${gauge(g.last.score,g.last.estado)}</div></div></div>
+   <div class="grid g6" style="margin-top:16px">${kpi('Último período',monthOf(g.last)?ymLabel(monthOf(g.last)):esc(g.last.start.slice(0,7))+' → '+esc(g.last.end.slice(0,7)),STATUS_TXT[g.last.estado])}${kpi('Vendas '+yr,eur(tot),n0(ytd.length)+' meses analisados')}${kpi('IVA '+yr,eur(totIva),'')}${kpi('Análises',n0(g.list.length),'desde '+esc(g.list[g.list.length-1].start))}${kpi('Correções',n0(g.corr),'todas as análises')}${kpi('Programa',esc((g.last.software||'').slice(0,22)),'cert. '+esc(g.last.certificado||'—'))}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('dash')} Mapa de meses</h3>${years.map(y=>`<div class="row" style="margin:8px 0;gap:14px"><b class="mono" style="width:44px">${y}</b><span class="strip big">${[...Array(12)].map((_,i)=>{ const ym=y+'-'+String(i+1).padStart(2,'0'); const c=monthCell(g,ym); return `<span class="msb" data-ym="${ym}" style="background:${c?ST_COL[c.estado]:'var(--bg2)'};${c?'cursor:pointer':'border:1px dashed var(--line2)'}" title="${c?STATUS_TXT[c.estado]+' · '+eur(c.vendas):'sem análise'}">${MESES[i]}</span>`; }).join('')}</span></div>`).join('')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('file')} Todos os períodos analisados</h3><div id="fT"></div></div>`;
+  table($('#fT'),{size:60,rows:g.list,cols:[{k:'start',l:'Período',f:(v,h)=>monthOf(h)?ymLabel(monthOf(h)):esc(h.start+' → '+h.end)},{k:'vendas',l:'Vendas',num:1,f:n2},{k:'iva',l:'IVA',num:1,f:n2},
+    {k:'score',l:'Pont.',num:1,html:h=>`<b class="mono st-${h.estado}">${h.score}</b>`},{k:'al',l:'Alertas',v:h=>h.alertas.crit*1e6+h.alertas.err*1e3+h.alertas.warn,html:h=>['crit','err','warn'].map(s=>h.alertas[s]?`<span class="badge ${SEV[s].c}">${h.alertas[s]}</span>`:'').join(' ')},
+    {k:'dp',l:'DP',html:h=>dpStatus(h)},{k:'c',l:'Correções',num:1,v:h=>(h.correcoes||[]).length,f:n0},{k:'operador',l:'Operador'},{k:'atualizadoEm',l:'Atualizado',f:v=>new Date(v).toLocaleString('pt-PT')}],onRow:openSummary});
+  $('#fBack').onclick=()=>{ S.hisCo=null; RENDER.historico(); };
+  $('#fEvo').onclick=()=>{ S.evo={nif:g.nif,ref:'',pa:'',pb:'',tab:'prod'}; go('evolucao'); };
+  $$('.msb',el).forEach(b=>b.onclick=()=>{ const c=monthCell(g,b.dataset.ym); if(c) openSummary(c); });
+}
+
+/* =====================  ANÁLISES DE GESTÃO — separadores  ===================== */
+const AN_TABS=[['vendas','Vendas'],['clientes','Clientes'],['artigos','Artigos & ABC'],['precos','Preços & descontos'],['pagamentos','Pagamentos & recebimentos'],['documentos','Documentos'],['auditoria','Auditoria']];
+RENDER.analises=function(){ const el=$('#v-analises'); const t=S.anTab||'vendas';
+  if(t==='vendas'){ _anBase(); anVendasExtra(el); } else { el.innerHTML=''; ({clientes:anClientes,artigos:anArtigos,precos:anPrecos,pagamentos:anPagamentos,documentos:anDocumentos,auditoria:anAuditoria})[t](el); }
+  el.insertAdjacentHTML('afterbegin',`<div class="tabs" id="anTabs">${AN_TABS.map(([k,l])=>`<div class="tab ${k===t?'on':''}" data-t="${k}">${l}</div>`).join('')}</div>`);
+  $$('#anTabs .tab').forEach(x=>x.onclick=()=>{ S.anTab=x.dataset.t; RENDER.analises(); $('.content').scrollTop=0; });
+};
+const act=d=>d.status!=='A'&&d.status!=='F';
+function anVendasExtra(el){ const R=S.R, A=S.A; const SI=R.docs.filter(d=>d.sec==='SI'&&act(d));
+  const sales=SI.filter(d=>d.type!=='NC'); const bands=[[0,5],[5,10],[10,20],[20,50],[50,100],[100,250],[250,500],[500,1000],[1000,5000],[5000,Infinity]];
+  const bd=bands.map(([a,b])=>{ const ds=sales.filter(d=>d.gross>=a&&d.gross<b); return {k:b===Infinity?`> ${n0(a)} €`:`${n0(a)} – ${n0(b)} €`,n:ds.length,v:r2(ds.reduce((s,d)=>s+d.gross,0))}; });
+  let nl=0, nu=0, disc=0; for(const d of sales){ nl+=d.ln; for(let k=d.l0;k<d.l0+d.ln;k++){ nu+=R.lines[k].q>0?R.lines[k].q:0; disc+=R.lines[k].disc||0; } }
+  const ser={}; for(const d of R.docs.filter(x=>x.sec==='SI')){ const k=d.type+' '+(d.series||''); const x=ser[k]||(ser[k]={k,docs:0,v:0,an:0,anv:0}); if(d.status==='A'){ x.an++; x.anv+=d.gross; } else if(d.status!=='F'){ x.docs++; x.v+=(d.type==='NC'?-1:1)*d.net; } }
+  let acc=0; const cum=A.byDay.map(d=>({k:d.k,label:d.k.slice(8),v:(acc+=d.v,r2(acc))}));
+  const box=document.createElement('div'); box.innerHTML=`
+   <div class="grid g4" style="margin-top:16px">${kpi('Linhas por venda',(sales.length?nl/sales.length:0).toFixed(1).replace('.',','),'artigos diferentes por talão/fatura')}${kpi('Unidades por venda',(sales.length?nu/sales.length:0).toFixed(1).replace('.',','),'quantidade média')}${kpi('Descontos concedidos',eur(disc),'SettlementAmount das linhas')}${kpi('Carga média de IVA',(A.totals.net?A.totals.tax/A.totals.net*100:0).toFixed(2).replace('.',',')+'%','IVA ÷ vendas líquidas')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Faturação acumulada no período</h3><div id="axCum"></div></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('scale')} Distribuição das vendas por valor</h3><div id="axBand"></div></div><div class="card"><h3>${ico('file')} Por série / caixa</h3><div id="axSer"></div></div></div>`;
+  el.appendChild(box);
+  vbars($('#axCum'),cum.map(d=>({...d,tip:`Até ${d.k}<br><b>${eur(d.v)}</b>`})),{h:200});
+  table($('#axBand'),{rows:bd,cols:[{k:'k',l:'Valor do documento'},{k:'n',l:'Nº',num:1,f:n0},{k:'p',l:'% docs',num:1,v:r=>sales.length?r.n/sales.length*100:0,f:v=>v.toFixed(1).replace('.',',')+'%'},{k:'v',l:'Valor',num:1,f:n2},{k:'pv',l:'% valor',num:1,v:r=>{ const t=bd.reduce((s,x)=>s+x.v,0); return t?r.v/t*100:0; },html:r=>{ const t=bd.reduce((s,x)=>s+x.v,0); const p=t?r.v/t*100:0; return `<span class="row" style="justify-content:flex-end;gap:6px"><i style="display:inline-block;height:8px;width:${Math.round(p)}px;background:var(--bar);border-radius:3px"></i>${p.toFixed(1).replace('.',',')}%</span>`; }}]});
+  table($('#axSer'),{rows:Object.values(ser),sort:'v',dir:-1,cols:[{k:'k',l:'Tipo e série'},{k:'docs',l:'Docs',num:1,f:n0},{k:'v',l:'Vendas',num:1,f:n2},{k:'t',l:'Ticket',num:1,v:x=>x.docs?x.v/x.docs:0,f:n2},{k:'an',l:'Anulados',num:1,f:n0},{k:'anv',l:'Valor anulado',num:1,f:n2}]});
+}
+function anClientes(el){ const R=S.R, A=S.A; const end=R.header.EndDate;
+  const cs=A.custs.map(c=>({...c,ticket:c.docs?c.gross/c.docs:0,dias:c.last&&end?Math.round((new Date(end)-new Date(c.last))/864e5):null}));
+  const named=cs.filter(c=>c.nif&&c.nif!=='999999990'); const cf=cs.filter(c=>c.nif==='999999990'); const totN=A.totals.net||1;
+  const freq=[['1 compra',c=>c.docs===1],['2 a 3',c=>c.docs>=2&&c.docs<=3],['4 a 10',c=>c.docs>=4&&c.docs<=10],['11 a 30',c=>c.docs>=11&&c.docs<=30],['Mais de 30',c=>c.docs>30]].map(([k,f])=>{ const x=named.filter(f); return {k,n:x.length,v:r2(x.reduce((s,c)=>s+c.net,0))}; });
+  const city={}; for(const c of named){ const m=R.customers[c.id]||{}; let k=String(m.city||'').trim().toUpperCase().replace(/\s+/g,' '); if(!k||k==='DESCONHECIDO') k='(sem localidade)'; city[k]=(city[k]||0)+c.net; }
+  let acc=0; const sorted=named.slice().sort((a,b)=>b.net-a.net); const totNamed=sorted.reduce((s,c)=>s+c.net,0)||1; for(const c of sorted){ acc+=c.net; c.cls=acc<=totNamed*0.8?'A':acc<=totNamed*0.95?'B':'C'; }
+  el.innerHTML=`<div class="grid g6">${kpi('Clientes identificados',n0(named.length),'com NIF')}${kpi('Vendas a clientes c/ NIF',(named.reduce((s,c)=>s+c.net,0)/totN*100).toFixed(1).replace('.',',')+'%',eur(named.reduce((s,c)=>s+c.net,0)))}${kpi('Consumidor final',(cf.reduce((s,c)=>s+c.net,0)/totN*100).toFixed(1).replace('.',',')+'%',eur(cf.reduce((s,c)=>s+c.net,0)))}
+    ${kpi('Clientes recorrentes',n0(named.filter(c=>c.docs>=2).length),'2 ou mais compras')}${kpi('Ticket médio (c/ NIF)',eur(named.length?named.reduce((s,c)=>s+c.gross,0)/named.reduce((s,c)=>s+c.docs,0):0),'por documento')}${kpi('Classe A',n0(sorted.filter(c=>c.cls==='A').length),'clientes que fazem 80%')}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('users')} Frequência de compra</h3><div id="clF"></div></div><div class="card"><h3>${ico('layers')} Vendas por localidade <span class="r hint">clientes com NIF</span></h3><div id="clC"></div></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('users')} Carteira de clientes <span class="r"><button class="btn sm" id="clCsv">${ico('down')} Excel</button></span></h3><div id="clT"></div></div>`;
+  table($('#clF'),{rows:freq,cols:[{k:'k',l:'Nº de compras no período'},{k:'n',l:'Clientes',num:1,f:n0},{k:'v',l:'Vendas',num:1,f:n2}]});
+  hbars($('#clC'),Object.entries(city).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>({k,v})));
+  const cols=[{k:'name',l:'Cliente'},{k:'nif',l:'NIF'},{k:'cls',l:'ABC',html:c=>`<span class="badge ${c.cls==='A'?'b-acc':c.cls==='B'?'b-info':'b-warn'}">${c.cls}</span>`},{k:'docs',l:'Docs',num:1,f:n0},{k:'net',l:'Vendas',num:1,f:n2},{k:'pc',l:'% vendas',num:1,v:c=>c.net/totN*100,f:v=>v.toFixed(2).replace('.',',')+'%'},{k:'ticket',l:'Ticket',num:1,f:n2},{k:'last',l:'Última compra'},{k:'dias',l:'Dias sem comprar',num:1,f:v=>v==null?'':n0(v)}];
+  table($('#clT'),{rows:sorted,sort:'net',dir:-1,size:50,cols,onRow:c=>{ S.docF={q:c.nif,sec:'SI',type:'',series:'',status:'',d1:'',d2:'',rate:'',vmin:'',vmax:'',alert:false,fixed:false}; go('documentos'); }});
+  $('#clCsv').onclick=()=>csvDownload(`AuditNux_carteira_clientes_${fileTag()}.csv`,cols.map(c=>({label:c.l,v:x=>c.v?c.v(x):x[c.k]})),sorted);
+}
+function anArtigos(el){ const A=S.A; const ps=A.prods.slice().sort((a,b)=>b.base-a.base); const tot=ps.reduce((s,p)=>s+p.base,0)||1; let acc=0;
+  for(const p of ps){ acc+=p.base; p.cum=acc/tot*100; p.cls=acc<=tot*0.8?'A':acc<=tot*0.95?'B':'C'; }
+  const cnt=k=>ps.filter(p=>p.cls===k).length, val=k=>ps.filter(p=>p.cls===k).reduce((s,p)=>s+p.base,0);
+  el.innerHTML=`<div class="grid g4">${kpi('Artigos vendidos',n0(ps.length),'no período')}${['A','B','C'].map(k=>kpi('Classe '+k,n0(cnt(k))+' artigos',(val(k)/tot*100).toFixed(1).replace('.',',')+'% das vendas · '+(cnt(k)/(ps.length||1)*100).toFixed(1).replace('.',',')+'% dos artigos')).join('')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Curva ABC (Pareto) <span class="r hint">vendas acumuladas pelos artigos ordenados do maior para o menor</span></h3><div id="arP"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('box')} Artigos por classe <span class="r"><button class="btn sm" id="arCsv">${ico('down')} Excel</button></span></h3><div id="arT"></div></div>`;
+  const step=Math.max(1,Math.ceil(ps.length/60)); const pts=[]; for(let i=0;i<ps.length;i+=step) pts.push({k:i+1,label:String(i+1),v:r2(ps[i].cum),tip:`${n0(i+1)} artigos (${((i+1)/ps.length*100).toFixed(1).replace('.',',')}%)<br><b>${ps[i].cum.toFixed(1).replace('.',',')}% das vendas</b>`});
+  vbars($('#arP'),pts,{h:200,axf:v=>Math.round(v)+'%'});
+  const cols=[{k:'cls',l:'Classe',html:p=>`<span class="badge ${p.cls==='A'?'b-acc':p.cls==='B'?'b-info':'b-warn'}">${p.cls}</span>`},{k:'code',l:'Código'},{k:'desc',l:'Artigo'},{k:'q',l:'Quantidade',num:1,f:n2},{k:'base',l:'Vendas',num:1,f:n2},{k:'pc',l:'% vendas',num:1,v:p=>p.base/tot*100,f:v=>v.toFixed(2).replace('.',',')+'%'},{k:'cum',l:'% acumulada',num:1,f:v=>v.toFixed(1).replace('.',',')+'%'},{k:'docs',l:'Docs',num:1,f:n0}];
+  table($('#arT'),{rows:ps,size:50,cols,onRow:p=>openProduct(p)});
+  $('#arCsv').onclick=()=>csvDownload(`AuditNux_ABC_artigos_${fileTag()}.csv`,cols.map(c=>({label:c.l,v:x=>c.v?c.v(x):x[c.k]})),ps);
+}
+function anPrecos(el){ const A=S.A; const f=S.prF||(S.prF={var:true,q:''}); const P=A.prices;
+  const disc=P.reduce((s,x)=>s+x.disc,0), zeroN=P.reduce((s,x)=>s+x.zero,0);
+  el.innerHTML=`<div class="grid g4">${kpi('Artigos com mais de um preço',n0(P.filter(x=>x.np>1&&!x.open).length),'excluindo preço aberto')}${kpi('Variação acima de 50%',n0(P.filter(x=>!x.open&&x.np>1&&x.amp>50).length),'promoções ou erros de preço')}${kpi('Linhas a preço zero',n0(zeroN),'ofertas / brindes')}${kpi('Descontos de linha',eur(disc),'total do período')}</div>
+   <div class="card" style="margin-top:16px"><div class="toolbar"><input class="inp grow" id="prQ" placeholder="Pesquisar artigo…" value="${esc(f.q)}"><label class="chk"><input type="checkbox" id="prV" ${f.var?'checked':''}> Só artigos com variação de preço</label><span class="sp"></span><button class="btn" id="prCsv">${ico('down')} Excel</button></div><div id="prT"></div></div>`;
+  const q=norm(f.q).trim(); const rows=P.filter(x=>(!f.var||x.np>1||x.zero)&&(!q||norm(x.code+' '+x.desc).includes(q)));
+  const cols=[{k:'code',l:'Código'},{k:'desc',l:'Artigo'},{k:'n',l:'Linhas',num:1,f:n0},{k:'q',l:'Qtd',num:1,f:n2},{k:'pm',l:'Preço médio',num:1,f:v=>NF2.format(v)},{k:'min',l:'Mínimo',num:1,f:v=>NF2.format(v)},{k:'max',l:'Máximo',num:1,f:v=>NF2.format(v)},{k:'np',l:'Nº preços',num:1,f:n0},
+    {k:'amp',l:'Amplitude',num:1,v:x=>x.open?-1:x.amp,html:x=>x.open?'<span class="badge b-info">preço aberto</span>':x.np>1?`<b class="${x.amp>50?'st-warn':''}">${x.amp.toFixed(0)}%</b>`:'—'},{k:'zero',l:'A zero',num:1,html:x=>x.zero?`<span class="badge b-info">${x.zero}</span>`:''},{k:'disc',l:'Descontos',num:1,f:n2}];
+  S.prT=table($('#prT'),Object.assign(S.prT?{_st:S.prT._st}:{sort:'amp',dir:-1},{rows,size:50,cols,onRow:x=>{ const p=A.prods.find(p=>p.code===x.code); if(p) openProduct(p); }}));
+  let tm; $('#prQ').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ f.q=e.target.value; RENDER.analises(); const i=$('#prQ'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); },250); };
+  $('#prV').onchange=e=>{ f.var=e.target.checked; RENDER.analises(); };
+  $('#prCsv').onclick=()=>csvDownload(`AuditNux_precos_${fileTag()}.csv`,cols.map(c=>({label:c.l,k:c.k})),rows);
+}
+function anPagamentos(el){ const R=S.R, A=S.A; const P=A.pay; const tot=P.filter(x=>x.src!=='Recibos').reduce((s,x)=>s+x.v,0)||1;
+  const cash=P.filter(x=>x.src!=='Recibos'&&x.m==='NU').reduce((s,x)=>s+x.v,0);
+  const inv=new Map(R.docs.filter(d=>d.sec==='SI').map(d=>[d.no,d])); const PY=R.docs.filter(d=>d.sec==='PY'&&d.status!=='A');
+  let wd=0, wv=0; const paid=new Set(); const rec=[];
+  for(const d of PY){ for(let k=d.l0;k<d.l0+d.ln;k++){ const L=R.lines[k]; if(!L.ref) continue; paid.add(L.ref); const f=inv.get(L.ref); if(f&&f.date&&d.date){ const days=Math.max(0,(new Date(d.date)-new Date(f.date))/864e5); wd+=days*Math.abs(L.amt); wv+=Math.abs(L.amt); rec.push({rec:d.no,fat:f.no,cli:custName(f),df:f.date,dr:d.date,dias:Math.round(days),v:Math.abs(L.amt)}); } } }
+  const credit=R.docs.filter(d=>d.sec==='SI'&&act(d)&&d.type==='FT'&&!paid.has(d.no));
+  el.innerHTML=`<div class="grid g4">${kpi('Pago em numerário',(cash/tot*100).toFixed(1).replace('.',',')+'%',eur(cash)+' (faturas pronto pagamento)')}${kpi('Recibos emitidos',n0(PY.length),eur(PY.reduce((s,d)=>s+d.gross,0)))}${kpi('Prazo médio de recebimento',wv?(wd/wv).toFixed(0)+' dias':'—','faturas recebidas no próprio período')}${kpi('Faturas (FT) sem recibo no ficheiro',n0(credit.length),eur(credit.reduce((s,d)=>s+d.gross,0)))}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('scale')} Meios de pagamento</h3><div id="pgM"></div></div><div class="card"><h3>${ico('chart')} Distribuição</h3><div id="pgH"></div></div></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('file')} Recebimentos de faturas <span class="r hint">fatura e recibo no mesmo ficheiro</span></h3><div id="pgR"></div></div><div class="card"><h3>${ico('alert')} Faturas a crédito sem recibo neste ficheiro</h3><div id="pgO"></div><p class="hint" style="margin-top:8px">Podem ter sido recebidas noutro período ou fora do programa de faturação — confirmar com a conta corrente do cliente.</p></div></div>`;
+  table($('#pgM'),{rows:P,cols:[{k:'src',l:'Origem'},{k:'m',l:'Meio',v:x=>MECH[x.m]||x.m},{k:'n',l:'Nº',num:1,f:n0},{k:'v',l:'Valor',num:1,f:n2}],empty:'O ficheiro não indica meios de pagamento'});
+  hbars($('#pgH'),P.map(x=>({k:(MECH[x.m]||x.m)+' · '+(x.src==='Recibos'?'recibos':'faturas'),v:x.v})));
+  table($('#pgR'),{rows:rec,sort:'dias',dir:-1,size:20,empty:'Sem recibos de faturas deste período',cols:[{k:'rec',l:'Recibo'},{k:'fat',l:'Fatura'},{k:'cli',l:'Cliente'},{k:'dias',l:'Dias',num:1,f:n0},{k:'v',l:'Valor',num:1,f:n2}]});
+  table($('#pgO'),{rows:credit,sort:'gross',dir:-1,size:20,empty:'Todas as faturas têm recibo',cols:[{k:'no',l:'Fatura'},{k:'date',l:'Data'},{k:'c',l:'Cliente',v:custName},{k:'gross',l:'Total',num:1,f:n2}],onRow:d=>openDoc(d.i)});
+}
+function anDocumentos(el){ const R=S.R; const g={}; for(const d of R.docs){ const k=d.sec+'|'+d.type; const x=g[k]||(g[k]={sec:({SI:'Faturação',WD:'Conferência',MG:'Transporte',PY:'Recibos'})[d.sec],type:d.type,n:0,N:0,F:0,A:0,v:0}); x.n++; x[d.status]=(x[d.status]||0)+1; if(d.status!=='A') x.v+=d.gross; }
+  const rows=Object.values(g).map(x=>({...x,v:r2(x.v)})); const WD=R.docs.filter(d=>d.sec==='WD'); const conv=WD.length?WD.filter(d=>d.status==='F').length/WD.length*100:null;
+  el.innerHTML=`<div class="grid g4">${kpi('Documentos no ficheiro',n0(R.docs.length),'todas as secções')}${kpi('Anulados',n0(R.docs.filter(d=>d.status==='A').length),'todas as secções')}${kpi('Conferência faturados',conv==null?'—':conv.toFixed(1).replace('.',',')+'%',n0(WD.length)+' documentos de conferência')}${kpi('Conferência em aberto',n0(WD.filter(d=>d.status==='N').length),eur(WD.filter(d=>d.status==='N').reduce((s,d)=>s+d.gross,0)))}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('file')} Documentos por tipo e estado</h3><div id="dcT"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('alert')} Documentos de conferência em aberto</h3><div id="dcW"></div></div>`;
+  table($('#dcT'),{rows,cols:[{k:'sec',l:'Secção'},{k:'type',l:'Tipo',v:x=>x.type+' — '+(DOC_TYPES[x.type]||'')},{k:'n',l:'Total',num:1,f:n0},{k:'N',l:'Normais',num:1,f:n0},{k:'F',l:'Faturados',num:1,f:n0},{k:'A',l:'Anulados',num:1,f:n0},{k:'v',l:'Valor (não anulados)',num:1,f:n2}]});
+  table($('#dcW'),{rows:WD.filter(d=>d.status==='N'),size:30,empty:'Nenhum documento em aberto',cols:[{k:'no',l:'Documento'},{k:'type',l:'Tipo',v:d=>d.type+' — '+(DOC_TYPES[d.type]||'')},{k:'date',l:'Data'},{k:'c',l:'Cliente',v:custName},{k:'gross',l:'Total',num:1,f:n2}],onRow:d=>openDoc(d.i)});
+}
+
+/* =====================================================================
+   PERÍODO GLOBAL — Empresa + Período comandam análises, mapas e exportações
+   ===================================================================== */
+
+/* ---------- Resumo mensal v2 (substitui a versão anterior) ---------- */
+function buildCubes(){ const R=S.R, H=R.header; const out={};
+  const prodKey=L=>L.p||('#'+lineDesc(L)); const bandsLim=[5,10,20,50,100,250,500,1000,5000,Infinity];
+  const mk=ym=>out[ym]||(out[ym]={v:2,id:H.TaxRegistrationNumber+'_'+ym,nif:H.TaxRegistrationNumber,empresa:H.CompanyName,ym,net:0,tax:0,gross:0,docs:0,nc:0,ncv:0,anul:0,anulv:0,cf:0,
+    byDay:{},byHour:new Array(24).fill(0),byWd:new Array(7).fill(0),heat:Array.from({length:7},()=>new Array(24).fill(0)),byRate:{},byType:{},ops:{},_p:{},_c:{},bigDocs:0,round:0,benf:new Array(10).fill(0),
+    rates:{},exempt:{},bands:bandsLim.map(()=>[0,0]),nl:0,nu:0,disc:0,series:{},pay:{},dtypes:{},wdOpen:[],pmr:{wd:0,wv:0},ftNoRec:{n:0,v:0}});
+  const inv=new Map(); for(const d of R.docs) if(d.sec==='SI') inv.set(d.no,d);
+  const paid=new Set(); for(const d of R.docs){ if(d.sec!=='PY'||d.status==='A') continue; for(let k=d.l0;k<d.l0+d.ln;k++){ const L=R.lines[k]; if(!L.ref) continue; paid.add(L.ref); const f=inv.get(L.ref); if(f&&f.date&&d.date&&d.date.slice(0,7)>=(H.StartDate||'').slice(0,7)&&d.date.slice(0,7)<=(H.EndDate||'9999').slice(0,7)){ const c=mk(d.date.slice(0,7)); const days=Math.max(0,(new Date(d.date)-new Date(f.date))/864e5); c.pmr.wd+=days*Math.abs(L.amt); c.pmr.wv+=Math.abs(L.amt); } } }
+  const ymA=(H.StartDate||'0000-00').slice(0,7), ymB=(H.EndDate||'9999-99').slice(0,7);
+  for(const d of R.docs){ if(!d.date) continue; const ym=d.date.slice(0,7); if(ym<ymA||ym>ymB) continue; const c=mk(ym);
+    const dk=d.sec+'|'+d.type; const dt=c.dtypes[dk]||(c.dtypes[dk]={sec:d.sec,type:d.type,n:0,N:0,F:0,A:0,v:0}); dt.n++; dt[d.status]=(dt[d.status]||0)+1; if(d.status!=='A') dt.v+=d.gross;
+    if(d.sec==='WD'&&d.status==='N'&&c.wdOpen.length<300){ const cu=R.customers[d.cust]; c.wdOpen.push({no:d.no,type:d.type,date:d.date,cust:cu?cu.name:d.cust,gross:d.gross}); }
+    if(d.pay&&d.pay.length&&d.status!=='A'&&!(d.sec==='SI'&&d.status==='F')&&(d.sec==='SI'||d.sec==='PY')){ const sum=d.pay.reduce((s,p)=>s+p[1],0), ok=Math.abs(sum-d.gross)<=0.011;
+      for(const [m,a] of d.pay){ const k=(d.sec==='PY'?'PY':'SI')+'|'+m; const x=c.pay[k]||(c.pay[k]={src:d.sec==='PY'?'Recibos':'Faturas (pronto pagamento)',m,n:0,v:0}); x.n++; x.v+= ok?a:(sum>0?d.gross*(a/sum):d.gross/d.pay.length); } }
+    if(d.sec!=='SI') continue;
+    const sk=d.type+' '+(d.series||''); const se=c.series[sk]||(c.series[sk]={k:sk,docs:0,v:0,an:0,anv:0});
+    const ou=d.user||'—'; const o=c.ops[ou]||(c.ops[ou]={docs:0,net:0,anul:0,anulv:0,nc:0,ncv:0});
+    if(d.status==='A'){ c.anul++; c.anulv+=d.gross; se.an++; se.anv+=d.gross; o.anul++; o.anulv+=d.gross; continue; }
+    if(d.status==='F') continue;
+    const sg=d.type==='NC'?-1:1; const net=sg*d.net; c.net+=net; c.tax+=sg*d.tax; c.gross+=sg*d.gross; se.docs++; se.v+=net;
+    if(d.type==='FT'&&!paid.has(d.no)){ c.ftNoRec.n++; c.ftNoRec.v+=d.gross; }
+    if(d.type==='NC'){ c.nc++; c.ncv+=d.net; } else { c.docs++; c.nl+=d.ln; const bi=bandsLim.findIndex(l=>d.gross<l); c.bands[bi][0]++; c.bands[bi][1]+=d.gross;
+      if(d.gross>=10){ const fd=+String(Math.floor(d.gross))[0]; if(fd) c.benf[fd]++; if(d.gross>=20&&Math.abs(d.gross-Math.round(d.gross/5)*5)<0.005) c.round++; c.bigDocs++; } }
+    const cu=R.customers[d.cust]; if(cu&&cu.nif==='999999990') c.cf+=net;
+    const dd=d.date.slice(8,10); c.byDay[dd]=(c.byDay[dd]||0)+net; const wd=new Date(d.date+'T12:00:00').getDay(); c.byWd[wd]+=net;
+    if(d.sys){ const h=+d.sys.slice(11,13); if(!isNaN(h)){ c.byHour[h]+=net; c.heat[wd][h]+=net; } }
+    c.byType[d.type]=(c.byType[d.type]||0)+net; o.docs++; o.net+=net; if(d.type==='NC'){ o.nc++; o.ncv+=d.net; }
+    const ck=d.cust||'?'; const cc=c._c[ck]||(c._c[ck]={id:ck,nif:cu?cu.nif:'',name:cu?cu.name:ck,city:cu?cu.city||'':'',net:0,gross:0,docs:0,last:''}); cc.net+=net; cc.gross+=sg*d.gross; cc.docs++; if(d.date>cc.last) cc.last=d.date;
+    for(let k=d.l0;k<d.l0+d.ln;k++){ const L=R.lines[k]; const rk=L.tt==='IVA'?`${L.reg} ${L.pct}%`:(L.tt||'—'); c.byRate[rk]=(c.byRate[rk]||0)+L.amt;
+      const fk=`${L.tt||'—'}|${L.reg||''}|${L.code||''}|${L.pct==null?'':L.pct}`; const fr=c.rates[fk]||(c.rates[fk]={tt:L.tt,reg:L.reg,code:L.code,pct:L.pct,base:0,n:0}); fr.base+=L.amt; fr.n++;
+      if((L.tt==='IVA'&&L.pct===0)||L.tt==='NS'){ const ek=L.exc||'(sem código)'; const e=c.exempt[ek]||(c.exempt[ek]={code:ek,reason:L.excR||'',base:0,n:0}); e.base+=L.amt; e.n++; }
+      if(d.type!=='NC'&&L.q>0) c.nu+=L.q; c.disc+=L.disc||0;
+      const pk=prodKey(L); const p=c._p[pk]||(c._p[pk]={k:pk,code:L.p||'',desc:lineDesc(L),q:0,base:0,n:0,docs:new Set(),pmin:Infinity,pmax:-Infinity,ps:new Set(),zero:0,disc:0,r:new Set()});
+      p.q+=(L.amt<0?-1:1)*L.q; p.base+=L.amt; p.n++; p.docs.add(d.i); p.disc+=L.disc||0; if(L.tt==='IVA'&&L.pct!=null) p.r.add(L.pct);
+      if(d.type!=='NC'&&L.q>0){ if(L.up<=0) p.zero++; else { p.pmin=Math.min(p.pmin,L.up); p.pmax=Math.max(p.pmax,L.up); if(p.ps.size<60) p.ps.add(Math.round(L.up*10000)); } } } }
+  for(const ym in out){ const c=out[ym]; const ps=Object.values(c._p).sort((a,b)=>b.base-a.base); const cs=Object.values(c._c).sort((a,b)=>b.net-a.net);
+    c.nProds=ps.length; c.nCusts=cs.length; c.prodTotal=r2(ps.reduce((s,p)=>s+p.base,0));
+    c.prods=ps.slice(0,4000).map(p=>({k:p.k,desc:p.desc,q:r2(p.q),base:r2(p.base),n:p.n,docs:p.docs.size,pmin:isFinite(p.pmin)?p.pmin:0,pmax:isFinite(p.pmax)?p.pmax:0,np:p.ps.size,zero:p.zero,disc:r2(p.disc),r:[...p.r]}));
+    c.custs=cs.slice(0,2500).map(x=>({id:x.id,nif:x.nif,name:x.name,city:x.city,net:r2(x.net),gross:r2(x.gross),docs:x.docs,last:x.last})); c.custIds=cs.slice(0,3000).map(x=>x.id);
+    delete c._p; delete c._c;
+    ['net','tax','gross','ncv','anulv','cf','disc','nu'].forEach(k=>c[k]=r2(c[k])); for(const k in c.byDay) c.byDay[k]=r2(c.byDay[k]); for(const k in c.byRate) c.byRate[k]=r2(c.byRate[k]); for(const k in c.byType) c.byType[k]=r2(c.byType[k]);
+    for(const x of Object.values(c.rates)) x.base=r2(x.base); for(const x of Object.values(c.exempt)) x.base=r2(x.base); for(const x of Object.values(c.series)){ x.v=r2(x.v); x.anv=r2(x.anv); } for(const x of Object.values(c.pay)) x.v=r2(x.v); for(const x of Object.values(c.dtypes)) x.v=r2(x.v);
+    c.bands=c.bands.map(([n,v])=>n+':'+r2(v)); c.ftNoRec.v=r2(c.ftNoRec.v);
+    c.byHour=c.byHour.map(r2); c.byWd=c.byWd.map(r2); c.heat=c.heat.map(r=>r.map(r2).join(',')); for(const o of Object.values(c.ops)){ o.net=r2(o.net); o.anulv=r2(o.anulv); o.ncv=r2(o.ncv); }
+    // alertas do mês (do ficheiro analisado)
+    c.score=S.A?S.A.score:null; c.estado=S.A?S.A.status:null; c.alertas=S.A?S.A.counts:null;
+    c.ficheiro=R.file.name; c.operador=S.oper; c.em=new Date().toISOString(); c.completo=monthComplete(ym,H);
+    if(!c.net&&!c.docs&&!c.anul&&!c.nc){ delete out[ym]; continue; }
+    S.cubes[c.id]=c; }
+  S.ctxDirty=true; return Object.values(out); }
+
+/* ---------- Gravação compacta (artigos e clientes em texto, para caberem no limite de 1 MB por documento) ---------- */
+const SEP='\u0001';
+function packCube(c){ const x=Object.assign({},c); x.pA=(c.prods||[]).map(p=>[p.k,String(p.desc||'').replace(/\u0001/g,' '),p.q,p.base,p.n,p.docs||0,p.pmin||0,p.pmax||0,p.np||0,p.zero||0,p.disc||0,(p.r||[]).join('|')].join(SEP));
+  x.cA=(c.custs||[]).map(u=>[u.id,u.nif||'',String(u.name||'').replace(/\u0001/g,' '),String(u.city||'').replace(/\u0001/g,' '),u.net,u.gross||0,u.docs,u.last||''].join(SEP)); delete x.prods; delete x.custs; return x; }
+function unpackCube(c){ if(c.pA){ c.prods=c.pA.map(s=>{ const a=s.split(SEP); return {k:a[0],desc:a[1],q:+a[2],base:+a[3],n:+a[4],docs:+a[5],pmin:+a[6],pmax:+a[7],np:+a[8],zero:+a[9],disc:+a[10],r:a[11]?a[11].split('|').map(Number):[]}; }); delete c.pA; }
+  if(c.cA){ c.custs=c.cA.map(s=>{ const a=s.split(SEP); return {id:a[0],nif:a[1],name:a[2],city:a[3],net:+a[4],gross:+a[5],docs:+a[6],last:a[7]}; }); delete c.cA; } return c; }
+async function saveCubes(list){ list=list||Object.values(S.cubes).filter(c=>c.nif===(S.R&&S.R.header.TaxRegistrationNumber));
+  if(S.cloud.on){ try{ for(const c of list) await wsCol('cubos').doc(c.id).set(packCube(c)); }catch(e){ toast('Nuvem (resumos mensais): '+esc(e.message),'err'); } }
+  else { const k='auditnux_cubos_'+(S.ws||'local'); const all=lsGet(k,{}); for(const c of list) all[c.id]=packCube(c); try{ localStorage.setItem(k,JSON.stringify(all)); }catch(e){ /* quota */ } } }
+async function loadCubes(nif){ let arr=[];
+  if(S.cloud.on){ try{ const snap=await wsCol('cubos').where('nif','==',nif).get(); arr=snap.docs.map(d=>d.data()); }catch(e){ toast('Nuvem (resumos mensais): '+esc(e.message),'err'); } }
+  else { arr=Object.values(lsGet('auditnux_cubos_'+(S.ws||'local'),{})).filter(c=>c.nif===nif); }
+  for(const c of arr) if(!S.cubes[c.id]) S.cubes[c.id]=unpackCube(c); return Object.values(S.cubes).filter(c=>c.nif===nif).sort((a,b)=>a.ym.localeCompare(b.ym)); }
+
+/* ---------- Junção de meses (substitui a versão anterior; mantém compatibilidade) ---------- */
+function mergeCubes(list){ const m={n:list.length,yms:list.map(c=>c.ym).sort(),net:0,tax:0,gross:0,docs:0,nc:0,ncv:0,anul:0,anulv:0,cf:0,byHour:new Array(24).fill(0),byWd:new Array(7).fill(0),heat:Array.from({length:7},()=>new Array(24).fill(0)),byRate:{},byType:{},ops:{},prods:{},custs:{},custIds:new Set(),benf:new Array(10).fill(0),round:0,bigDocs:0,nProdsMax:0,
+    byDate:{},byMonth:{},rates:{},exempt:{},bands:new Array(10).fill(0).map(()=>[0,0]),nl:0,nu:0,disc:0,series:{},pay:{},dtypes:{},wdOpen:[],pmr:{wd:0,wv:0},ftNoRec:{n:0,v:0},v1:0};
+  for(const c of list){ ['net','tax','gross','docs','nc','ncv','anul','anulv','cf','round','bigDocs','nl','nu','disc'].forEach(k=>m[k]+=c[k]||0); if(!c.v) m.v1++;
+    c.byHour.forEach((v,i)=>m.byHour[i]+=v); c.byWd.forEach((v,i)=>m.byWd[i]+=v); heatOf(c).forEach((r,i)=>r.forEach((v,j)=>m.heat[i][j]+=v)); (c.benf||[]).forEach((v,i)=>m.benf[i]+=v);
+    for(const k in c.byDay) m.byDate[c.ym+'-'+k]=(m.byDate[c.ym+'-'+k]||0)+c.byDay[k];
+    m.byMonth[c.ym]={net:c.net,tax:c.tax,gross:c.gross,docs:c.docs,nc:c.ncv,anul:c.anul,nCusts:c.nCusts,completo:c.completo};
+    for(const k in c.byRate) m.byRate[k]=(m.byRate[k]||0)+c.byRate[k]; for(const k in c.byType) m.byType[k]=(m.byType[k]||0)+c.byType[k];
+    for(const k in c.ops){ const o=m.ops[k]||(m.ops[k]={docs:0,net:0,anul:0,anulv:0,nc:0,ncv:0}); for(const f in o) o[f]+=c.ops[k][f]||0; }
+    for(const k in (c.rates||{})){ const r=c.rates[k], x=m.rates[k]||(m.rates[k]={tt:r.tt,reg:r.reg,code:r.code,pct:r.pct,base:0,n:0}); x.base+=r.base; x.n+=r.n; }
+    for(const k in (c.exempt||{})){ const r=c.exempt[k], x=m.exempt[k]||(m.exempt[k]={code:r.code,reason:r.reason,base:0,n:0}); x.base+=r.base; x.n+=r.n; }
+    (c.bands||[]).forEach((b,i)=>{ const [n,v]=String(b).split(':').map(Number); m.bands[i][0]+=n||0; m.bands[i][1]+=v||0; });
+    for(const k in (c.series||{})){ const r=c.series[k], x=m.series[k]||(m.series[k]={k,docs:0,v:0,an:0,anv:0}); x.docs+=r.docs; x.v+=r.v; x.an+=r.an; x.anv+=r.anv; }
+    for(const k in (c.pay||{})){ const r=c.pay[k], x=m.pay[k]||(m.pay[k]={src:r.src,m:r.m,n:0,v:0}); x.n+=r.n; x.v+=r.v; }
+    for(const k in (c.dtypes||{})){ const r=c.dtypes[k], x=m.dtypes[k]||(m.dtypes[k]={sec:r.sec,type:r.type,n:0,N:0,F:0,A:0,v:0}); for(const f of ['n','N','F','A','v']) x[f]+=r[f]||0; }
+    m.wdOpen.push(...(c.wdOpen||[])); if(c.pmr){ m.pmr.wd+=c.pmr.wd; m.pmr.wv+=c.pmr.wv; } if(c.ftNoRec){ m.ftNoRec.n+=c.ftNoRec.n; m.ftNoRec.v+=c.ftNoRec.v; }
+    for(const p of c.prods){ const x=m.prods[p.k]||(m.prods[p.k]={k:p.k,code:p.code!=null?p.code:(p.k[0]==='#'?'':p.k),desc:p.desc,q:0,base:0,n:0,docs:0,pmin:Infinity,pmax:-Infinity,np:0,zero:0,disc:0,r:new Set(),months:0});
+      x.q+=p.q; x.base+=p.base; x.n+=p.n; x.docs+=p.docs||0; x.zero+=p.zero||0; x.disc+=p.disc||0; x.months++; if(p.pmin>0) x.pmin=Math.min(x.pmin,p.pmin); if(p.pmax>0) x.pmax=Math.max(x.pmax,p.pmax); x.np=Math.max(x.np,p.np||0); (p.r||[]).forEach(v=>x.r.add(v)); }
+    for(const p of c.custs){ const x=m.custs[p.id]||(m.custs[p.id]={id:p.id,nif:p.nif,name:p.name,city:p.city||'',net:0,gross:0,docs:0,last:'',months:0}); x.net+=p.net; x.gross+=p.gross||0; x.docs+=p.docs; x.months++; if((p.last||'')>x.last) x.last=p.last||''; }
+    (c.custIds||[]).forEach(i=>m.custIds.add(i)); m.nProdsMax=Math.max(m.nProdsMax,c.nProds||0); }
+  for(const p of Object.values(m.prods)){ if(!isFinite(p.pmin)) p.pmin=0; if(!isFinite(p.pmax)) p.pmax=0; p.amp=p.pmin>0?(p.pmax-p.pmin)/p.pmin*100:0; p.open=p.np>15; p.rates=[...p.r]; p.multi=p.rates.length>1; }
+  m.ticket=m.docs?m.gross/m.docs:0; m.nCusts=m.custIds.size; return m; }
+
+/* ---------- Contexto (empresa + período) ---------- */
+const PERIOD_VIEWS=['iva','analises','artigos','clientes','relatorios'];
+async function ctxNifs(){ const n=new Map(); if(S.R) n.set(S.R.header.TaxRegistrationNumber,S.R.header.CompanyName);
+  for(const c of Object.values(S.cubes)) if(!n.has(c.nif)) n.set(c.nif,c.empresa);
+  if(S.cloud.on){ try{ if(!S.history.length||S.historyDirty) await cloudLoadHistory(); }catch(e){} for(const h of S.history) if(!n.has(h.nif)) n.set(h.nif,h.empresa); }
+  else { for(const c of Object.values(lsGet('auditnux_cubos_'+(S.ws||'local'),{}))) if(!n.has(c.nif)) n.set(c.nif,c.empresa); }
+  return n; }
+async function ensureCtx(){ const nifs=await ctxNifs(); if(!nifs.size) return null;
+  if(!S.ctx||!nifs.has(S.ctx.nif)){ const nif=S.R?S.R.header.TaxRegistrationNumber:[...nifs.keys()][0]; S.ctx={nif,from:'',to:''}; }
+  const cubes=await loadCubes(S.ctx.nif); const yms=cubes.map(c=>c.ym);
+  if(!yms.length) return {nifs,cubes,yms,sel:[],M:null};
+  if(!S.ctx.to||!yms.includes(S.ctx.to)&&S.ctx.to>yms[yms.length-1]) S.ctx.to=yms[yms.length-1];
+  if(!S.ctx.from) S.ctx.from= S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif? (S.R.header.StartDate||'').slice(0,7)||S.ctx.to : S.ctx.to;
+  if(S.ctx.from>S.ctx.to) S.ctx.from=S.ctx.to;
+  const sel=cubes.filter(c=>c.ym>=S.ctx.from&&c.ym<=S.ctx.to); S.ctxM=mergeCubes(sel);
+  return {nifs,cubes,yms,sel,M:S.ctxM}; }
+function ctxLabel(){ const c=S.ctx; if(!c) return ''; if(c.from===c.to) return ymLong(c.from); if(c.from.slice(0,4)===c.to.slice(0,4)&&c.from.slice(5)==='01'&&c.to.slice(5)==='12') return 'ano de '+c.from.slice(0,4); return ymLabel(c.from)+' a '+ymLabel(c.to); }
+function monthsBetween(a,b){ const out=[]; let x=a; while(x<=b&&out.length<400){ out.push(x); x=ymAdd(x,1); } return out; }
+function periodBar(host,X,rerender){ const c=S.ctx; const yms=X.yms; const all=yms.length?monthsBetween(yms[0],yms[yms.length-1]):[]; const missing=monthsBetween(c.from,c.to).filter(y=>!yms.includes(y));
+  const empresa=X.nifs.get(c.nif)||c.nif;
+  host.insertAdjacentHTML('afterbegin',`<div class="card pbar"><div class="toolbar" style="margin:0">
+    <label class="fld">Empresa<select class="inp" id="pbN">${[...X.nifs].map(([n,e])=>`<option value="${n}" ${n===c.nif?'selected':''}>${esc(e)} · ${n}</option>`).join('')}</select></label>
+    <label class="fld">De<select class="inp" id="pbF">${all.map(y=>`<option value="${y}" ${y===c.from?'selected':''}>${ymLabel(y)}${yms.includes(y)?'':' ·'}</option>`).join('')}</select></label>
+    <label class="fld">Até<select class="inp" id="pbT">${all.map(y=>`<option value="${y}" ${y===c.to?'selected':''}>${ymLabel(y)}${yms.includes(y)?'':' ·'}</option>`).join('')}</select></label>
+    <div class="row" style="margin-top:14px;gap:4px">${[['m','Mês'],['q','Trimestre'],['y','Ano'],['ytd','Acum. ano'],['12','12 meses'],['all','Tudo']].map(([k,l])=>`<button class="btn sm" data-pp="${k}">${l}</button>`).join('')}</div>
+    <span class="sp"></span><div style="text-align:right"><div class="pb-lab">${esc(empresa)}</div><div class="hint">${esc(ctxLabel())} · ${n0(X.sel.length)} ${X.sel.length===1?'mês':'meses'} com dados${missing.length?` · <span class="st-warn">${missing.length} sem SAF-T: ${missing.slice(0,6).map(ymLabel).join(', ')}${missing.length>6?'…':''}</span>`:''}</div></div></div></div>`);
+  const upd=()=>{ S.ctxDirty=true; rerender(); };
+  $('#pbN').onchange=e=>{ S.ctx={nif:e.target.value,from:'',to:''}; S.evo=null; upd(); };
+  $('#pbF').onchange=e=>{ c.from=e.target.value; if(c.from>c.to) c.to=c.from; upd(); };
+  $('#pbT').onchange=e=>{ c.to=e.target.value; if(c.from>c.to) c.from=c.to; upd(); };
+  $$('[data-pp]',host).forEach(b=>b.onclick=()=>{ const t=c.to, y=t.slice(0,4), m=+t.slice(5); const k=b.dataset.pp;
+    if(k==='m') c.from=t; else if(k==='q'){ const q0=Math.floor((m-1)/3)*3+1; c.from=y+'-'+String(q0).padStart(2,'0'); c.to=y+'-'+String(q0+2).padStart(2,'0'); }
+    else if(k==='y'){ c.from=y+'-01'; c.to=y+'-12'; } else if(k==='ytd') c.from=y+'-01'; else if(k==='12') c.from=ymAdd(t,-11); else if(k==='all'){ c.from=yms[0]; c.to=yms[yms.length-1]; }
+    upd(); }); }
+async function periodView(id,draw){ const el=$('#v-'+id); el.innerHTML=`<div class="card"><div class="empty">${ico('layers')} A preparar o período…</div></div>`;
+  const X=await ensureCtx();
+  if(!X){ el.innerHTML=`<div class="card hero-empty" style="min-height:40vh"><div>${ico('upload')}<h2>Sem dados ainda</h2><p>Importe um ou vários SAF-T. Cada ficheiro fica guardado mês a mês e pode depois analisar qualquer período: um mês, vários meses ou anos.</p><button class="btn pri" onclick="go('importar')">${ico('upload')} Importar SAF-T</button></div></div>`; return; }
+  el.innerHTML=''; if(!X.sel.length){ el.innerHTML='<div class="card empty" style="margin-top:16px">Não há SAF-T carregados neste período para esta empresa.</div>'; periodBar(el,X,()=>periodView(id,draw)); return; }
+  const body=document.createElement('div'); el.appendChild(body); draw(body,X.M,X); periodBar(el,X,()=>periodView(id,draw));
+  $('#vSub').textContent=VIEWS[id][1]+' · '+(X.nifs.get(S.ctx.nif)||'')+' · '+ctxLabel(); }
+const multiMonth=()=>S.ctx&&S.ctx.from!==S.ctx.to;
+function salesSeries(M){ if(!multiMonth()) return Object.entries(M.byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({k,label:k.slice(8),v:r2(v),tip:`${new Date(k+'T12:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'})}<br><b>${eur(v)}</b>`}));
+  return monthsBetween(S.ctx.from,S.ctx.to).map(y=>({k:y,label:MESES[+y.slice(5)-1]+(y.slice(5)==='01'||y===S.ctx.from?' '+y.slice(2,4):''),v:r2((M.byMonth[y]||{}).net||0),tip:`${ymLong(y)}<br><b>${M.byMonth[y]?eur(M.byMonth[y].net):'sem SAF-T'}</b>`})); }
+function dpFromRates(rates){ const dp={}; for(const r of Object.values(rates)){ if(r.tt!=='IVA'||!r.pct) continue; const t=rateOf(r.reg); if(!t) continue; const z=dp[r.reg]||(dp[r.reg]={reg:r.reg,c1:0,c2:0,c5:0,c6:0,c3:0,c4:0,outros:[]}); const iva=r2(r.base*r.pct/100);
+    if(r.pct===t.RED){ z.c1+=r.base; z.c2+=iva; } else if(r.pct===t.INT){ z.c5+=r.base; z.c6+=iva; } else if(r.pct===t.NOR){ z.c3+=r.base; z.c4+=iva; } else z.outros.push({...r,iva}); }
+  for(const z of Object.values(dp)) ['c1','c2','c3','c4','c5','c6'].forEach(k=>z[k]=r2(z[k])); return dp; }
+function ratesRows(M){ return Object.values(M.rates).map(r=>({...r,base:r2(r.base),iva:r.pct?r2(r.base*r.pct/100):0})).sort((a,b)=>(a.reg||'').localeCompare(b.reg||'')||((b.pct||0)-(a.pct||0))); }
+
+/* ---------- MAPA IVA & DP por período ---------- */
+RENDER.iva=function(){ periodView('iva',async(el,M,X)=>{ const rows=ratesRows(M); const base=r2(rows.reduce((s,r)=>s+r.base,0)), iva=r2(rows.reduce((s,r)=>s+r.iva,0));
+  const single=!multiMonth(); const REGN={'PT':'Continente','PT-AC':'Açores','PT-MA':'Madeira'};
+  const sums=S.cloud.on? S.history.filter(h=>h.nif===S.ctx.nif&&monthOf(h)&&monthOf(h)>=S.ctx.from&&monthOf(h)<=S.ctx.to) : [];
+  const sumOf=ym=>{ if(S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif&&(S.R.header.StartDate||'').slice(0,7)===ym&&(S.R.header.EndDate||'').slice(0,7)===ym) return {local:true,dp:S.dp}; return sums.find(h=>monthOf(h)===ym)||null; };
+  el.innerHTML=`<div class="grid g4" style="margin-top:16px">${kpi('Base tributável',eur(base),ctxLabel())}${kpi('IVA (mapa por taxa)',eur(iva),'base × taxa')}${kpi('IVA (documentos)',eur(M.tax),'TaxPayable')}${kpi('Diferença',eur(r2(M.tax-iva)),'arredondamentos')}</div>
+   ${rows.some(r=>r.tt==='IVA'&&validRates(r.reg)&&!validRates(r.reg).includes(r.pct))?`<div class="card" style="margin-top:16px;border-color:var(--crit)"><b class="st-crit">${ico('alert')} Há bases a taxas de IVA inválidas neste período.</b> <span class="hint">Abra o SAF-T do mês em causa e corrija em Validação / Correções; os meses já corrigidos atualizam-se ao voltar a carregar.</span></div>`:''}
+   <div class="card" style="margin-top:16px"><h3>${ico('percent')} Mapa por região e taxa — ${esc(ctxLabel())} <span class="r"><button class="btn sm" id="ivCsv">${ico('down')} Excel</button><button class="btn sm" onclick="pdfIVA()">${ico('pdf')} PDF</button></span></h3><div id="ivMap"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('scale')} Declaração Periódica — Quadro 06</h3><div id="ivDP"></div></div>
+   ${multiMonth()?`<div class="card" style="margin-top:16px"><h3>${ico('chart')} Mês a mês</h3><div id="ivMon"></div></div>`:''}
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('file')} Por tipo de documento</h3><div id="ivType"></div></div><div class="card"><h3>${ico('shield')} Isentas e não sujeitas</h3><div id="ivEx"></div></div></div>`;
+  const cols=[{k:'tt',l:'Imposto'},{k:'reg',l:'Região'},{k:'code',l:'Código'},{k:'pct',l:'Taxa',num:1,f:v=>v==null?'':pctf(v)},{k:'n',l:'Linhas',num:1,f:n0},{k:'base',l:'Base tributável',num:1,f:n2},{k:'iva',l:'IVA',num:1,f:n2},
+    {k:'campo',l:'Campo DP',v:m=>{ const t=rateOf(m.reg); if(m.tt!=='IVA'||!t) return ''; return m.pct===t.RED?'1 / 2':m.pct===t.INT?'5 / 6':m.pct===t.NOR?'3 / 4':m.pct===0?'Isenta':'— inválida'; }}];
+  table($('#ivMap'),{rows,cols,rowCls:r=>{ const v=validRates(r.reg); return r.tt==='IVA'&&v&&!v.includes(r.pct)?'hl':''; },foot:(c,rs)=>c.k==='tt'?'Total':['base','iva'].includes(c.k)?n2(rs.reduce((s,r)=>s+r[c.k],0)):c.k==='n'?n0(rs.reduce((s,r)=>s+r.n,0)):''});
+  $('#ivCsv').onclick=()=>csvDownload(`AuditNux_mapa_iva_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,v:r=>c.v?c.v(r):r[c.k]})),rows);
+  const DP=dpFromRates(M.rates); const F=[['c1','1','Base — taxa reduzida'],['c2','2','IVA — taxa reduzida'],['c5','5','Base — taxa intermédia'],['c6','6','IVA — taxa intermédia'],['c3','3','Base — taxa normal'],['c4','4','IVA — taxa normal']];
+  const host=$('#ivDP');
+  if(single){ const sm=sumOf(S.ctx.from); const u=sm?(sm.dp||{}):{};
+    host.innerHTML=`<p class="hint">${sm?'Introduza os valores declarados na DP deste mês. As diferenças aparecem na hora e ficam guardadas na análise do mês.':'Para guardar os valores da DP deste mês é preciso que o SAF-T do mês tenha sido analisado (na nuvem) ou esteja aberto.'}</p>`+Object.keys(DP).map(rg=>{ const z=DP[rg], d=u[rg]||{};
+      return `<h4 style="margin:12px 0 6px">${REGN[rg]||rg}</h4><div class="tbl-wrap"><table class="t"><thead><tr><th>Campo</th><th>Descrição</th><th class="num">SAF-T</th><th class="num">Declarado</th><th class="num">Diferença</th></tr></thead><tbody>${F.map(([k,c,dsc])=>{ const has=d[k]!==undefined&&d[k]!==''; const df=has?r2(z[k]-(+d[k])):null;
+        return `<tr><td class="mono"><b>${c}</b></td><td>${dsc}</td><td class="num">${n2(z[k])}</td><td class="num"><input class="inp dp-in" data-r="${rg}" data-k="${k}" value="${has?String(d[k]).replace('.',','):''}" ${sm?'':'disabled'}></td><td class="num" id="df-${rg}-${k}">${df==null?'':`<span class="${Math.abs(df)<0.01?'diff-ok':'diff-bad'}">${n2(df)}</span>`}</td></tr>`; }).join('')}</tbody></table></div>`; }).join('')+(sm?`<div class="row" style="margin-top:10px"><button class="btn pri" id="dpSave">${ico('save')} Guardar valores da DP</button></div>`:'');
+    const work=JSON.parse(JSON.stringify(u));
+    $$('.dp-in',host).forEach(i=>i.oninput=()=>{ const rg=i.dataset.r,k=i.dataset.k; const raw=i.value.trim().replace(/\s/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); (work[rg]||(work[rg]={}))[k]=raw===''?'':+raw; const df=raw===''?null:r2(DP[rg][k]-(+raw)); $(`#df-${rg}-${k}`).innerHTML=df==null||isNaN(df)?'':`<span class="${Math.abs(df)<0.01?'diff-ok':'diff-bad'}">${n2(df)}</span>`; });
+    const sb=$('#dpSave'); if(sb) sb.onclick=async()=>{ if(sm.local){ S.dp=work; if(S.cloud.on) await cloudSaveSummary(); else toast('Valores guardados nesta sessão (modo local).','ok'); } else { sm.dp=work; sm.dpCalc=DP; sm.atualizadoEm=new Date().toISOString(); if(await cloudSaveSummaryObj(sm)) toast(ico('cloud')+' Valores da DP guardados','ok'); } };
+  } else {
+    const mrows=monthsBetween(S.ctx.from,S.ctx.to).map(ym=>{ const c=X.cubes.find(x=>x.ym===ym); const z=c?dpFromRates(c.rates||{}).PT||{}:{}; const sm=sumOf(ym); const d=sm&&sm.dp&&sm.dp.PT||{}; const has=k=>d[k]!==undefined&&d[k]!=='';
+      const ivaS=c?r2((z.c2||0)+(z.c4||0)+(z.c6||0)):null, ivaD=['c2','c4','c6'].some(has)?r2(['c2','c4','c6'].reduce((s,k)=>s+(+d[k]||0),0)):null; return {ym,c,ivaS,ivaD,dif:ivaS!=null&&ivaD!=null?r2(ivaS-ivaD):null,z}; });
+    host.innerHTML='<p class="hint">Vários meses selecionados: o confronto com a DP é feito mês a mês (Continente). Para introduzir os valores declarados, escolha um único mês.</p><div id="ivDPm"></div>';
+    table($('#ivDPm'),{rows:mrows,cols:[{k:'ym',l:'Mês',f:v=>ymLabel(v)},{k:'b',l:'Bases 1+5+3',num:1,v:r=>r.c?r2((r.z.c1||0)+(r.z.c5||0)+(r.z.c3||0)):null,f:v=>v==null?'sem SAF-T':n2(v)},{k:'ivaS',l:'IVA SAF-T (2+6+4)',num:1,f:v=>v==null?'—':n2(v)},{k:'ivaD',l:'IVA declarado',num:1,f:v=>v==null?'—':n2(v)},{k:'dif',l:'Diferença',num:1,html:r=>r.dif==null?'<span class="muted">—</span>':`<span class="${Math.abs(r.dif)<0.01?'diff-ok':'diff-bad'}">${n2(r.dif)}</span>`}],
+      foot:(c,rs)=>c.k==='ym'?'Total':['ivaS','ivaD','dif'].includes(c.k)?n2(rs.reduce((s,r)=>s+(r[c.k]||0),0)):c.k==='b'?n2(rs.reduce((s,r)=>s+(r.c?(r.z.c1||0)+(r.z.c5||0)+(r.z.c3||0):0),0)):''}); }
+  if(multiMonth()){ const keys=[...new Set(X.sel.flatMap(c=>Object.keys(c.byRate)))].sort(); table($('#ivMon'),{rows:X.sel,cols:[{k:'ym',l:'Mês',f:v=>ymLabel(v)},...keys.map(k=>({k,l:'Base '+k,num:1,v:c=>r2(c.byRate[k]||0),f:n2})),{k:'tax',l:'IVA documentos',num:1,f:n2}],foot:(c,rs)=>c.k==='ym'?'Total':n2(rs.reduce((s,x)=>s+(c.v?c.v(x):x[c.k]||0),0))}); }
+  table($('#ivType'),{rows:Object.entries(M.byType).map(([t,v])=>({t,v:r2(v)})).sort((a,b)=>b.v-a.v),cols:[{k:'t',l:'Tipo',v:x=>x.t+' — '+(DOC_TYPES[x.t]||'')},{k:'v',l:'Vendas líquidas',num:1,f:n2}]});
+  table($('#ivEx'),{rows:Object.values(M.exempt).map(e=>({...e,base:r2(e.base)})),empty:'Sem operações isentas',cols:[{k:'code',l:'Código'},{k:'reason',l:'Motivo'},{k:'n',l:'Linhas',num:1,f:n0},{k:'base',l:'Base',num:1,f:n2}]});
+}); };
+
+/* ---------- ANÁLISES DE GESTÃO por período ---------- */
+RENDER.analises=function(){ periodView('analises',(el,M,X)=>{ const t=S.anTab||'vendas';
+  el.innerHTML=`<div class="tabs" id="anTabs" style="margin-top:16px">${AN_TABS.map(([k,l])=>`<div class="tab ${k===t?'on':''}" data-t="${k}">${l}</div>`).join('')}</div><div id="anBody"></div>`;
+  $$('#anTabs .tab',el).forEach(x=>x.onclick=()=>{ S.anTab=x.dataset.t; RENDER.analises(); });
+  ({vendas:pVendas,clientes:pClientes,artigos:pArtigos,precos:pPrecos,pagamentos:pPagamentos,documentos:pDocumentos,auditoria:pAuditoria})[t]($('#anBody'),M,X); }); };
+function pVendas(el,M,X){ const WD=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']; const days=Object.keys(M.byDate).length||1;
+  const best=Object.entries(M.byDate).sort((a,b)=>b[1]-a[1])[0]||['—',0]; const peak=M.byHour.map((v,h)=>({h,v})).sort((a,b)=>b.v-a.v)[0];
+  const ser=salesSeries(M); let acc=0; const cum=ser.map(d=>({...d,v:(acc+=d.v,r2(acc)),tip:`Até ${d.k}<br><b>${eur(acc)}</b>`}));
+  const bandL=['0 – 5 €','5 – 10 €','10 – 20 €','20 – 50 €','50 – 100 €','100 – 250 €','250 – 500 €','500 – 1 000 €','1 000 – 5 000 €','> 5 000 €']; const bT=M.bands.reduce((s,b)=>s+b[1],0)||1, bN=M.bands.reduce((s,b)=>s+b[0],0)||1;
+  el.innerHTML=`<div class="grid g6">${kpi('Vendas líquidas',eur(M.net),ctxLabel())}${kpi('Média diária',eur(M.net/days),n0(days)+' dias com vendas')}${kpi('Melhor dia',eur(best[1]),best[0])}${kpi('Hora de pico',peak&&peak.v?String(peak.h).padStart(2,'0')+'h':'—',peak?eur(peak.v):'')}${kpi('Ticket médio',eur(M.ticket),'por venda')}${kpi('Nº de vendas',n0(M.docs),n0(M.nc)+' notas de crédito')}</div>
+   <div class="grid g4" style="margin-top:16px">${kpi('Linhas por venda',(M.docs?M.nl/M.docs:0).toFixed(1).replace('.',','),'artigos por talão/fatura')}${kpi('Unidades por venda',(M.docs?M.nu/M.docs:0).toFixed(1).replace('.',','),'quantidade média')}${kpi('Descontos concedidos',eur(M.disc),'linhas')}${kpi('Carga média de IVA',(M.net?M.tax/M.net*100:0).toFixed(2).replace('.',',')+'%','IVA ÷ vendas')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Vendas líquidas ${multiMonth()?'por mês':'por dia'}</h3><div id="pv1"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Faturação acumulada</h3><div id="pv2"></div></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>Por hora do dia</h3><div id="pv3"></div></div><div class="card"><h3>Por dia da semana</h3><div id="pv4"></div></div></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>Top 15 artigos</h3><div id="pv5"></div></div><div class="card"><h3>Top 10 clientes <span class="r hint">exclui consumidor final</span></h3><div id="pv6"></div></div></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('scale')} Distribuição das vendas por valor</h3><div id="pv7"></div></div><div class="card"><h3>${ico('file')} Por série / caixa</h3><div id="pv8"></div></div></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>Por taxa de IVA (base)</h3><div id="pv9"></div></div><div class="card"><h3>Por tipo de documento</h3><div id="pv10"></div></div></div>`;
+  vbars($('#pv1'),ser); vbars($('#pv2'),cum,{h:190});
+  vbars($('#pv3'),M.byHour.map((v,h)=>({k:h,label:String(h).padStart(2,'0'),v:r2(v)})),{h:190}); vbars($('#pv4'),[1,2,3,4,5,6,0].map(i=>({k:WD[i].slice(0,3),v:r2(M.byWd[i]),tip:`${WD[i]}<br><b>${eur(M.byWd[i])}</b>`})),{h:190});
+  hbars($('#pv5'),Object.values(M.prods).sort((a,b)=>b.base-a.base).slice(0,15).map(p=>({k:p.desc||p.code,v:p.base})));
+  hbars($('#pv6'),Object.values(M.custs).filter(c=>c.nif!=='999999990').sort((a,b)=>b.net-a.net).slice(0,10).map(c=>({k:c.name,v:c.net})));
+  table($('#pv7'),{rows:M.bands.map((b,i)=>({k:bandL[i],n:b[0],v:r2(b[1])})),cols:[{k:'k',l:'Valor do documento'},{k:'n',l:'Nº',num:1,f:n0},{k:'pn',l:'% docs',num:1,v:r=>r.n/bN*100,f:v=>v.toFixed(1).replace('.',',')+'%'},{k:'v',l:'Valor',num:1,f:n2},{k:'pv',l:'% valor',num:1,v:r=>r.v/bT*100,html:r=>`<span class="row" style="justify-content:flex-end;gap:6px"><i style="display:inline-block;height:8px;width:${Math.round(r.v/bT*100)}px;background:var(--bar);border-radius:3px"></i>${(r.v/bT*100).toFixed(1).replace('.',',')}%</span>`}]});
+  table($('#pv8'),{rows:Object.values(M.series),sort:'v',dir:-1,cols:[{k:'k',l:'Tipo e série'},{k:'docs',l:'Docs',num:1,f:n0},{k:'v',l:'Vendas',num:1,f:n2},{k:'t',l:'Ticket',num:1,v:x=>x.docs?x.v/x.docs:0,f:n2},{k:'an',l:'Anulados',num:1,f:n0},{k:'anv',l:'Valor anulado',num:1,f:n2}]});
+  hbars($('#pv9'),ratesRows(M).filter(r=>r.tt==='IVA').map(r=>({k:`${r.reg} · ${pctf(r.pct)}`,v:r.base})));
+  hbars($('#pv10'),Object.entries(M.byType).sort((a,b)=>b[1]-a[1]).map(([t,v])=>({k:`${t} — ${DOC_TYPES[t]||''}`,v})));
+}
+function custRows(M){ const tot=M.net||1; const cs=Object.values(M.custs).map(c=>({...c,ticket:c.docs?c.gross/c.docs:0,valid:c.nif==='999999990'?null:nifValid(c.nif),dias:c.last?Math.round((new Date(S.ctx.to+'-28')-new Date(c.last))/864e5):null}));
+  const named=cs.filter(c=>c.nif&&c.nif!=='999999990').sort((a,b)=>b.net-a.net); const tn=named.reduce((s,c)=>s+c.net,0)||1; let acc=0; for(const c of named){ acc+=c.net; c.cls=acc<=tn*0.8?'A':acc<=tn*0.95?'B':'C'; c.pc=c.net/tot*100; } return {cs,named}; }
+function pClientes(el,M){ const {cs,named}=custRows(M); const tot=M.net||1; const cfv=cs.filter(c=>c.nif==='999999990').reduce((s,c)=>s+c.net,0);
+  const freq=[['1 compra',c=>c.docs===1],['2 a 3',c=>c.docs>=2&&c.docs<=3],['4 a 10',c=>c.docs>=4&&c.docs<=10],['11 a 30',c=>c.docs>=11&&c.docs<=30],['Mais de 30',c=>c.docs>30]].map(([k,f])=>{ const x=named.filter(f); return {k,n:x.length,v:r2(x.reduce((s,c)=>s+c.net,0))}; });
+  const city={}; for(const c of named){ let k=String(c.city||'').trim().toUpperCase().replace(/\s+/g,' '); if(!k||k==='DESCONHECIDO') k='(sem localidade)'; city[k]=(city[k]||0)+c.net; }
+  el.innerHTML=`<div class="grid g6">${kpi('Clientes identificados',n0(named.length),'com NIF')}${kpi('Vendas c/ NIF',((tot-cfv)/tot*100).toFixed(1).replace('.',',')+'%',eur(tot-cfv))}${kpi('Consumidor final',(cfv/tot*100).toFixed(1).replace('.',',')+'%',eur(cfv))}${kpi('Recorrentes',n0(named.filter(c=>c.docs>=2).length),'2 ou mais compras')}${kpi('Comprou em vários meses',n0(named.filter(c=>c.months>1).length),multiMonth()?'fidelização':'—')}${kpi('Classe A',n0(named.filter(c=>c.cls==='A').length),'fazem 80% (c/ NIF)')}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('users')} Frequência de compra</h3><div id="pc1"></div></div><div class="card"><h3>${ico('layers')} Vendas por localidade</h3><div id="pc2"></div></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('users')} Carteira de clientes <span class="r"><button class="btn sm" id="pcCsv">${ico('down')} Excel</button></span></h3><div id="pc3"></div></div>`;
+  table($('#pc1'),{rows:freq,cols:[{k:'k',l:'Nº de compras no período'},{k:'n',l:'Clientes',num:1,f:n0},{k:'v',l:'Vendas',num:1,f:n2}]});
+  hbars($('#pc2'),Object.entries(city).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>({k,v})));
+  const cols=[{k:'name',l:'Cliente'},{k:'nif',l:'NIF'},{k:'cls',l:'ABC',html:c=>`<span class="badge ${c.cls==='A'?'b-acc':c.cls==='B'?'b-info':'b-warn'}">${c.cls}</span>`},{k:'docs',l:'Docs',num:1,f:n0},{k:'months',l:'Meses',num:1,f:n0},{k:'net',l:'Vendas',num:1,f:n2},{k:'pc',l:'% vendas',num:1,f:v=>v.toFixed(2).replace('.',',')+'%'},{k:'ticket',l:'Ticket',num:1,f:n2},{k:'last',l:'Última compra'},{k:'dias',l:'Dias sem comprar',num:1,f:v=>v==null?'':n0(Math.max(0,v))}];
+  table($('#pc3'),{rows:named,sort:'net',dir:-1,size:50,cols,onRow:c=>trendModal('cust',c)});
+  $('#pcCsv').onclick=()=>csvDownload(`AuditNux_clientes_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,v:x=>c.v?c.v(x):x[c.k]})),named); }
+function prodRows(M){ const ps=Object.values(M.prods).sort((a,b)=>b.base-a.base); const tot=ps.reduce((s,p)=>s+p.base,0)||1; let acc=0; for(const p of ps){ acc+=p.base; p.cum=acc/tot*100; p.cls=acc<=tot*0.8?'A':acc<=tot*0.95?'B':'C'; p.pc=p.base/tot*100; } return ps; }
+function pArtigos(el,M){ const ps=prodRows(M); const tot=ps.reduce((s,p)=>s+p.base,0)||1; const cnt=k=>ps.filter(p=>p.cls===k).length, val=k=>ps.filter(p=>p.cls===k).reduce((s,p)=>s+p.base,0);
+  el.innerHTML=`<div class="grid g4">${kpi('Artigos vendidos',n0(Math.max(ps.length,M.nProdsMax)),ctxLabel())}${['A','B','C'].map(k=>kpi('Classe '+k,n0(cnt(k))+' artigos',(val(k)/tot*100).toFixed(1).replace('.',',')+'% das vendas · '+(cnt(k)/(ps.length||1)*100).toFixed(1).replace('.',',')+'% dos artigos')).join('')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Curva ABC (Pareto)</h3><div id="pa1"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('box')} Artigos por classe <span class="r"><button class="btn sm" id="paCsv">${ico('down')} Excel</button></span></h3><div id="pa2"></div></div>`;
+  const step=Math.max(1,Math.ceil(ps.length/60)); const pts=[]; for(let i=0;i<ps.length;i+=step) pts.push({k:i+1,label:String(i+1),v:r2(ps[i].cum),tip:`${n0(i+1)} artigos<br><b>${ps[i].cum.toFixed(1).replace('.',',')}% das vendas</b>`}); vbars($('#pa1'),pts,{h:190,axf:v=>Math.round(v)+'%'});
+  const cols=[{k:'cls',l:'Classe',html:p=>`<span class="badge ${p.cls==='A'?'b-acc':p.cls==='B'?'b-info':'b-warn'}">${p.cls}</span>`},{k:'code',l:'Código'},{k:'desc',l:'Artigo'},{k:'q',l:'Quantidade',num:1,f:n2},{k:'base',l:'Vendas',num:1,f:n2},{k:'pc',l:'% vendas',num:1,f:v=>v.toFixed(2).replace('.',',')+'%'},{k:'cum',l:'% acumulada',num:1,f:v=>v.toFixed(1).replace('.',',')+'%'},{k:'months',l:'Meses',num:1,f:n0}];
+  table($('#pa2'),{rows:ps,size:50,cols,onRow:p=>trendModal('prod',p)});
+  $('#paCsv').onclick=()=>csvDownload(`AuditNux_ABC_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,v:x=>c.v?c.v(x):x[c.k]})),ps); }
+function pPrecos(el,M){ const f=S.prF2||(S.prF2={var:true,q:''}); const P=Object.values(M.prods); const disc=P.reduce((s,x)=>s+x.disc,0), zero=P.reduce((s,x)=>s+x.zero,0);
+  el.innerHTML=`<div class="grid g4">${kpi('Artigos com mais de um preço',n0(P.filter(x=>x.np>1&&!x.open).length),'excluindo preço aberto')}${kpi('Variação acima de 50%',n0(P.filter(x=>!x.open&&x.np>1&&x.amp>50).length),'promoções ou erros de preço')}${kpi('Linhas a preço zero',n0(zero),'ofertas / brindes')}${kpi('Descontos de linha',eur(disc),ctxLabel())}</div>
+   <div class="card" style="margin-top:16px"><div class="toolbar"><input class="inp grow" id="ppQ" placeholder="Pesquisar artigo…" value="${esc(f.q)}"><label class="chk"><input type="checkbox" id="ppV" ${f.var?'checked':''}> Só com variação de preço ou ofertas</label><span class="sp"></span><button class="btn" id="ppCsv">${ico('down')} Excel</button></div><div id="ppT"></div></div>`;
+  const q=norm(f.q).trim(); const rows=P.filter(x=>(!f.var||x.np>1||x.zero)&&(!q||norm(x.code+' '+x.desc).includes(q)));
+  const cols=[{k:'code',l:'Código'},{k:'desc',l:'Artigo'},{k:'n',l:'Linhas',num:1,f:n0},{k:'q',l:'Qtd',num:1,f:n2},{k:'pm',l:'Preço médio',num:1,v:x=>x.q?x.base/x.q:0,f:v=>NF2.format(v)},{k:'pmin',l:'Mínimo',num:1,f:v=>NF2.format(v)},{k:'pmax',l:'Máximo',num:1,f:v=>NF2.format(v)},
+    {k:'amp',l:'Amplitude',num:1,v:x=>x.open?-1:x.amp,html:x=>x.open?'<span class="badge b-info">preço aberto</span>':x.np>1?`<b class="${x.amp>50?'st-warn':''}">${x.amp.toFixed(0)}%</b>`:'—'},{k:'zero',l:'A zero',num:1,html:x=>x.zero?`<span class="badge b-info">${x.zero}</span>`:''},{k:'disc',l:'Descontos',num:1,f:n2}];
+  S.ppT=table($('#ppT'),Object.assign(S.ppT?{_st:S.ppT._st}:{sort:'amp',dir:-1},{rows,size:50,cols,onRow:p=>trendModal('prod',p)}));
+  let tm; $('#ppQ').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ f.q=e.target.value; RENDER.analises(); },300); }; $('#ppV').onchange=e=>{ f.var=e.target.checked; RENDER.analises(); };
+  $('#ppCsv').onclick=()=>csvDownload(`AuditNux_precos_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,v:x=>c.v?c.v(x):x[c.k]})),rows); }
+function pPagamentos(el,M){ const P=Object.values(M.pay).map(x=>({...x,v:r2(x.v)})).sort((a,b)=>b.v-a.v); const tot=P.filter(x=>x.src!=='Recibos').reduce((s,x)=>s+x.v,0)||1; const cash=P.filter(x=>x.src!=='Recibos'&&x.m==='NU').reduce((s,x)=>s+x.v,0);
+  const rec=P.filter(x=>x.src==='Recibos');
+  el.innerHTML=`<div class="grid g4">${kpi('Pago em numerário',(cash/tot*100).toFixed(1).replace('.',',')+'%',eur(cash))}${kpi('Recibos',n0(rec.reduce((s,x)=>s+x.n,0)),eur(rec.reduce((s,x)=>s+x.v,0)))}${kpi('Prazo médio de recebimento',M.pmr.wv?(M.pmr.wd/M.pmr.wv).toFixed(0)+' dias':'—','fatura e recibo no mesmo ficheiro')}${kpi('Faturas (FT) sem recibo',n0(M.ftNoRec.n),eur(M.ftNoRec.v))}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('scale')} Meios de pagamento</h3><div id="pp1"></div></div><div class="card"><h3>${ico('chart')} Distribuição</h3><div id="pp2"></div></div></div>
+   <p class="hint" style="margin-top:10px">Faturas a crédito sem recibo: contadas por ficheiro mensal — podem ter sido recebidas em meses seguintes ou fora do programa de faturação.</p>`;
+  table($('#pp1'),{rows:P,cols:[{k:'src',l:'Origem'},{k:'m',l:'Meio',v:x=>MECH[x.m]||x.m},{k:'n',l:'Nº',num:1,f:n0},{k:'v',l:'Valor',num:1,f:n2}],empty:'Sem meios de pagamento registados'});
+  hbars($('#pp2'),P.map(x=>({k:(MECH[x.m]||x.m)+' · '+(x.src==='Recibos'?'recibos':'faturas'),v:x.v}))); }
+function pDocumentos(el,M){ const rows=Object.values(M.dtypes); const WDt=rows.filter(x=>x.sec==='WD'); const wdN=WDt.reduce((s,x)=>s+x.n,0), wdF=WDt.reduce((s,x)=>s+(x.F||0),0);
+  el.innerHTML=`<div class="grid g4">${kpi('Documentos',n0(rows.reduce((s,x)=>s+x.n,0)),ctxLabel())}${kpi('Anulados',n0(rows.reduce((s,x)=>s+(x.A||0),0)),'todas as secções')}${kpi('Conferência faturados',wdN?(wdF/wdN*100).toFixed(1).replace('.',',')+'%':'—',n0(wdN)+' documentos')}${kpi('Conferência em aberto',n0(M.wdOpen.length),eur(M.wdOpen.reduce((s,d)=>s+d.gross,0)))}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('file')} Documentos por tipo e estado</h3><div id="pd1"></div></div><div class="card" style="margin-top:16px"><h3>${ico('alert')} Documentos de conferência em aberto</h3><div id="pd2"></div></div>`;
+  table($('#pd1'),{rows,cols:[{k:'sec',l:'Secção',v:x=>({SI:'Faturação',WD:'Conferência',MG:'Transporte',PY:'Recibos'})[x.sec]},{k:'type',l:'Tipo',v:x=>x.type+' — '+(DOC_TYPES[x.type]||'')},{k:'n',l:'Total',num:1,f:n0},{k:'N',l:'Normais',num:1,f:n0},{k:'F',l:'Faturados',num:1,f:n0},{k:'A',l:'Anulados',num:1,f:n0},{k:'v',l:'Valor (não anulados)',num:1,f:n2}]});
+  table($('#pd2'),{rows:M.wdOpen,size:30,empty:'Nenhum documento em aberto',cols:[{k:'no',l:'Documento'},{k:'type',l:'Tipo',v:d=>d.type+' — '+(DOC_TYPES[d.type]||'')},{k:'date',l:'Data'},{k:'cust',l:'Cliente'},{k:'gross',l:'Total',num:1,f:n2}]}); }
+function pAuditoria(el,M,X){ const bn=M.benf.reduce((s,v)=>s+v,0); const bexp=[0,...[1,2,3,4,5,6,7,8,9].map(k=>Math.log10(1+1/k))]; const bobs=M.benf.map(v=>bn?v/bn:0); const mad=bn?[1,2,3,4,5,6,7,8,9].reduce((s,k)=>s+Math.abs(bobs[k]-bexp[k]),0)/9:0;
+  const verdict=bn<300?'amostra insuficiente':mad<=0.006?'conformidade próxima':mad<=0.012?'conformidade aceitável':mad<=0.015?'conformidade marginal':'não conformidade';
+  const sums=S.cloud.on?S.history.filter(h=>h.nif===S.ctx.nif&&(h.start||'').slice(0,7)>=S.ctx.from&&(h.end||'').slice(0,7)<=S.ctx.to).sort((a,b)=>a.start.localeCompare(b.start)):[];
+  el.innerHTML=`<div class="grid g4">${kpi('Documentos anulados',n0(M.anul),eur(M.anulv))}${kpi('Notas de crédito',n0(M.nc),eur(M.ncv))}${kpi('Valores redondos',bn?(M.round/(M.bigDocs||1)*100).toFixed(1).replace('.',',')+'%':'—','múltiplos de 5 € (≥ 20 €)')}${kpi('Benford (MAD)',mad.toFixed(4).replace('.',','),verdict)}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('users')} Por operador / posto</h3><div id="pz1"></div></div><div class="card"><h3>${ico('scale')} Lei de Benford <span class="r hint">n=${n0(bn)}</span></h3><div id="pz2"></div></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('shield')} Validação de cada ficheiro do período</h3><div id="pz3"></div></div>`;
+  table($('#pz1'),{rows:Object.entries(M.ops).map(([u,o])=>({user:u,...o})),sort:'net',dir:-1,cols:[{k:'user',l:'Operador'},{k:'docs',l:'Docs',num:1,f:n0},{k:'net',l:'Vendas',num:1,f:n2},{k:'nc',l:'NC',num:1,f:n0},{k:'anul',l:'Anulados',num:1,f:n0},{k:'anulv',l:'Valor anulado',num:1,f:n2}]});
+  const box=$('#pz2'); const W=Math.max(300,box.clientWidth||520), H=190, pl=40, pb=24, pt=10, mx=Math.max(...bobs,...bexp)*1.1||1, y=v=>pt+(H-pt-pb)*(1-v/mx), gw=(W-pl-8)/9; let g='';
+  for(let i=0;i<=4;i++){ const v=mx*i/4; g+=`<line class="grid" x1="${pl}" x2="${W-8}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${pl-6}" y="${y(v)+3}" text-anchor="end">${Math.round(v*100)}%</text>`; }
+  for(let k=1;k<=9;k++){ const x=pl+(k-1)*gw+gw*0.2, w=gw*0.6; g+=`<rect x="${x}" y="${y(bobs[k])}" width="${w}" height="${Math.max(1,y(0)-y(bobs[k]))}" rx="3" fill="var(--bar)"/><line x1="${x-3}" x2="${x+w+3}" y1="${y(bexp[k])}" y2="${y(bexp[k])}" stroke="var(--gold)" stroke-width="2.5"/><text class="ax" x="${x+w/2}" y="${H-8}" text-anchor="middle">${k}</text>`; }
+  box.innerHTML=`<div class="row" style="gap:16px;font-size:12px;margin-bottom:4px"><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:var(--bar);display:inline-block"></i>Observado</span><span class="row" style="gap:6px"><i style="width:14px;height:3px;background:var(--gold);display:inline-block"></i>Esperado</span></div><div class="chart"><svg viewBox="0 0 ${W} ${H}" height="${H}">${g}</svg></div>`;
+  table($('#pz3'),{rows:sums,empty:S.cloud.on?'Sem análises guardadas no período':'Disponível com a nuvem ligada',cols:[{k:'start',l:'Período',f:(v,h)=>monthOf(h)?ymLabel(monthOf(h)):h.start+' → '+h.end},{k:'score',l:'Pont.',num:1,html:h=>`<b class="mono st-${h.estado}">${h.score}</b>`},{k:'al',l:'Alertas',html:h=>['crit','err','warn'].map(s=>h.alertas[s]?`<span class="badge ${SEV[s].c}">${h.alertas[s]}</span>`:'').join(' ')},{k:'c',l:'Correções',num:1,v:h=>(h.correcoes||[]).length,f:n0},{k:'dp',l:'DP',html:h=>dpStatus(h)}],onRow:openSummary}); }
+function trendModal(kind,x){ const X={cubes:Object.values(S.cubes).filter(c=>c.nif===S.ctx.nif&&c.ym>=S.ctx.from&&c.ym<=S.ctx.to).sort((a,b)=>a.ym.localeCompare(b.ym))};
+  const rows=X.cubes.map(c=>{ const it=kind==='prod'?c.prods.find(p=>p.k===x.k):c.custs.find(p=>p.id===x.id); return {ym:c.ym,v:it?(kind==='prod'?it.base:it.net):0,q:it?(kind==='prod'?it.q:it.docs):0}; });
+  modal(`${ico(kind==='prod'?'box':'users')} ${esc(kind==='prod'?(x.desc||x.code):x.name)}`,`<div class="kv"><div>${kind==='prod'?'Código':'NIF'}<b class="mono">${esc(kind==='prod'?x.code:x.nif)}</b></div><div>Vendas no período<b class="mono">${eur(kind==='prod'?x.base:x.net)}</b></div><div>${kind==='prod'?'Quantidade':'Documentos'}<b class="mono">${kind==='prod'?n2(x.q):n0(x.docs)}</b></div><div>Período<b>${esc(ctxLabel())}</b></div></div><div id="trC"></div><div id="trT"></div>
+    ${S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif?`<p class="hint">O detalhe documento a documento está disponível para o ficheiro aberto (${esc(S.R.header.StartDate)} a ${esc(S.R.header.EndDate)}).</p>`:''}`,
+    `${S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif&&kind==='prod'?`<button class="btn" id="trDoc">${ico('file')} Ver no ficheiro aberto</button>`:''}<button class="btn pri" onclick="closeModal()">Fechar</button>`);
+  if(rows.length>1) vbars($('#trC'),rows.map(r=>({k:r.ym,label:MESES[+r.ym.slice(5)-1],v:r.v,tip:`${ymLong(r.ym)}<br><b>${eur(r.v)}</b>`})),{h:170});
+  table($('#trT'),{rows,cols:[{k:'ym',l:'Mês',f:v=>ymLabel(v)},{k:'v',l:'Vendas',num:1,f:n2},{k:'q',l:kind==='prod'?'Quantidade':'Documentos',num:1,f:n2}]});
+  const b=$('#trDoc'); if(b) b.onclick=()=>{ const p=S.A.prods.find(p=>p.code===x.code); if(p) openProduct(p); else toast('Artigo sem vendas no ficheiro aberto'); }; }
+
+/* ---------- ARTIGOS e CLIENTES (Exploração) por período ---------- */
+RENDER.artigos=function(){ periodView('artigos',(el,M)=>{ const f=S.artF2||(S.artF2={q:'',multi:false}); const ps=prodRows(M);
+  el.innerHTML=`<div class="grid g4" style="margin-top:16px">${kpi('Artigos vendidos',n0(ps.length),ctxLabel())}${kpi('Com taxas de IVA diferentes',n0(ps.filter(p=>p.multi).length),'possível erro na ficha')}${kpi('Maior artigo',esc((ps[0]||{}).desc||'—'),ps[0]?eur(ps[0].base):'')}${kpi('Vendas',eur(M.net),'')}</div>
+   <div class="card" style="margin-top:16px"><div class="toolbar"><input class="inp grow" id="aQ" placeholder="Pesquisar código ou descrição…" value="${esc(f.q)}"><label class="chk"><input type="checkbox" id="aM" ${f.multi?'checked':''}> Só com taxas diferentes</label><span class="sp"></span><button class="btn" id="aCsv">${ico('down')} Excel</button></div><div id="aT"></div></div>`;
+  const q=norm(f.q).trim(); const rows=ps.filter(p=>(!f.multi||p.multi)&&(!q||norm(p.code+' '+p.desc).includes(q)));
+  const cols=[{k:'code',l:'Código'},{k:'desc',l:'Descrição'},{k:'q',l:'Quantidade',num:1,f:n2},{k:'base',l:'Vendas líquidas',num:1,f:n2},{k:'pc',l:'% vendas',num:1,f:v=>v.toFixed(2).replace('.',',')+'%'},{k:'n',l:'Linhas',num:1,f:n0},{k:'months',l:'Meses',num:1,f:n0},{k:'rates',l:'Taxas',v:p=>p.rates.join(' '),html:p=>p.rates.map(r=>`<span class="badge ${p.multi?'b-warn':'b-acc'}">${pctf(r)}</span>`).join(' ')}];
+  S.aT2=table($('#aT'),Object.assign(S.aT2?{_st:S.aT2._st}:{sort:'base',dir:-1},{rows,size:100,cols,onRow:p=>trendModal('prod',p),foot:(c,rs)=>c.k==='code'?'Total':c.k==='base'?n2(rs.reduce((s,p)=>s+p.base,0)):''}));
+  let tm; $('#aQ').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ f.q=e.target.value; RENDER.artigos(); },300); }; $('#aM').onchange=e=>{ f.multi=e.target.checked; RENDER.artigos(); };
+  $('#aCsv').onclick=()=>csvDownload(`AuditNux_artigos_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,v:x=>c.v?c.v(x):x[c.k]})),rows); }); };
+RENDER.clientes=function(){ periodView('clientes',(el,M)=>{ const f=S.cliF2||(S.cliF2={q:'',inv:false}); const {cs}=custRows(M); const tot=M.net||1;
+  const cf=cs.filter(c=>c.nif==='999999990').reduce((s,c)=>s+c.net,0);
+  el.innerHTML=`<div class="grid g4" style="margin-top:16px">${kpi('Clientes com vendas',n0(cs.length),ctxLabel())}${kpi('Consumidor final',(cf/tot*100).toFixed(1).replace('.',',')+'%',eur(cf))}${kpi('NIF inválidos',n0(cs.filter(c=>c.valid===false).length),'dígito de controlo')}${kpi('Maior cliente',esc((cs.filter(c=>c.nif!=='999999990').sort((a,b)=>b.net-a.net)[0]||{}).name||'—'),'')}</div>
+   <div class="card" style="margin-top:16px"><div class="toolbar"><input class="inp grow" id="cQ" placeholder="Pesquisar nome, NIF, localidade…" value="${esc(f.q)}"><label class="chk"><input type="checkbox" id="cI" ${f.inv?'checked':''}> Só NIF inválidos</label><span class="sp"></span><button class="btn" id="cCsv">${ico('down')} Excel</button></div><div id="cT"></div></div>`;
+  const q=norm(f.q).trim(); const rows=cs.filter(c=>(!f.inv||c.valid===false)&&(!q||norm(c.name+' '+c.nif+' '+c.city).includes(q)));
+  const cols=[{k:'name',l:'Nome'},{k:'nif',l:'NIF',html:c=>`<span class="mono">${esc(c.nif)}</span> ${c.valid===false?'<span class="badge b-warn">inválido</span>':''}`},{k:'city',l:'Localidade'},{k:'docs',l:'Docs',num:1,f:n0},{k:'months',l:'Meses',num:1,f:n0},{k:'net',l:'Vendas líquidas',num:1,f:n2},{k:'gross',l:'Total c/ IVA',num:1,f:n2},{k:'last',l:'Última compra'}];
+  S.cT2=table($('#cT'),Object.assign(S.cT2?{_st:S.cT2._st}:{sort:'net',dir:-1},{rows,size:100,cols,onRow:c=>trendModal('cust',c),foot:(c,rs)=>c.k==='name'?'Total':['net','gross'].includes(c.k)?n2(rs.reduce((s,x)=>s+x[c.k],0)):''}));
+  let tm; $('#cQ').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ f.q=e.target.value; RENDER.clientes(); },300); }; $('#cI').onchange=e=>{ f.inv=e.target.checked; RENDER.clientes(); };
+  $('#cCsv').onclick=()=>csvDownload(`AuditNux_clientes_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,k:c.k})),rows); }); };
+
+/* ---------- RELATÓRIOS por período ---------- */
+RENDER.relatorios=function(){ periodView('relatorios',(el,M)=>{ const o=S.repO||(S.repO={capa:true,mapa:true,dp:true,alertas:true,detalhe:true,corr:true,maxDet:40});
+  const fileOk=!!S.R; const card=(icon,t,d,btn)=>`<div class="card"><h3>${ico(icon)} ${t}</h3><p class="hint" style="min-height:38px">${d}</p>${btn}</div>`;
+  el.innerHTML=`<h3 class="sech">${ico('layers')} Do período selecionado — ${esc(ctxLabel())}</h3><div class="grid g3">
+    ${card('percent','Mapa de IVA & DP','Apuramento por região e taxa, campos da Declaração Periódica e mês a mês.',`<button class="btn pri" onclick="pdfIVA()">${ico('pdf')} Gerar PDF</button>`)}
+    ${card('chart','Relatório de vendas para o cliente','Indicadores, vendas por dia/mês, hora e semana, artigos e clientes principais.',`<button class="btn gold" onclick="pdfSales()">${ico('pdf')} Gerar PDF premium</button>`)}
+    ${card('layers','Relatório de evolução','Comparativos mês a mês e ano a ano até ao último mês do período.',`<button class="btn" onclick="S.evo={nif:S.ctx.nif,ref:S.ctx.to,pa:'',pb:'',tab:'prod'};pdfEvol()">${ico('pdf')} Gerar PDF</button>`)}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('down')} Exportações do período para Excel</h3><div class="row">
+    <button class="btn" onclick="go('artigos');setTimeout(()=>$('#aCsv')&&$('#aCsv').click(),900)">Artigos</button><button class="btn" onclick="go('clientes');setTimeout(()=>$('#cCsv')&&$('#cCsv').click(),900)">Clientes</button>
+    <button class="btn" onclick="go('iva');setTimeout(()=>$('#ivCsv')&&$('#ivCsv').click(),900)">Mapa de IVA</button><button class="btn" id="rMes">Mês a mês</button></div></div>
+   <h3 class="sech" style="margin-top:22px">${ico('file')} Do ficheiro aberto ${fileOk?'— '+esc(S.R.header.CompanyName)+' · '+esc(S.R.header.StartDate)+' a '+esc(S.R.header.EndDate):'<span class="hint">(nenhum ficheiro aberto)</span>'}</h3>
+   <div class="grid g2"><div class="card"><h3>${ico('pdf')} Relatório de Auditoria SAF-T</h3><p class="hint">Capa, pontuação, mapa de IVA, confronto com a DP, alertas e correções do ficheiro.</p>
+    <div class="grid g2" style="gap:4px;margin:10px 0">${[['capa','Capa e resumo executivo'],['mapa','Mapa de IVA por taxa'],['dp','Confronto com a DP'],['alertas','Quadro de alertas'],['detalhe','Detalhe das ocorrências'],['corr','Registo de correções']].map(([k,l])=>`<label class="chk"><input type="checkbox" data-o="${k}" ${o[k]?'checked':''}> ${l}</label>`).join('')}</div>
+    <button class="btn pri" onclick="pdfAudit()" ${fileOk?'':'disabled'}>${ico('pdf')} Gerar relatório de auditoria</button></div>
+    <div class="card"><h3>${ico('wrench')} Correções e detalhe</h3><p class="hint">Registo de correções, SAF-T corrigido e listagens documento a documento.</p><div class="row">
+     <button class="btn" onclick="pdfFixes()" ${fileOk&&S.fixLog.length?'':'disabled'}>${ico('pdf')} Registo de correções</button><button class="btn" onclick="go('correcoes')" ${fileOk?'':'disabled'}>${ico('down')} SAF-T corrigido</button>
+     <button class="btn" onclick="go('documentos');setTimeout(()=>$('#dfCsv').click(),80)" ${fileOk?'':'disabled'}>Documentos</button><button class="btn" onclick="go('documentos');setTimeout(()=>$('#dfCsvL').click(),80)" ${fileOk?'':'disabled'}>Linhas</button><button class="btn" onclick="exportAlertsCSV()" ${fileOk?'':'disabled'}>Alertas</button></div></div></div>`;
+  $$('[data-o]',el).forEach(c=>c.onchange=()=>o[c.dataset.o]=c.checked);
+  $('#rMes').onclick=()=>csvDownload(`AuditNux_mes_a_mes_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,[{label:'Mês',k:'ym'},{label:'Vendas líquidas',k:'net'},{label:'IVA',k:'tax'},{label:'Total',k:'gross'},{label:'Nº vendas',k:'docs'},{label:'Notas de crédito',k:'ncv'},{label:'Anulados',k:'anul'},{label:'Clientes',k:'nCusts'}],Object.values(S.cubes).filter(c=>c.nif===S.ctx.nif&&c.ym>=S.ctx.from&&c.ym<=S.ctx.to).sort((a,b)=>a.ym.localeCompare(b.ym)));
+}); };
+
+/* ---------- PDF por período (substituem as versões do ficheiro) ---------- */
+async function pdfIVA(){ const X=await ensureCtx(); if(!X||!X.M) return toast('Sem dados no período','err'); const M=X.M; const doc=pdfNew('Mapa de IVA e Declaração Periódica'); if(!doc) return; const emp=X.nifs.get(S.ctx.nif)||'';
+  const rows=ratesRows(M); const base=r2(rows.reduce((s,r)=>s+r.base,0)), iva=r2(rows.reduce((s,r)=>s+r.iva,0)); let y=26;
+  y=pdfH(doc,y,`${emp} — ${ctxLabel()}`); y=kpiBoxes(doc,y,[{l:'Base tributável',v:eur(base)},{l:'IVA (por taxa)',v:eur(iva)},{l:'IVA (documentos)',v:eur(M.tax),d:'dif. '+n2(r2(M.tax-iva))}]);
+  y=pdfH(doc,y,'Mapa por região e taxa'); y=pdfTable(doc,y,['Imposto','Região','Código','Taxa','Linhas','Base','IVA'],rows.map(m=>[m.tt||'',m.reg||'',m.code||'',m.pct==null?'':pctf(m.pct),n0(m.n),n2(m.base),n2(m.iva)]),{foot:[['Total','','','','',n2(base),n2(iva)]],columnStyles:{3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}});
+  const DP=dpFromRates(M.rates); for(const rg of Object.keys(DP)){ const z=DP[rg]; y=pdfH(doc,y,'Declaração Periódica — Quadro 06 · '+({'PT':'Continente','PT-AC':'Açores','PT-MA':'Madeira'}[rg]||rg));
+    y=pdfTable(doc,y,['Campo','Descrição','SAF-T'],[['1','Base tributável — taxa reduzida',n2(z.c1)],['2','IVA — taxa reduzida',n2(z.c2)],['5','Base tributável — taxa intermédia',n2(z.c5)],['6','IVA — taxa intermédia',n2(z.c6)],['3','Base tributável — taxa normal',n2(z.c3)],['4','IVA — taxa normal',n2(z.c4)]],{columnStyles:{0:{cellWidth:14,halign:'center',fontStyle:'bold'},2:{halign:'right'}}}); }
+  if(X.sel.length>1){ y=pdfH(doc,y,'Mês a mês'); y=pdfTable(doc,y,['Mês','Vendas líquidas','IVA (documentos)','Nº vendas'],X.sel.map(c=>[ymLabel(c.ym),n2(c.net),n2(c.tax),n0(c.docs)]),{foot:[['Total',n2(M.net),n2(M.tax),n0(M.docs)]],columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}}}); }
+  const ex=Object.values(M.exempt); if(ex.length){ y=pdfH(doc,y,'Operações isentas e não sujeitas'); y=pdfTable(doc,y,['Código','Motivo','Linhas','Base'],ex.map(e=>[e.code,e.reason,n0(e.n),n2(e.base)]),{columnStyles:{2:{halign:'right'},3:{halign:'right'}}}); }
+  pdfFrame(doc,`${emp}  ·  NIF ${S.ctx.nif}  ·  ${ctxLabel()}`); doc.save(`AuditNux_Mapa_IVA_${emp.replace(/[^A-Za-z0-9]+/g,'_').slice(0,40)}_${S.ctx.from}_${S.ctx.to}.pdf`); }
+async function pdfSales(){ const X=await ensureCtx(); if(!X||!X.M) return toast('Sem dados no período','err'); const M=X.M; const doc=pdfNew('Relatório de Vendas'); if(!doc) return; const emp=X.nifs.get(S.ctx.nif)||''; const W=doc.internal.pageSize.getWidth(); const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  let y=26; y=pdfH(doc,y,`${emp} — ${ctxLabel()}`); const days=Object.keys(M.byDate).length||1; const best=Object.entries(M.byDate).sort((a,b)=>b[1]-a[1])[0]||['-',0];
+  y=kpiBoxes(doc,y,[{l:'Vendas líquidas',v:eur(M.net)},{l:'Total c/ IVA',v:eur(M.gross)},{l:'Nº de vendas',v:n0(M.docs)},{l:'Ticket médio',v:eur(M.ticket)},{l:'Média diária',v:eur(M.net/days),d:n0(days)+' dias'},{l:'Melhor dia',v:eur(best[1]),d:best[0]}]);
+  const ser=salesSeries(M); y=pdfH(doc,y+2,multiMonth()?'Vendas líquidas por mês':'Vendas líquidas por dia'); pdfBars(doc,26,y+2,W-38,46,ser,d=>d.label); y+=60;
+  y=pdfH(doc,y,'Por hora do dia'); pdfBars(doc,26,y+2,W-38,34,M.byHour.map((v,h)=>({k:h,v})),d=>String(d.k).padStart(2,'0')); y+=48;
+  doc.addPage(); y=26; y=pdfH(doc,y,'Por dia da semana'); pdfBars(doc,26,y+2,W-38,30,[1,2,3,4,5,6,0].map(i=>({k:WD[i],v:M.byWd[i]})),d=>d.k); y+=44;
+  const ps=prodRows(M); y=pdfH(doc,y,'Top 20 artigos'); y=pdfTable(doc,y,['#','Artigo','Quantidade','Vendas líquidas','% do total'],ps.slice(0,20).map((p,i)=>[String(i+1),p.desc||p.code,n2(p.q),n2(p.base),p.pc.toFixed(1).replace('.',',')+'%']),{columnStyles:{0:{cellWidth:8},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}});
+  const {named}=custRows(M); y=pdfH(doc,y,'Top 15 clientes (excluindo consumidor final)'); y=pdfTable(doc,y,['#','Cliente','NIF','Documentos','Vendas líquidas'],named.slice(0,15).map((c,i)=>[String(i+1),c.name,c.nif,n0(c.docs),n2(c.net)]),{columnStyles:{0:{cellWidth:8},3:{halign:'right'},4:{halign:'right'}}});
+  y=pdfH(doc,y,'Vendas por taxa de IVA'); y=pdfTable(doc,y,['Região','Taxa','Base','IVA'],ratesRows(M).filter(r=>r.tt==='IVA').map(r=>[r.reg,pctf(r.pct),n2(r.base),n2(r.iva)]),{columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}}});
+  pdfFrame(doc,`${emp}  ·  NIF ${S.ctx.nif}  ·  ${ctxLabel()}`); doc.save(`AuditNux_Vendas_${emp.replace(/[^A-Za-z0-9]+/g,'_').slice(0,40)}_${S.ctx.from}_${S.ctx.to}.pdf`); }
+
+/* ---------- integração ---------- */
+document.addEventListener('DOMContentLoaded',()=>{ PERIOD_VIEWS.forEach(v=>{ const n=$(`.nav[data-v="${v}"]`); if(n) n.classList.remove('need'); });
+  VIEWS.iva=['Mapa de IVA & Declaração Periódica','Por período'];VIEWS.analises=['Análises de gestão','Por período'];VIEWS.artigos=['Artigos','Por período'];VIEWS.clientes=['Clientes','Por período'];VIEWS.relatorios=['Relatórios & Exportações','Por período e do ficheiro aberto']; });
 </script>
 </body>
 </html>
