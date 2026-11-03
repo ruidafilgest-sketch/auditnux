@@ -1,0 +1,45 @@
+rules_version = '2';
+// =====================================================================
+//  AuditNux — Centro de Auditoria SAF-T · Regras de segurança do Firestore
+//  Cada conta tem o seu ESPAÇO isolado: espacos/{uid}/...
+//  Ninguém (nem o administrador) consegue ler o espaço de outra conta.
+//  ADMINISTRADOR: troque o email abaixo pelo email da conta geral do gabinete
+//  (tem de ser igual à constante ADMIN_EMAIL no index.html).
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin()  { return signedIn() && request.auth.token.email == 'dafilgest.sistemas@gmail.com'; }
+    function perfil()   { return get(/databases/$(database)/documents/utilizadores/$(request.auth.uid)).data; }
+    function donoDe(ws) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/utilizadores/$(request.auth.uid))
+        && perfil().ws == ws
+        && perfil().bloqueado == false;
+    }
+
+    // Perfil de cada conta (criado automaticamente no primeiro acesso)
+    match /utilizadores/{uid} {
+      allow get:    if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow list:   if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.ws == uid
+                    && request.resource.data.bloqueado == false
+                    && request.resource.data.papel == 'dono'
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.keys().hasOnly(['ws','email','nome','gabinete','criadoEm','bloqueado','papel']);
+      // só o administrador pode suspender/reativar — e só esse campo
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bloqueado']);
+      allow delete: if false;
+    }
+
+    // Dados de cada espaço (resumos, correções, DP, definições)
+    match /espacos/{ws}/{doc=**} {
+      allow read, write: if donoDe(ws);
+    }
+
+    // Tudo o resto fica fechado
+    match /{document=**} { allow read, write: if false; }
+  }
+}
