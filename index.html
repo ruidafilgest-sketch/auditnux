@@ -481,7 +481,7 @@ async function parse(file){
     }
     R.docs.push(d);
   };
-  const sectionHead=(name,body)=>{ R.sections[name]={n:num(tag(body,'NumberOfEntries')),debit:num(tag(body,'TotalDebit')),credit:num(tag(body,'TotalCredit')),
+  const sectionHead=(name,body)=>{ R.sections[name]={nLines:tag(body,'NumberOfMovementLines'),qty:tag(body,'TotalQuantityIssued'),n:num(tag(body,'NumberOfEntries')),debit:num(tag(body,'TotalDebit')),credit:num(tag(body,'TotalCredit')),
     nRaw:tag(body,'NumberOfEntries'),debitRaw:tag(body,'TotalDebit'),creditRaw:tag(body,'TotalCredit')}; };
 
   while(true){
@@ -601,7 +601,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -833,7 +833,7 @@ function analyse(){
     const c=custs[d.cust]||(custs[d.cust]={id:d.cust,docs:0,net:0,gross:0,last:''}); c.docs++; const sg=d.type==='NC'?-1:1; c.net+=sg*d.net; c.gross+=sg*d.gross; if((d.date||'')>c.last) c.last=d.date;
     for(let k=d.l0;k<d.l0+d.ln;k++){ const L=lines[k]; nLinesActive++; const key=L.p||('?'+lineDesc(L)); const p=prods[key]||(prods[key]={code:L.p,desc:lineDesc(L),q:0,base:0,n:0,rates:new Map(),docs:new Set()});
       p.q+= (L.amt<0?-1:1)*L.q*s; p.base+=L.amt; p.n++; p.docs.add(d.i); const rk=L.tt==='IVA'?L.pct:(L.tt||'—'); p.rates.set(rk,(p.rates.get(rk)||0)+1); } }
-  A.prods=Object.values(prods).map(p=>({code:p.code,desc:p.desc,q:p.q,base:r2(p.base),n:p.n,docs:p.docs.size,rates:[...p.rates.entries()],multi:[...p.rates.keys()].filter(k=>typeof k==='number').length>1}));
+  A.prods=Object.values(prods).map(p=>({code:p.code,desc:p.desc,q:p.q,base:r2(p.base),n:p.n,docs:p.docs.size,rates:[...p.rates.entries()],multi:[...p.rates.keys()].filter(k=>typeof k==='number'&&k>0).length>1}));
   A.custs=Object.values(custs).map(c=>{ const m=R.customers[c.id]||{}; return {id:c.id,nif:m.nif||'',name:m.name||c.id,city:m.city||'',country:m.country||'',docs:c.docs,net:r2(c.net),gross:r2(c.gross),last:c.last,
      valid: (m.country&&m.country!=='PT'&&m.country!=='Desconhecido')?null:(m.nif==='999999990'?null:nifValid(m.nif))}; });
   A.nLinesActive=nLinesActive; A.nDocsActive=SI.filter(active).length;
@@ -849,12 +849,16 @@ function analyse(){
   // Controlo de totais de secção
   const secMap={SI:'SalesInvoices',WD:'WorkingDocuments',MG:'MovementOfGoods',PY:'Payments'}; const hdrItems=[], cntItems=[];
   for(const sc of ['SI','WD','MG','PY']){ const meta=R.sections[secMap[sc]]; if(!meta) continue; const ds=docs.filter(d=>d.sec===sc);
-    if(meta.n!==ds.length) cntItems.push({m:`${secMap[sc]}: cabeçalho indica ${n0(meta.n)} documentos, o ficheiro tem ${n0(ds.length)}`});
+    if(sc==='MG'){ // MovementOfGoods não tem NumberOfEntries: controla-se por NumberOfMovementLines
+      if(meta.nLines!=null){ let all=0, act=0; for(const d of ds){ all+=d.ln; if(d.status!=='A') act+=d.ln; } const n=+meta.nLines; if(n!==all&&n!==act) cntItems.push({sec:sc,m:`${secMap[sc]}: cabeçalho indica ${n0(n)} linhas, o ficheiro tem ${n0(act)} (${n0(all)} incluindo anulados)`}); } }
+    else if(meta.nRaw!=null&&meta.n!==ds.length) cntItems.push({sec:sc,m:`${secMap[sc]}: cabeçalho indica ${n0(meta.n)} documentos, o ficheiro tem ${n0(ds.length)}`});
     if(sc==='SI'||sc==='WD'||sc==='PY'){ let cr=0, db=0; for(const d of ds){ if(d.status==='A') continue; if(sc==='SI'&&d.status==='F') continue; for(let k=d.l0;k<d.l0+d.ln;k++){ const L=lines[k]; if(L.side==='C') cr+=L.amt; else if(L.side==='D') db+=-L.amt; } }
-      if(Math.abs(r2(cr)-meta.credit)>0.011) hdrItems.push({m:`${secMap[sc]}: TotalCredit ${n2(meta.credit)} ≠ soma das linhas ${n2(cr)} (dif. ${n2(r2(cr-meta.credit))})`,v:r2(cr-meta.credit)});
-      if(Math.abs(r2(db)-meta.debit)>0.011) hdrItems.push({m:`${secMap[sc]}: TotalDebit ${n2(meta.debit)} ≠ soma das linhas ${n2(db)} (dif. ${n2(r2(db-meta.debit))})`,v:r2(db-meta.debit)}); } }
-  add('T01','crit','Número de documentos do cabeçalho não coincide','O campo NumberOfEntries da secção não corresponde ao número de documentos existentes.',cntItems);
-  add('T02','crit','Totais de controlo (TotalCredit/TotalDebit) não coincidem','A soma dos valores das linhas não corresponde aos totais de controlo da secção — o programa de contabilidade pode rejeitar o ficheiro.',hdrItems);
+      if(Math.abs(r2(cr)-meta.credit)>0.011) hdrItems.push({sec:sc,m:`${secMap[sc]}: TotalCredit ${n2(meta.credit)} ≠ soma das linhas ${n2(cr)} (dif. ${n2(r2(cr-meta.credit))})`,v:r2(cr-meta.credit)});
+      if(Math.abs(r2(db)-meta.debit)>0.011) hdrItems.push({sec:sc,m:`${secMap[sc]}: TotalDebit ${n2(meta.debit)} ≠ soma das linhas ${n2(db)} (dif. ${n2(r2(db-meta.debit))})`,v:r2(db-meta.debit)}); } }
+  add('T01','crit','Número de faturas do cabeçalho não coincide','O NumberOfEntries da secção de faturação (SalesInvoices) não corresponde ao número de documentos — o ficheiro pode estar incompleto.',cntItems.filter(x=>x.sec==='SI'));
+  add('T04','warn','Contagem do cabeçalho não coincide (guias, conferência ou recibos)','O total de controlo de uma secção que não é faturação não corresponde ao conteúdo. Não afeta a importação das vendas na contabilidade.',cntItems.filter(x=>x.sec!=='SI'));
+  add('T02','crit','Totais de controlo da faturação não coincidem','A soma das linhas de faturação não corresponde ao TotalCredit/TotalDebit de SalesInvoices — o programa de contabilidade pode rejeitar o ficheiro.',hdrItems.filter(x=>x.sec==='SI'));
+  add('T05','warn','Totais de controlo de conferência ou recibos não coincidem','Diferença nos totais de controlo de WorkingDocuments ou Payments. Não afeta a importação das vendas.',hdrItems.filter(x=>x.sec!=='SI'));
   // Documentos
   const it=(f)=>{ const out=[]; for(const d of SI) { const r=f(d); if(r) out.push(r===true?{d:d.i}:Object.assign({d:d.i},r)); } return out; };
   add('D01','crit','Total líquido do documento ≠ soma das linhas','O NetTotal do documento não corresponde à soma dos valores das linhas.', it(d=>d.hasTotals&&Math.abs(d.net-d.sumL)>0.011?{m:`NetTotal ${n2(d.net)} vs linhas ${n2(d.sumL)}`,v:r2(d.net-d.sumL)}:null));
@@ -878,12 +882,12 @@ function analyse(){
   add('D11','warn','NIF de cliente inválido','O NIF do cliente não passa a validação do dígito de controlo.', it(d=>{ const c=custOf(d); if(!c||!c.nif||c.nif==='999999990') return null; if(c.country&&c.country!=='PT'&&c.country!=='Desconhecido') return null; return nifValid(c.nif)?null:{m:`${c.name} — NIF ${c.nif}`}; }));
   add('D12','warn','Fatura simplificada acima do limite','Faturas simplificadas acima do limite legal (configurável nas Definições).', it(d=>d.type==='FS'&&active(d)&&d.gross>CFG.limiteFS?{m:`${eur(d.gross)}`,v:d.gross}:null));
   add('D13','warn','Consumidor final com valor elevado','Documentos sem NIF do adquirente (consumidor final) com valor acima do limite configurado — verificar identificação do adquirente.', it(d=>{ const c=custOf(d); return active(d)&&c&&c.nif==='999999990'&&d.gross>CFG.limiteCF?{m:eur(d.gross),v:d.gross}:null; }));
-  add('D14','warn','Nota de crédito sem referência ao documento de origem','As notas de crédito devem indicar a fatura a que respeitam.', it(d=>d.type==='NC'&&!d.hasRefs?{m:'Sem References'}:null));
+  add('D14','info','Nota de crédito sem referência ao documento de origem','Notas de crédito sem indicação da fatura a que respeitam (ex.: descontos globais ou rappel). Confirmar se é a situação.', it(d=>d.type==='NC'&&!d.hasRefs?{m:'Sem References'}:null));
   add('D15','err','Data do documento posterior à data de registo','A data do documento é posterior à data/hora em que foi registado no sistema.', it(d=>d.sys&&d.date&&d.date>d.sys.slice(0,10)?{m:`Doc ${d.date} · registo ${d.sys.slice(0,10)}`}:null));
   add('D16','info','Registo tardio','Documentos registados vários dias depois da sua data (dias configuráveis).', it(d=>{ if(!d.sys||!d.date) return null; const g=(new Date(d.sys.slice(0,10))-new Date(d.date))/864e5; return g>CFG.diasRegisto?{m:`${Math.round(g)} dias`,v:g}:null; }));
   add('D17','info','Documentos anulados','Lista de documentos com estado A (anulado) — confirmar a justificação.', it(d=>d.status==='A'?{m:'Anulado em '+(d.statusDate||'').slice(0,10),v:d.gross}:null));
   add('D18','info','Documentos manuais ou recuperados','Documentos com origem M (manual/recuperado) ou integrados de outro sistema.', it(d=>d.src&&d.src!=='P'?{m:'Origem '+d.src}:null));
-  add('D19','warn','Documentos de valor zero','Documentos não anulados com total zero.', it(d=>active(d)&&d.hasTotals&&d.gross===0?{m:'Total 0,00'}:null));
+  add('D19','info','Documentos de valor zero','Documentos não anulados com total zero.', it(d=>active(d)&&d.hasTotals&&d.gross===0?{m:'Total 0,00'}:null));
   // Linhas
   const li=(f)=>{ const out=[]; for(const d of SI){ for(let k=d.l0;k<d.l0+d.ln;k++){ const r=f(lines[k],d,k); if(r) out.push(Object.assign({d:d.i,l:k},r===true?{}:r)); } } return out; };
   const ttSet=new Set(R.taxTable.map(t=>`${t.region}|${t.pct}`));
@@ -896,11 +900,11 @@ function analyse(){
   add('L04','err','Código de motivo de isenção desconhecido','O código de isenção não consta da tabela da AT.', li(L=>L.exc&&!EXEMPT_CODES.includes(L.exc)?{m:`${lineDesc(L)} — ${L.exc}`}:null));
   add('L05','warn','Valor da linha ≠ quantidade × preço','O valor da linha não corresponde à quantidade multiplicada pelo preço unitário.', li(L=>{ if(!L.q||!L.up) return null; const c=L.q*L.up; const a=Math.abs(L.amt); return Math.abs(c-a)>Math.max(0.011,a*0.005)?{m:`${lineDesc(L)} — ${n2(L.q)} × ${n2(L.up)} = ${n2(c)} vs ${n2(a)}`,v:r2(a-c)}:null; }));
   const multi=new Set(A.prods.filter(p=>p.multi).map(p=>p.code));
-  const multiItems=li(L=>L.p&&multi.has(L.p)&&L.tt==='IVA'?{m:`${lineDesc(L)} — ${pctf(L.pct)}`,v:L.amt}:null);
+  const multiItems=li(L=>L.p&&multi.has(L.p)&&L.tt==='IVA'&&L.pct>0?{m:`${lineDesc(L)} — ${pctf(L.pct)}`,v:L.amt}:null);
   // taxa minoritária de cada artigo (sugestão = taxa mais frequente)
-  const major={}; for(const p of A.prods) if(p.multi){ let best=null,bn=-1; for(const [k,n] of p.rates) if(typeof k==='number'&&n>bn){bn=n;best=k;} major[p.code]=best; }
+  const major={}; for(const p of A.prods) if(p.multi){ let best=null,bn=-1; for(const [k,n] of p.rates) if(typeof k==='number'&&k>0&&n>bn){bn=n;best=k;} major[p.code]=best; }
   for(const x of multiItems){ const L=lines[x.l]; x.sug=major[L.p]; x.minor= L.pct!==major[L.p]; }
-  add('L06','warn','Mesmo artigo vendido a taxas de IVA diferentes','O mesmo código de artigo aparece com taxas diferentes — normalmente indica erro na ficha do artigo. A sugestão é a taxa mais usada para esse artigo.', multiItems.filter(x=>x.minor),'rate');
+  add('L06','warn','Mesmo artigo vendido a taxas de IVA diferentes','O mesmo código de artigo aparece com taxas de IVA diferentes (não contam as vendas isentas a 0%, como exportações ou intracomunitárias). Normalmente indica erro na ficha do artigo. A sugestão é a taxa mais usada para esse artigo.', multiItems.filter(x=>x.minor),'rate');
   const dict=parseDict(); const clsItems=[];
   if(dict.rules.length){ for(const d of SI){ for(let k=d.l0;k<d.l0+d.ln;k++){ const L=lines[k]; if(L.tt!=='IVA'||L.pct==null||L.reg==null) continue; const t=rateOf(L.reg); if(!t) continue;
       const ds=norm(lineDesc(L)); if(dict.excl.some(x=>x.test(ds))) continue;
@@ -910,13 +914,14 @@ function analyse(){
   const hasProd=Object.keys(R.products).length>0;
   add('H04','info','Ficheiro sem tabela de produtos','O SAF-T não inclui MasterFiles/Product (habitual nos ficheiros de submissão mensal à AT). As descrições são lidas das linhas.', hasProd?[]:[{m:'MasterFiles/Product ausente'}]);
   add('L09','info','Artigo inexistente na tabela de produtos','O código do artigo não existe em MasterFiles/Product.', hasProd?li(L=>L.p&&!R.products[L.p]?{m:`${L.p} — ${lineDesc(L)}`}:null):[]);
-  add('L10','warn','Taxa usada não consta da tabela de impostos','A combinação região/taxa da linha não existe na TaxTable do próprio ficheiro.', li(L=>L.tt==='IVA'&&L.pctRaw!=null&&R.taxTable.length&&!ttSet.has(`${L.reg}|${L.pctRaw}`)?{m:`${L.reg} ${pctf(L.pct)}`}:null));
+  const ttNum=new Set(R.taxTable.filter(t=>t.pct!=null&&t.pct!=='').map(t=>`${t.region}|${+t.pct}`));
+  add('L10','info','Taxa usada não consta da tabela de impostos','A combinação região/taxa da linha não existe na TaxTable do próprio ficheiro.', li(L=>L.tt==='IVA'&&L.pct!=null&&ttNum.size&&!ttNum.has(`${L.reg}|${L.pct}`)?{m:`${L.reg} ${pctf(L.pct)}`}:null));
   // Controlo mapa vs documentos
   const dif=r2(A.totals.tax-A.totals.ivaMap);
-  add('T03','warn','IVA dos documentos ≠ IVA do mapa por taxa','A soma do IVA dos documentos difere do IVA calculado por taxa (diferenças de arredondamento ou erros de totais).', Math.abs(dif)>0.05?[{m:`Documentos ${n2(A.totals.tax)} vs mapa ${n2(A.totals.ivaMap)} (dif. ${n2(dif)})`,v:dif}]:[]);
+  add('T03','info','IVA dos documentos ≠ IVA do mapa por taxa','A soma do IVA dos documentos difere do IVA calculado por taxa para além do arredondamento esperado (o programa arredonda documento a documento; o mapa calcula por taxa).', Math.abs(dif)>Math.max(0.05,Math.abs(A.totals.tax)*0.0002)?[{m:`Documentos ${n2(A.totals.tax)} vs mapa ${n2(A.totals.ivaMap)} (dif. ${n2(dif)})`,v:dif}]:[]);
   // Tabela de impostos com taxas estranhas
-  const odd=R.taxTable.filter(t=>t.type==='IVA'&&validRates(t.region)&&!validRates(t.region).includes(+t.pct));
-  add('C01','warn','Tabela de impostos do programa com taxas inválidas','A TaxTable do programa de faturação contém taxas que não existem na região — risco de serem escolhidas por engano. Recomenda-se apagá-las/desativá-las no programa.', odd.map(t=>({m:`${t.region} ${t.code} ${pctf(+t.pct)}`})));
+  const odd=R.taxTable.filter(t=>t.type==='IVA'&&validRates(t.region)&&!validRates(t.region).includes(+t.pct)&&!(t.exp&&t.exp<(H.StartDate||'')));
+  add('C01','info','Tabela de impostos do programa com taxas inválidas','A TaxTable do programa de faturação contém taxas que não existem na região — risco de serem escolhidas por engano. Recomenda-se apagá-las/desativá-las no programa.', odd.map(t=>({m:`${t.region} ${t.code} ${pctf(+t.pct)}`})));
 
   // ---------- Auditoria (padrões) ----------
   const ops={}; let anTot=0, docTot=0; for(const d of SI){ const u=d.user||'—'; const o=ops[u]||(ops[u]={user:u,docs:0,net:0,anul:0,anulv:0,nc:0,ncv:0}); docTot++;
@@ -938,7 +943,8 @@ function analyse(){
   add('A06','warn','Peso elevado de notas de crédito','As notas de crédito representam mais de 5% das vendas do período.', salesv&&ncv/salesv>0.05?[{m:`${eur(ncv)} em notas de crédito (${(ncv/salesv*100).toFixed(1).replace('.',',')}% das vendas)`,v:r2(ncv)}]:[]);
   // ---------- Documentos de conferência, preços, ofertas ----------
   const WDdocs=docs.filter(d=>d.sec==='WD'); const wdOpen=WDdocs.filter(d=>d.status==='N');
-  add('A07','warn','Documentos de conferência por faturar','Consultas de mesa, notas de encomenda, orçamentos ou pró-formas que continuam em aberto (estado N) — confirmar se foram ou vão ser faturados. A AT controla especialmente as consultas de mesa não convertidas em fatura.', wdOpen.map(d=>({d:d.i,m:`${d.type} — ${DOC_TYPES[d.type]||''} · ${custName(d)}`,v:d.gross||d.net})));
+  add('A07','warn','Consultas de mesa por faturar','Consultas de mesa (CM) que continuam em aberto — a AT controla especialmente as consultas de mesa não convertidas em fatura.', wdOpen.filter(d=>d.type==='CM').map(d=>({d:d.i,m:`${d.type} — ${DOC_TYPES[d.type]||''} · ${custName(d)}`,v:d.gross||d.net})));
+  add('A10','info','Encomendas, orçamentos e pró-formas em aberto','Documentos de conferência em aberto (notas de encomenda, orçamentos, pró-formas…) — normal enquanto aguardam entrega ou faturação.', wdOpen.filter(d=>d.type!=='CM').map(d=>({d:d.i,m:`${d.type} — ${DOC_TYPES[d.type]||''} · ${custName(d)}`,v:d.gross||d.net})));
   const pst={}; for(const d of SI){ if(!active(d)||d.type==='NC') continue; for(let k=d.l0;k<d.l0+d.ln;k++){ const L=lines[k]; if(!L.p||L.q<=0) continue; const x=pst[L.p]||(pst[L.p]={code:L.p,desc:lineDesc(L),min:Infinity,max:-Infinity,n:0,set:new Set(),zero:0,zeroQ:0,q:0,base:0,disc:0});
       x.n++; x.q+=L.q; x.base+=L.amt; x.disc+=L.disc||0; if(L.up<=0){ x.zero++; x.zeroQ+=L.q; continue; } x.min=Math.min(x.min,L.up); x.max=Math.max(x.max,L.up); x.set.add(Math.round(L.up*10000)); } }
   A.prices=Object.values(pst).filter(x=>x.n).map(x=>({code:x.code,desc:x.desc,n:x.n,q:r2(x.q),base:r2(x.base),pm:x.q?x.base/x.q:0,min:isFinite(x.min)?x.min:0,max:isFinite(x.max)?x.max:0,np:x.set.size,amp:isFinite(x.min)&&x.min>0?(x.max-x.min)/x.min*100:0,zero:x.zero,zeroQ:x.zeroQ,disc:r2(x.disc),open:x.set.size>15}));
@@ -2260,6 +2266,201 @@ async function pdfSales(){ const X=await ensureCtx(); if(!X||!X.M) return toast(
 /* ---------- integração ---------- */
 document.addEventListener('DOMContentLoaded',()=>{ PERIOD_VIEWS.forEach(v=>{ const n=$(`.nav[data-v="${v}"]`); if(n) n.classList.remove('need'); });
   VIEWS.iva=['Mapa de IVA & Declaração Periódica','Por período'];VIEWS.analises=['Análises de gestão','Por período'];VIEWS.artigos=['Artigos','Por período'];VIEWS.clientes=['Clientes','Por período'];VIEWS.relatorios=['Relatórios & Exportações','Por período e do ficheiro aberto']; });
+
+/* =====================================================================
+   FINANCEIRO — diário de vendas SNC, conta corrente, mercados, IVA completo,
+   retenções, projeção do ano e dossier anual (a partir do SAF-T de faturação)
+   ===================================================================== */
+const lastDay=ym=>{ const y=+ym.slice(0,4), m=+ym.slice(5); return ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'); };
+const EU=new Set(['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','EL','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','RO','SE','SI','SK','XI']);
+// Enquadramento dos motivos de isenção na DP (Quadro 06) — segundo as instruções oficiais da AT
+const EXC_DP={M16:'7',M40:'7',M05:'8',M06:'8',M26:'8',M30:'8',M31:'8',M32:'8',M33:'8',M34:'8',M41:'8',M42:'8',M43:'8',M44:'8',M07:'9'};
+const EXC_TXT={M01:'Art. 16.º n.º 6 CIVA (não inclusão no valor tributável)',M02:'Art. 6.º DL 198/90',M04:'Art. 13.º CIVA',M05:'Art. 14.º CIVA (exportações)',M06:'Art. 15.º CIVA',M07:'Art. 9.º CIVA (isenção sem direito à dedução)',M09:'Art. 62.º b) CIVA',M10:'Art. 53.º CIVA (regime de isenção)',M11:'Regime particular do tabaco',M12:'Regime da margem — agências de viagens',M13:'Regime da margem — bens em segunda mão',M14:'Regime da margem — objetos de arte',M15:'Regime da margem — objetos de coleção e antiguidades',M16:'Art. 14.º RITI (intracomunitárias)',M19:'Outras isenções',M20:'Regime forfetário',M21:'IVA — não confere direito à dedução',M25:'Mercadorias à consignação',M26:'Isenção de IVA com direito à dedução no cabaz alimentar',M30:'Inversão do sujeito passivo — art. 2.º n.º 1 i)',M31:'Inversão — art. 2.º n.º 1 j)',M32:'Inversão — art. 2.º n.º 1 l)',M33:'Inversão — art. 2.º n.º 1 m)',M34:'Inversão — art. 2.º n.º 1 n)',M40:'Art. 6.º n.º 6 a) CIVA (serviços intracomunitários)',M41:'Art. 8.º n.º 3 RITI (triangulares)',M42:'DL 21/2007 (construção)',M43:'DL 362/99 (sucatas)',M44:'Art. 6.º CIVA — não localizadas em Portugal',M99:'Não sujeito / não tributado'};
+const DEF_CONTAS={cli:'2111',vMercNac:'71111',vMercUE:'71112',vMercFora:'71113',vServNac:'72111',vServUE:'72112',vServFora:'72113',dev:'717',ivaRED:'243311',ivaINT:'243312',ivaNOR:'243313',ivaReg:'24341',ivaOutro:'24331',ret:'2412'};
+const CONTAS_L={cli:'Clientes c/c',vMercNac:'Vendas de mercadorias — mercado nacional',vMercUE:'Vendas de mercadorias — mercado comunitário',vMercFora:'Vendas de mercadorias — mercado extracomunitário',vServNac:'Prestações de serviços — nacional',vServUE:'Prestações de serviços — comunitário',vServFora:'Prestações de serviços — extracomunitário',dev:'Devoluções e descontos (notas de crédito)',ivaRED:'IVA liquidado — taxa reduzida',ivaINT:'IVA liquidado — taxa intermédia',ivaNOR:'IVA liquidado — taxa normal',ivaReg:'IVA — regularizações a favor (notas de crédito)',ivaOutro:'IVA liquidado — outras taxas',ret:'Retenções na fonte sofridas'};
+function contasOf(nif){ return Object.assign({},DEF_CONTAS,CFG.contas||{},(CFG.contasEmp||{})[nif]||{}); }
+function mktOf(cu){ const c=String(cu&&cu.country||'PT').toUpperCase(); if(!c||c==='PT'||c==='DESCONHECIDO') return 'nac'; return EU.has(c)?'ue':'fora'; }
+
+/* ---------- dados financeiros no resumo mensal ---------- */
+function addFin(list){ const R=S.R; if(!R||!list||!list.length) return; const H=R.header; const by={}; for(const c of list) by[c.ym]=c;
+  const F=ym=>{ const c=by[ym]; if(!c) return null; return c.fin||(c.fin={sS:{net:0,tax:0,gross:0,n:0},sN:{net:0,tax:0,gross:0,n:0},rS:{},rN:{},mk:{},mkN:{},exS:{},exN:{},wht:{v:0,n:0,c:{}},recap:{},inv:[],rec:[],ncr:[],natSrc:Object.keys(R.products).length?'tabela':'sem tabela'}); };
+  const nat=L=>{ const p=R.products[L.p]; const t=p&&p.type; return t==='S'?'S':'P'; };
+  for(const d of R.docs){ if(!d.date) continue; const ym=d.date.slice(0,7); const f=F(ym); if(!f) continue;
+    if(d.sec==='PY'){ if(d.status==='A') continue; for(let k=d.l0;k<d.l0+d.ln;k++){ const L=R.lines[k]; if(L.ref&&f.rec.length<3000) f.rec.push({r:L.ref,rn:d.no,d:d.date,v:r2(Math.abs(L.amt))}); } continue; }
+    if(d.sec!=='SI'||d.status==='A'||d.status==='F') continue;
+    const cu=R.customers[d.cust]; const mk=mktOf(cu); const isNC=d.type==='NC'; const T=isNC?f.sN:f.sS; T.net+=d.net; T.tax+=d.tax; T.gross+=d.gross; T.n++;
+    if(d.wht){ const sg=isNC?-1:1; f.wht.v+=sg*d.wht; f.wht.n++; const w=f.wht.c[d.cust]||(f.wht.c[d.cust]={nif:cu?cu.nif:'',name:cu?cu.name:d.cust,v:0,n:0}); w.v+=sg*d.wht; w.n++; }
+    if((d.type==='FT'||d.type==='ND')&&!(d.pay&&d.pay.length)&&f.inv.length<2500) f.inv.push({n:d.no,d:d.date,c:d.cust,nf:cu?cu.nif:'',nm:cu?cu.name:d.cust,g:d.gross});
+    for(let k=d.l0;k<d.l0+d.ln;k++){ const L=R.lines[k]; const a=isNC?-L.amt:L.amt;
+      const key=`${L.tt||'—'}|${L.reg||''}|${L.code||''}|${L.pct==null?'':L.pct}`; const RR=isNC?f.rN:f.rS; const x=RR[key]||(RR[key]={tt:L.tt,reg:L.reg,code:L.code,pct:L.pct,base:0}); x.base+=a;
+      const mkk=mk+'|'+nat(L); const MK=isNC?f.mkN:f.mk; MK[mkk]=(MK[mkk]||0)+a;
+      if((L.tt==='IVA'&&L.pct===0)||L.tt==='NS'){ const ek=L.exc||'(sem código)'; const EX=isNC?f.exN:f.exS; const e=EX[ek]||(EX[ek]={base:0,reason:L.excR||''}); e.base+=a; }
+      if(mk==='ue'&&((L.tt==='IVA'&&L.pct===0)||L.tt==='NS')){ const rk=(cu&&cu.nif)||d.cust; const rc=f.recap[rk]||(f.recap[rk]={nif:cu?cu.nif:'',name:cu?cu.name:d.cust,country:cu?cu.country:'',bens:0,serv:0,outros:0}); const sg=isNC?-1:1; if(L.exc==='M16') rc.bens+=sg*a; else if(L.exc==='M40') rc.serv+=sg*a; else rc.outros+=sg*a; }
+      if(isNC&&L.ref&&f.ncr.length<1500) f.ncr.push({r:L.ref,v:r2(Math.abs(a)*(1+(L.pct||0)/100))}); } }
+  for(const c of list){ const f=c.fin; if(!f) continue; for(const T of [f.sS,f.sN]) ['net','tax','gross'].forEach(k=>T[k]=r2(T[k]));
+    for(const RR of [f.rS,f.rN]) for(const x of Object.values(RR)) x.base=r2(x.base); for(const MK of [f.mk,f.mkN]) for(const k in MK) MK[k]=r2(MK[k]);
+    for(const EX of [f.exS,f.exN]) for(const x of Object.values(EX)) x.base=r2(x.base); f.wht.v=r2(f.wht.v); for(const w of Object.values(f.wht.c)) w.v=r2(w.v);
+    for(const x of Object.values(f.recap)){ x.bens=r2(x.bens); x.serv=r2(x.serv); x.outros=r2(x.outros); } } }
+const _bcBase=buildCubes; buildCubes=function(){ const r=_bcBase(); try{ addFin(r); }catch(e){ console.error('fin',e); } return r; };
+function finMerge(list){ const m={sS:{net:0,tax:0,gross:0,n:0},sN:{net:0,tax:0,gross:0,n:0},rS:{},rN:{},mk:{},mkN:{},exS:{},exN:{},wht:{v:0,n:0,c:{}},recap:{},has:0,miss:[]};
+  for(const c of list){ const f=c.fin; if(!f){ m.miss.push(c.ym); continue; } m.has++;
+    for(const k of ['sS','sN']) for(const x of ['net','tax','gross','n']) m[k][x]+=f[k][x]||0;
+    for(const k of ['rS','rN']) for(const key in f[k]){ const r=f[k][key], x=m[k][key]||(m[k][key]={tt:r.tt,reg:r.reg,code:r.code,pct:r.pct,base:0}); x.base+=r.base; }
+    for(const k of ['mk','mkN']) for(const key in f[k]) m[k][key]=(m[k][key]||0)+f[k][key];
+    for(const k of ['exS','exN']) for(const key in f[k]){ const e=f[k][key], x=m[k][key]||(m[k][key]={base:0,reason:e.reason}); x.base+=e.base; }
+    m.wht.v+=f.wht.v; m.wht.n+=f.wht.n; for(const id in f.wht.c){ const w=f.wht.c[id], x=m.wht.c[id]||(m.wht.c[id]={nif:w.nif,name:w.name,v:0,n:0}); x.v+=w.v; x.n+=w.n; }
+    for(const k in f.recap){ const r=f.recap[k], x=m.recap[k]||(m.recap[k]={nif:r.nif,name:r.name,country:r.country,bens:0,serv:0,outros:0}); x.bens+=r.bens; x.serv+=r.serv; x.outros+=r.outros; } }
+  return m; }
+function rateSlot(reg,pct){ const t=rateOf(reg); if(!t||!pct) return null; return pct===t.RED?'RED':pct===t.INT?'INT':pct===t.NOR?'NOR':null; }
+
+/* ---------- Diário de vendas (SNC) ---------- */
+function diarioLines(f,nif,label){ const C=contasOf(nif); const L=[]; const add=(conta,desc,db,cr)=>{ db=r2(db); cr=r2(cr); if(Math.abs(db)<0.005&&Math.abs(cr)<0.005) return; L.push({conta,desc,db,cr}); };
+  const accV=(mk,nat)=>nat==='S'?({nac:C.vServNac,ue:C.vServUE,fora:C.vServFora})[mk]:({nac:C.vMercNac,ue:C.vMercUE,fora:C.vMercFora})[mk];
+  // vendas
+  add(C.cli,'Clientes — vendas de '+label,f.sS.gross,0);
+  for(const k of Object.keys(f.mk).sort()){ const [mk,nat]=k.split('|'); add(accV(mk,nat),CONTAS_L[nat==='S'?'vServ'+({nac:'Nac',ue:'UE',fora:'Fora'})[mk]:'vMerc'+({nac:'Nac',ue:'UE',fora:'Fora'})[mk]],0,f.mk[k]); }
+  const ivaLines=(RR,total,side)=>{ const slots={}; let calc=0; for(const r of Object.values(RR)){ if(r.tt!=='IVA'||!r.pct) continue; const s=rateSlot(r.reg,r.pct)||'OUT'; const v=r2(r.base*r.pct/100); slots[s]=(slots[s]||0)+v; calc+=v; }
+    const keys=Object.keys(slots); if(!keys.length&&Math.abs(total)>0.005){ slots.OUT=0; keys.push('OUT'); }
+    const dif=r2(total-calc); if(keys.length){ const big=keys.sort((a,b)=>slots[b]-slots[a])[0]; slots[big]+=dif; }
+    for(const s of ['RED','INT','NOR','OUT']) if(slots[s]!=null){ const acc=side==='cr'?({RED:C.ivaRED,INT:C.ivaINT,NOR:C.ivaNOR,OUT:C.ivaOutro})[s]:C.ivaReg; const desc=side==='cr'?CONTAS_L[{RED:'ivaRED',INT:'ivaINT',NOR:'ivaNOR',OUT:'ivaOutro'}[s]]:CONTAS_L.ivaReg+' — '+({RED:'reduzida',INT:'intermédia',NOR:'normal',OUT:'outras'})[s]; side==='cr'?add(acc,desc,0,slots[s]):add(acc,desc,slots[s],0); } return dif; };
+  // IVA das vendas: total dos documentos (TaxPayable) repartido por taxa; o arredondamento vai para a taxa principal
+  const d1=ivaLines(f.rS,f.sS.tax,'cr');
+  // a base das linhas pode diferir em cêntimos do NetTotal dos documentos
+  const baseS=Object.values(f.mk).reduce((s,v)=>s+v,0); const db1=r2(f.sS.net-baseS); if(Math.abs(db1)>=0.005) add(C.vMercNac,'Acerto de arredondamento (base)',0,db1);
+  // notas de crédito
+  if(f.sN.n){ const baseN=Object.values(f.mkN).reduce((s,v)=>s+v,0); add(C.dev,CONTAS_L.dev,f.sN.net,0); ivaLines(f.rN,f.sN.tax,'db'); add(C.cli,'Clientes — notas de crédito de '+label,0,f.sN.gross); }
+  if(Math.abs(f.wht.v)>=0.005){ add(C.ret,CONTAS_L.ret,f.wht.v,0); add(C.cli,'Clientes — retenções na fonte',0,f.wht.v); }
+  const tdb=r2(L.reduce((s,x)=>s+x.db,0)), tcr=r2(L.reduce((s,x)=>s+x.cr,0)); return {L,tdb,tcr,ok:Math.abs(tdb-tcr)<0.005}; }
+
+/* ---------- Conta corrente / antiguidade ---------- */
+function arCompute(cubes,refDate){ const inv=new Map(); const pays=new Map(); const ncs=new Map(); const seen=new Set();
+  for(const c of cubes){ const f=c.fin; if(!f) continue; for(const i of f.inv) inv.set(i.n,i); for(const r of f.rec){ const key=(r.rn||'')+'|'+r.r; if(r.rn&&seen.has(key)) continue; seen.add(key); const a=pays.get(r.r)||[]; a.push(r); pays.set(r.r,a); } for(const n of f.ncr) ncs.set(n.r,(ncs.get(n.r)||0)+n.v); }
+  const open=[]; let pw=0, pv=0;
+  for(const i of inv.values()){ if(i.d>refDate) continue; const ps=(pays.get(i.n)||[]).filter(p=>p.d<=refDate); const paid=ps.reduce((s,p)=>s+p.v,0)+(ncs.get(i.n)||0);
+    for(const p of ps){ const days=Math.max(0,(new Date(p.d)-new Date(i.d))/864e5); pw+=days*p.v; pv+=p.v; }
+    const rest=r2(i.g-paid); if(rest>0.05){ const age=Math.max(0,Math.round((new Date(refDate)-new Date(i.d))/864e5)); open.push({...i,rest,age,b:age<=30?0:age<=60?1:age<=90?2:age<=180?3:4}); } }
+  const byC={}; for(const o of open){ const x=byC[o.c]||(byC[o.c]={c:o.c,nif:o.nf,name:o.nm,t:0,b:[0,0,0,0,0],n:0,oldest:o.d}); x.t+=o.rest; x.b[o.b]+=o.rest; x.n++; if(o.d<x.oldest) x.oldest=o.d; }
+  return {open,byC:Object.values(byC).map(x=>({...x,t:r2(x.t),b:x.b.map(r2)})).sort((a,b)=>b.t-a.t),pmr:pv?pw/pv:null,nInv:inv.size}; }
+
+/* ---------- Vista Financeiro ---------- */
+VIEWS.financeiro=['Financeiro','Diário de vendas, conta corrente, mercados, IVA, retenções, projeção e dossier'];
+const FIN_TABS=[['diario','Diário de vendas (SNC)'],['cc','Conta corrente & antiguidade'],['mercados','Mercados & Recapitulativa'],['iva','IVA completo'],['ret','Retenções'],['proj','Projeção do ano'],['dossier','Dossier anual']];
+RENDER.financeiro=function(){ periodView('financeiro',(el,M,X)=>{ const t=S.finTab||'diario';
+  const F=finMerge(X.sel); el.innerHTML=`<div class="tabs" id="fnTabs" style="margin-top:16px">${FIN_TABS.map(([k,l])=>`<div class="tab ${k===t?'on':''}" data-t="${k}">${l}</div>`).join('')}</div>${F.miss.length?`<div class="card" style="border-color:var(--warn);margin-bottom:12px"><b class="st-warn">${ico('alert')} ${F.miss.length} mês(es) foram carregados numa versão anterior e não têm dados financeiros:</b> ${F.miss.map(ymLabel).join(', ')}. <span class="hint">Volte a carregar esses SAF-T (Importação em lote) para os incluir.</span></div>`:''}<div id="fnBody"></div>`;
+  $$('#fnTabs .tab',el).forEach(x=>x.onclick=()=>{ S.finTab=x.dataset.t; RENDER.financeiro(); });
+  ({diario:fDiario,cc:fConta,mercados:fMercados,iva:fIva,ret:fRet,proj:fProj,dossier:fDossier})[t]($('#fnBody'),F,M,X); }); };
+
+function fDiario(el,F,M,X){ const nif=S.ctx.nif; const C=contasOf(nif); const months=X.sel.filter(c=>c.fin);
+  const per=months.map(c=>({ym:c.ym,...diarioLines(c.fin,nif,ymLabel(c.ym))})); const tot=diarioLines(F,nif,ctxLabel());
+  el.innerHTML=`<div class="grid g4">${kpi('Débitos',eur(tot.tdb),ctxLabel())}${kpi('Créditos',eur(tot.tcr),'')}${kpi('Equilíbrio',tot.ok?'<span class="st-ok">Débito = Crédito</span>':'<span class="st-crit">Desequilibrado</span>',tot.ok?'verificado':'dif. '+n2(tot.tdb-tot.tcr))}${kpi('Lançamentos',n0(per.length),'um resumo por mês')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('file')} Lançamento resumo — ${esc(ctxLabel())} <span class="r"><button class="btn sm" id="djCsv">${ico('down')} Excel (um lançamento por mês)</button><button class="btn sm" id="djPdf">${ico('pdf')} PDF</button></span></h3><div id="djT"></div>
+    <p class="hint" style="margin-top:8px">Clientes pelo total dos documentos, vendas pela base e IVA pelo TaxPayable dos documentos, repartido por taxa (o arredondamento fica na taxa principal). ${F.has&&X.sel[0].fin&&X.sel[0].fin.natSrc==='sem tabela'?'O ficheiro não traz a tabela de produtos, por isso todas as vendas vão para mercadorias (71). Ajuste as contas se forem serviços.':'Mercadorias e serviços são separados pelo tipo de produto do SAF-T.'}</p></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('gear')} Plano de contas <span class="r hint">${(CFG.contasEmp||{})[nif]?'personalizado para esta empresa':'padrão do gabinete'}</span></h3><div class="grid g3" id="djC">${Object.keys(DEF_CONTAS).map(k=>`<label class="fld">${CONTAS_L[k]}<input class="inp mono" data-c="${k}" value="${esc(C[k])}"></label>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><button class="btn pri" id="djSaveE">${ico('save')} Guardar para esta empresa</button><button class="btn" id="djSaveG">Guardar como padrão do gabinete</button><button class="btn danger" id="djReset">Repor padrão</button></div></div>`;
+  table($('#djT'),{rows:tot.L,size:200,cols:[{k:'conta',l:'Conta',f:v=>`<b class="mono">${esc(v)}</b>`},{k:'desc',l:'Descrição'},{k:'db',l:'Débito',num:1,f:v=>v?n2(v):''},{k:'cr',l:'Crédito',num:1,f:v=>v?n2(v):''}],foot:(c)=>c.k==='conta'?'Total':c.k==='db'?n2(tot.tdb):c.k==='cr'?n2(tot.tcr):''});
+  const read=()=>{ const o={}; $$('[data-c]',el).forEach(i=>o[i.dataset.c]=i.value.trim()); return o; };
+  $('#djSaveE').onclick=async()=>{ CFG.contasEmp=CFG.contasEmp||{}; CFG.contasEmp[nif]=read(); await cloudSaveConfig(); toast('Plano de contas guardado para esta empresa','ok'); RENDER.financeiro(); };
+  $('#djSaveG').onclick=async()=>{ CFG.contas=read(); await cloudSaveConfig(); toast('Plano de contas padrão guardado','ok'); RENDER.financeiro(); };
+  $('#djReset').onclick=async()=>{ if(CFG.contasEmp) delete CFG.contasEmp[nif]; await cloudSaveConfig(); RENDER.financeiro(); };
+  $('#djCsv').onclick=()=>{ const rows=[]; for(const p of per){ const last=lastDay(p.ym); p.L.forEach((l,i)=>rows.push({data:last,doc:'VND-'+p.ym,linha:i+1,conta:l.conta,desc:l.desc,db:l.db||'',cr:l.cr||''})); }
+    csvDownload(`AuditNux_diario_vendas_${nif}_${S.ctx.from}_${S.ctx.to}.csv`,[{label:'Data',k:'data'},{label:'Documento',k:'doc'},{label:'Linha',k:'linha'},{label:'Conta',k:'conta'},{label:'Descrição',k:'desc'},{label:'Débito',k:'db'},{label:'Crédito',k:'cr'}],rows); };
+  $('#djPdf').onclick=()=>{ const doc=pdfNew('Diário de Vendas — Lançamento Resumo'); if(!doc) return; const emp=X.nifs.get(nif)||''; let y=26;
+    for(const p of (per.length>1?[{ym:'',...tot},...per]:per)){ y=pdfH(doc,y,p.ym?ymLong(p.ym):'Total do período — '+ctxLabel()); y=pdfTable(doc,y,['Conta','Descrição','Débito','Crédito'],p.L.map(l=>[l.conta,l.desc,l.db?n2(l.db):'',l.cr?n2(l.cr):'']),{foot:[['','Total',n2(p.tdb),n2(p.tcr)]],columnStyles:{0:{cellWidth:24,fontStyle:'bold'},2:{halign:'right'},3:{halign:'right'}}}); }
+    pdfFrame(doc,`${emp}  ·  NIF ${nif}  ·  ${ctxLabel()}`); doc.save(`AuditNux_Diario_Vendas_${nif}_${S.ctx.from}_${S.ctx.to}.pdf`); }; }
+
+async function fConta(el,F,M,X){ const nif=S.ctx.nif; const cubesAll=(await loadCubes(nif)).filter(c=>c.ym<=S.ctx.to); const ref=lastDay(S.ctx.to);
+  const A=arCompute(cubesAll,ref); const tot=A.byC.reduce((s,x)=>s+x.t,0); const B=[0,1,2,3,4].map(i=>A.byC.reduce((s,x)=>s+x.b[i],0)); const BL=['0–30 dias','31–60','61–90','91–180','> 180 dias'];
+  el.innerHTML=`<div class="grid g4">${kpi('Saldo em aberto',eur(tot),'a '+ref.split('-').reverse().join('/'))}${kpi('Clientes com saldo',n0(A.byC.length),n0(A.open.length)+' faturas em aberto')}${kpi('Vencido há mais de 90 dias',eur(B[3]+B[4]),tot?((B[3]+B[4])/tot*100).toFixed(1).replace('.',',')+'% do saldo':'')}${kpi('Prazo médio de recebimento',A.pmr==null?'—':Math.round(A.pmr)+' dias','recibos emitidos')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('scale')} Antiguidade de saldos</h3><div id="ccB"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('users')} Saldos por cliente <span class="r"><button class="btn sm" id="ccCsv">${ico('down')} Excel</button><button class="btn sm" id="ccPdf">${ico('pdf')} PDF</button></span></h3><div id="ccT"></div>
+   <p class="hint" style="margin-top:8px">Considera as faturas a crédito (FT/ND sem pagamento no próprio documento) de todos os meses carregados até ${esc(ymLabel(S.ctx.to))}, menos os recibos e as notas de crédito que as referem. Recebimentos feitos fora do programa de faturação não aparecem — confirmar com a conta 21 da contabilidade.</p></div>`;
+  hbars($('#ccB'),BL.map((l,i)=>({k:l,v:B[i]})));
+  const cols=[{k:'name',l:'Cliente'},{k:'nif',l:'NIF'},{k:'n',l:'Faturas',num:1,f:n0},...BL.map((l,i)=>({k:'b'+i,l,num:1,v:x=>x.b[i],f:v=>v?n2(v):''})),{k:'t',l:'Total',num:1,f:n2},{k:'oldest',l:'Mais antiga'}];
+  table($('#ccT'),{rows:A.byC,size:50,cols,empty:'Sem saldos em aberto (ou sem faturas a crédito nos meses carregados)',foot:(c,rs)=>c.k==='name'?'Total':c.k==='t'?n2(rs.reduce((s,x)=>s+x.t,0)):c.k.startsWith('b')&&c.k.length===2?n2(rs.reduce((s,x)=>s+x.b[+c.k[1]],0)):'',
+    onRow:x=>{ const its=A.open.filter(o=>o.c===x.c).sort((a,b)=>a.d.localeCompare(b.d)); modal(`${ico('users')} ${esc(x.name)}`,'<div id="ccD"></div>','<button class="btn pri" onclick="closeModal()">Fechar</button>'); table($('#ccD'),{rows:its,cols:[{k:'n',l:'Fatura'},{k:'d',l:'Data'},{k:'age',l:'Dias',num:1,f:n0},{k:'g',l:'Total',num:1,f:n2},{k:'rest',l:'Em aberto',num:1,f:n2}]}); }});
+  $('#ccCsv').onclick=()=>csvDownload(`AuditNux_saldos_clientes_${nif}_${S.ctx.to}.csv`,[{label:'Cliente',k:'name'},{label:'NIF',k:'nif'},{label:'Faturas',k:'n'},...BL.map((l,i)=>({label:l,v:x=>x.b[i]})),{label:'Total',k:'t'},{label:'Mais antiga',k:'oldest'}],A.byC);
+  $('#ccPdf').onclick=()=>{ const doc=pdfNew('Antiguidade de Saldos de Clientes','l'); if(!doc) return; const emp=X.nifs.get(nif)||''; let y=26;
+    y=kpiBoxes(doc,y,[{l:'Saldo em aberto',v:eur(tot)},{l:'Clientes com saldo',v:n0(A.byC.length)},{l:'Vencido > 90 dias',v:eur(B[3]+B[4])}]);
+    y=pdfTable(doc,y,['Cliente','NIF','Faturas',...BL,'Total','Mais antiga'],A.byC.map(x=>[x.name,x.nif,n0(x.n),...x.b.map(v=>v?n2(v):''),n2(x.t),x.oldest]),{foot:[['Total','','',...B.map(n2),n2(tot),'']],columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right',fontStyle:'bold'}}});
+    pdfFrame(doc,`${emp}  ·  NIF ${nif}  ·  saldos a ${ref.split('-').reverse().join('/')}`); doc.save(`AuditNux_Saldos_Clientes_${nif}_${S.ctx.to}.pdf`); }; }
+
+function fMercados(el,F,M,X){ const MKL={nac:'Nacional',ue:'União Europeia',fora:'Fora da UE'}; const NL={P:'Mercadorias',S:'Serviços'};
+  const rows=Object.entries(F.mk).map(([k,v])=>{ const [mk,nat]=k.split('|'); return {mk,nat,v,nc:F.mkN[k]||0}; }); const tot=rows.reduce((s,r)=>s+r.v-r.nc,0)||1;
+  const byMk=['nac','ue','fora'].map(mk=>({k:MKL[mk],v:r2(rows.filter(r=>r.mk===mk).reduce((s,r)=>s+r.v-r.nc,0))}));
+  const recap=Object.values(F.recap).map(r=>({...r,bens:r2(r.bens),serv:r2(r.serv),outros:r2(r.outros),tot:r2(r.bens+r.serv+r.outros)})).filter(r=>Math.abs(r.tot)>=0.01).sort((a,b)=>b.tot-a.tot);
+  el.innerHTML=`<div class="grid g3">${byMk.map(x=>kpi(x.k,eur(x.v),(x.v/tot*100).toFixed(1).replace('.',',')+'% das vendas líquidas')).join('')}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('layers')} Vendas por mercado e natureza</h3><div id="mkT"></div></div><div class="card"><h3>${ico('chart')} Distribuição</h3><div id="mkH"></div></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('file')} Pré-Declaração Recapitulativa — ${esc(ctxLabel())} <span class="r"><button class="btn sm" id="rcCsv">${ico('down')} Excel</button></span></h3><div id="rcT"></div>
+   <p class="hint" style="margin-top:8px">Vendas isentas a clientes de outros Estados-membros, por NIF. Bens = art. 14.º RITI (M16) · Serviços = art. 6.º n.º 6 a) CIVA (M40). Confirmar o NIF intracomunitário válido (VIES) de cada cliente antes de entregar a declaração.</p></div>`;
+  table($('#mkT'),{rows,cols:[{k:'mk',l:'Mercado',v:r=>MKL[r.mk]},{k:'nat',l:'Natureza',v:r=>NL[r.nat]},{k:'v',l:'Vendas',num:1,f:n2},{k:'nc',l:'Notas de crédito',num:1,f:n2},{k:'l',l:'Líquido',num:1,v:r=>r2(r.v-r.nc),f:n2}],foot:(c,rs)=>c.k==='mk'?'Total':['v','nc','l'].includes(c.k)?n2(rs.reduce((s,r)=>s+(c.k==='l'?r.v-r.nc:r[c.k]),0)):''});
+  hbars($('#mkH'),byMk);
+  table($('#rcT'),{rows:recap,empty:'Sem vendas intracomunitárias no período',cols:[{k:'country',l:'País'},{k:'nif',l:'NIF'},{k:'name',l:'Cliente'},{k:'bens',l:'Bens (M16)',num:1,f:n2},{k:'serv',l:'Serviços (M40)',num:1,f:n2},{k:'outros',l:'Outros códigos',num:1,html:r=>r.outros?`<span class="st-warn">${n2(r.outros)}</span>`:''},{k:'tot',l:'Total',num:1,f:n2}],foot:(c,rs)=>['bens','serv','outros','tot'].includes(c.k)?n2(rs.reduce((s,r)=>s+r[c.k],0)):''});
+  $('#rcCsv').onclick=()=>csvDownload(`AuditNux_recapitulativa_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,[{label:'País',k:'country'},{label:'NIF',k:'nif'},{label:'Cliente',k:'name'},{label:'Bens (M16)',k:'bens'},{label:'Serviços (M40)',k:'serv'},{label:'Outros',k:'outros'},{label:'Total',k:'tot'}],recap); }
+
+function ivaQuad(f){ const q={c1:0,c2:0,c5:0,c6:0,c3:0,c4:0,c7:0,c8:0,c9:0,out:0,outIva:0,ncBase:0,ncIva:0,isOut:0};
+  for(const r of Object.values(f.rS)){ if(r.tt==='IVA'&&r.pct){ const s=rateSlot(r.reg,r.pct); const iva=r.base*r.pct/100; if(s==='RED'){q.c1+=r.base;q.c2+=iva;} else if(s==='INT'){q.c5+=r.base;q.c6+=iva;} else if(s==='NOR'){q.c3+=r.base;q.c4+=iva;} else {q.out+=r.base;q.outIva+=iva;} } }
+  for(const [code,e] of Object.entries(f.exS)){ const c=EXC_DP[code]; if(c==='7') q.c7+=e.base; else if(c==='8') q.c8+=e.base; else if(c==='9') q.c9+=e.base; else q.isOut+=e.base; }
+  for(const r of Object.values(f.rN)){ q.ncBase+=r.base; if(r.tt==='IVA'&&r.pct) q.ncIva+=r.base*r.pct/100; }
+  for(const k in q) q[k]=r2(q[k]); return q; }
+function fIva(el,F,M,X){ const nif=S.ctx.nif; const reg=(CFG.regimeIVA||{})[nif]||'M'; const months=X.sel.filter(c=>c.fin);
+  const groups=[]; if(reg==='T'){ const g={}; for(const c of months){ const y=c.ym.slice(0,4), q=Math.floor((+c.ym.slice(5)-1)/3)+1; const k=y+'-T'+q; (g[k]||(g[k]=[])).push(c); } for(const k of Object.keys(g).sort()) groups.push({k,l:k.replace('-T','.º T ').replace(/^(\d+)\.º T (\d)$/,'')||k,list:g[k]}); }
+  else for(const c of months) groups.push({k:c.ym,l:ymLabel(c.ym),list:[c]});
+  const rows=groups.map(g=>{ const f=finMerge(g.list); return {k:g.k,l:reg==='T'?g.k.replace('-T',' · ')+'.º trimestre':ymLabel(g.k),n:g.list.length,...ivaQuad(f)}; });
+  const T=ivaQuad(F); const ex=Object.entries(F.exS).map(([code,e])=>({code,reason:EXC_TXT[code]||e.reason,base:r2(e.base),dp:EXC_DP[code]?'Campo '+EXC_DP[code]:'Verificar'}));
+  el.innerHTML=`<div class="toolbar"><label class="fld">Regime de IVA desta empresa<select class="inp" id="rgI"><option value="M" ${reg==='M'?'selected':''}>Mensal</option><option value="T" ${reg==='T'?'selected':''}>Trimestral</option></select></label><span class="sp"></span><button class="btn" id="ivqCsv">${ico('down')} Excel</button></div>
+   <div class="grid g6">${kpi('Bases tributáveis (1+5+3)',eur(T.c1+T.c5+T.c3),ctxLabel())}${kpi('IVA liquidado (2+6+4)',eur(T.c2+T.c6+T.c4),'vendas')}${kpi('Campo 7',eur(T.c7),'intracomunitárias')}${kpi('Campo 8',eur(T.c8),'isentas c/ direito à dedução')}${kpi('Campo 9',eur(T.c9),'isentas s/ direito à dedução')}${kpi('IVA das notas de crédito',eur(T.ncIva),'regularização a favor (campo 40)')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('percent')} Quadro 06 por ${reg==='T'?'trimestre':'mês'} <span class="r hint">vendas sem as notas de crédito; as notas de crédito ficam à parte (campo 40)</span></h3><div id="ivqT"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('shield')} Isentas e não sujeitas — enquadramento na DP</h3><div id="ivqE"></div><p class="hint" style="margin-top:8px">Enquadramento segundo as instruções oficiais da DP: campo 7 — intracomunitárias (art. 14.º RITI e serviços do art. 6.º n.º 6 a)); campo 8 — exportações (art. 14.º CIVA), outras isentas com direito à dedução e inversão do sujeito passivo; campo 9 — isentas sem direito à dedução (art. 9.º CIVA). "Verificar" = enquadramento depende da situação concreta.</p></div>`;
+  const cols=[{k:'l',l:reg==='T'?'Trimestre':'Mês'},{k:'c1',l:'1 · Base red.',num:1,f:n2},{k:'c2',l:'2 · IVA',num:1,f:n2},{k:'c5',l:'5 · Base int.',num:1,f:n2},{k:'c6',l:'6 · IVA',num:1,f:n2},{k:'c3',l:'3 · Base norm.',num:1,f:n2},{k:'c4',l:'4 · IVA',num:1,f:n2},{k:'c7',l:'7',num:1,f:n2},{k:'c8',l:'8',num:1,f:n2},{k:'c9',l:'9',num:1,f:n2},{k:'ncIva',l:'40 · IVA NC',num:1,f:n2},{k:'liq',l:'IVA líquido',num:1,v:r=>r2(r.c2+r.c6+r.c4+r.outIva-r.ncIva),f:n2}];
+  table($('#ivqT'),{rows,size:60,cols,foot:(c,rs)=>c.k==='l'?'Total':n2(rs.reduce((s,r)=>s+(c.v?c.v(r):r[c.k]),0))});
+  table($('#ivqE'),{rows:ex,empty:'Sem operações isentas',cols:[{k:'code',l:'Código'},{k:'reason',l:'Enquadramento'},{k:'base',l:'Base',num:1,f:n2},{k:'dp',l:'DP',html:r=>`<span class="badge ${r.dp==='Verificar'?'b-warn':'b-acc'}">${r.dp}</span>`}]});
+  $('#rgI').onchange=async e=>{ CFG.regimeIVA=CFG.regimeIVA||{}; CFG.regimeIVA[nif]=e.target.value; await cloudSaveConfig(); RENDER.financeiro(); };
+  $('#ivqCsv').onclick=()=>csvDownload(`AuditNux_IVA_quadro06_${nif}_${S.ctx.from}_${S.ctx.to}.csv`,cols.map(c=>({label:c.l,v:r=>c.v?c.v(r):r[c.k]})),rows); }
+
+function fRet(el,F){ const rows=Object.values(F.wht.c).map(w=>({...w,v:r2(w.v)})).filter(w=>Math.abs(w.v)>=0.01).sort((a,b)=>b.v-a.v);
+  el.innerHTML=`<div class="grid g3">${kpi('Retenções na fonte sofridas',eur(F.wht.v),ctxLabel())}${kpi('Documentos com retenção',n0(F.wht.n),'')}${kpi('Clientes que retiveram',n0(rows.length),'confrontar com a Modelo 10 de cada cliente')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('users')} Retenções por cliente <span class="r"><button class="btn sm" id="rtCsv">${ico('down')} Excel</button></span></h3><div id="rtT"></div><p class="hint" style="margin-top:8px">Valores do campo WithholdingTax dos documentos de faturação. Úteis para a declaração de rendimentos (IRS/IRC) e para confrontar com as declarações dos clientes (Modelo 10).</p></div>`;
+  table($('#rtT'),{rows,empty:'Sem retenções na fonte no período',cols:[{k:'name',l:'Cliente'},{k:'nif',l:'NIF'},{k:'n',l:'Documentos',num:1,f:n0},{k:'v',l:'Retido',num:1,f:n2}],foot:(c,rs)=>c.k==='name'?'Total':c.k==='v'?n2(rs.reduce((s,x)=>s+x.v,0)):''});
+  $('#rtCsv').onclick=()=>csvDownload(`AuditNux_retencoes_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,[{label:'Cliente',k:'name'},{label:'NIF',k:'nif'},{label:'Documentos',k:'n'},{label:'Retido',k:'v'}],rows); }
+
+async function fProj(el,F,M,X){ const all=await loadCubes(S.ctx.nif); const yr=S.ctx.to.slice(0,4), last=+S.ctx.to.slice(5); const by=Object.fromEntries(all.map(c=>[c.ym,c.net]));
+  const cur=[], prv=[]; for(let m=1;m<=12;m++){ cur.push(by[yr+'-'+String(m).padStart(2,'0')]); prv.push(by[(+yr-1)+'-'+String(m).padStart(2,'0')]); }
+  const have=cur.slice(0,last).filter(v=>v!=null).length; const ytd=cur.slice(0,last).reduce((s,v)=>s+(v||0),0);
+  const prevYtd=prv.slice(0,last).every(v=>v!=null)?prv.slice(0,last).reduce((s,v)=>s+v,0):null; const prevRest=prv.slice(last).every(v=>v!=null)?prv.slice(last).reduce((s,v)=>s+v,0):null;
+  const fac=prevYtd?ytd/prevYtd:null; const projS=fac!=null&&prevRest!=null?ytd+prevRest*fac:null; const projL=have?ytd/have*12:null;
+  const proj=MESES.map((m,i)=>i<last?null:(fac!=null&&prv[i]!=null?r2(prv[i]*fac):projL!=null?r2(ytd/have):null));
+  el.innerHTML=`<div class="grid g4">${kpi('Acumulado '+yr,eur(ytd),'até '+MESES_L[last-1]+' ('+have+' meses com dados)')}${kpi('Projeção com sazonalidade',projS==null?'—':eur(projS),projS==null?'precisa dos 12 meses de '+(+yr-1):'ritmo '+((fac-1)*100>=0?'+':'')+((fac-1)*100).toFixed(1).replace('.',',')+'% vs '+(+yr-1))}${kpi('Projeção linear',projL==null?'—':eur(projL),'média mensal × 12')}${kpi('Ano anterior',prv.every(v=>v!=null)?eur(prv.reduce((s,v)=>s+v,0)):'—',String(+yr-1))}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} ${yr}: real e projetado</h3><div id="pjC"></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('file')} Mês a mês</h3><div id="pjT"></div><p class="hint" style="margin-top:8px">A projeção com sazonalidade aplica aos meses que faltam o comportamento do ano anterior, ajustado pelo ritmo deste ano. É uma estimativa para planeamento (pagamentos por conta, IRC, conversa com o cliente), não uma previsão garantida.</p></div>`;
+  const W=Math.max(320,$('#pjC').clientWidth||800), H=230, pl=62, pb=26, pt=10; const vals=MESES.map((m,i)=>i<last?cur[i]:proj[i]); const max=Math.max(1,...vals.filter(v=>v!=null)); const y=v=>pt+(H-pt-pb)*(1-v/max); const gw=(W-pl-8)/12;
+  let g=''; for(let i=0;i<=4;i++){ const v=max*i/4; g+=`<line class="grid" x1="${pl}" x2="${W-8}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${pl-6}" y="${y(v)+3}" text-anchor="end">${n0(v)}</text>`; }
+  MESES.forEach((m,i)=>{ const v=vals[i]; if(v!=null){ const x=pl+i*gw+gw*0.18, w=gw*0.64; g+=`<rect x="${x}" y="${y(v)}" width="${w}" height="${Math.max(1,y(0)-y(v))}" rx="4" fill="${i<last?'var(--bar)':'var(--muted)'}" ${i<last?'':'opacity=".55"'}><title>${MESES_L[i]}: ${eur(v)}${i<last?'':' (projeção)'}</title></rect>`; } g+=`<text class="ax" x="${pl+i*gw+gw/2}" y="${H-8}" text-anchor="middle">${m}</text>`; });
+  $('#pjC').innerHTML=`<div class="row" style="gap:16px;font-size:12px;margin-bottom:4px"><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:var(--bar);display:inline-block"></i>Real</span><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:var(--muted);opacity:.55;display:inline-block"></i>Projeção</span></div><div class="chart"><svg viewBox="0 0 ${W} ${H}" height="${H}">${g}</svg></div>`;
+  table($('#pjT'),{rows:MESES.map((m,i)=>({m:MESES_L[i],cur:cur[i],prv:prv[i],proj:proj[i]})),size:12,cols:[{k:'m',l:'Mês'},{k:'prv',l:String(+yr-1),num:1,f:v=>v==null?'—':n2(v)},{k:'cur',l:yr+' real',num:1,f:v=>v==null?'—':n2(v)},{k:'proj',l:yr+' projeção',num:1,f:v=>v==null?'':n2(v)}]}); }
+
+function fDossier(el,F,M,X){ el.innerHTML=`<div class="card"><h3>${ico('pdf')} Dossier da empresa — ${esc(ctxLabel())}</h3><p class="hint">Um único PDF com: capa, indicadores, vendas mês a mês, IVA (Quadro 06), isentas e enquadramento, mercados e pré-recapitulativa, clientes principais, saldos em aberto, retenções, notas de crédito e validação de cada ficheiro. Escolha o período na barra acima (ex.: <b>Ano</b> para o dossier anual).</p>
+   <button class="btn gold" id="dsGo">${ico('pdf')} Gerar dossier</button></div>`; $('#dsGo').onclick=()=>pdfDossier(); }
+async function pdfDossier(){ const X=await ensureCtx(); if(!X||!X.M) return; const M=X.M, F=finMerge(X.sel), nif=S.ctx.nif, emp=X.nifs.get(nif)||''; const doc=pdfNew('Dossier da Empresa'); if(!doc) return; const W=doc.internal.pageSize.getWidth();
+  doc.__cover=true; doc.setFillColor(...PC.navy); doc.rect(0,0,W,108,'F'); doc.setFillColor(...PC.acc); doc.rect(0,108,W,1.4,'F'); if(CFG.logo){ try{ doc.addImage(CFG.logo,CFG.logo.includes('png')?'PNG':'JPEG',16,14,0,14); }catch(e){} }
+  doc.setTextColor(34,211,238); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('AUDITNUX  ·  DOSSIER DA EMPRESA',W-16,20,{align:'right'}); doc.setTextColor(255,255,255); doc.setFontSize(26); doc.text(T('Dossier '+ctxLabel()),16,56);
+  doc.setFontSize(16); doc.text(T(emp),16,80); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(180,200,225); doc.text(T(`NIF ${nif}  ·  ${X.sel.length} meses com SAF-T  ·  ${CFG.gabinete||''}`),16,90);
+  let y=122; const q=ivaQuad(F); const ref=lastDay(S.ctx.to); const A=arCompute((await loadCubes(nif)).filter(c=>c.ym<=S.ctx.to),ref); const saldo=A.byC.reduce((s,x)=>s+x.t,0);
+  y=kpiBoxes(doc,y,[{l:'Vendas líquidas',v:eur(M.net)},{l:'IVA liquidado',v:eur(M.tax)},{l:'Nº de vendas',v:n0(M.docs)},{l:'Ticket médio',v:eur(M.ticket)},{l:'Saldo de clientes',v:eur(saldo),d:'a '+ref},{l:'Retenções sofridas',v:eur(F.wht.v)}]);
+  doc.addPage(); y=26; y=pdfH(doc,y,'Vendas mês a mês'); y=pdfTable(doc,y,['Mês','Vendas líquidas','IVA','Total','Nº vendas','Notas de crédito','Clientes'],X.sel.map(c=>[ymLabel(c.ym),n2(c.net),n2(c.tax),n2(c.gross),n0(c.docs),n2(c.ncv),n0(c.nCusts)]),{foot:[['Total',n2(M.net),n2(M.tax),n2(M.gross),n0(M.docs),n2(M.ncv),'']],columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}});
+  y=pdfH(doc,y,'IVA — Quadro 06 do período'); y=pdfTable(doc,y,['Campo','Descrição','Valor'],[['1','Base — taxa reduzida',n2(q.c1)],['2','IVA — taxa reduzida',n2(q.c2)],['5','Base — taxa intermédia',n2(q.c5)],['6','IVA — taxa intermédia',n2(q.c6)],['3','Base — taxa normal',n2(q.c3)],['4','IVA — taxa normal',n2(q.c4)],['7','Transmissões intracomunitárias',n2(q.c7)],['8','Isentas com direito à dedução / inversão',n2(q.c8)],['9','Isentas sem direito à dedução',n2(q.c9)],['40','IVA das notas de crédito (regularização a favor)',n2(q.ncIva)]],{columnStyles:{0:{cellWidth:14,halign:'center',fontStyle:'bold'},2:{halign:'right'}}});
+  const MKL={nac:'Nacional',ue:'União Europeia',fora:'Fora da UE'}; const mk=['nac','ue','fora'].map(k=>[MKL[k],n2(Object.entries(F.mk).filter(([x])=>x.startsWith(k+'|')).reduce((s,[,v])=>s+v,0)-Object.entries(F.mkN).filter(([x])=>x.startsWith(k+'|')).reduce((s,[,v])=>s+v,0))]);
+  y=pdfH(doc,y,'Mercados'); y=pdfTable(doc,y,['Mercado','Vendas líquidas'],mk,{columnStyles:{1:{halign:'right'}}});
+  const recap=Object.values(F.recap).filter(r=>Math.abs(r.bens+r.serv+r.outros)>=0.01); if(recap.length){ y=pdfH(doc,y,'Pré-Declaração Recapitulativa'); y=pdfTable(doc,y,['País','NIF','Cliente','Bens','Serviços','Total'],recap.map(r=>[r.country,r.nif,r.name,n2(r.bens),n2(r.serv),n2(r.bens+r.serv+r.outros)]),{columnStyles:{3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}}}); }
+  const {named}=custRows(M); y=pdfH(doc,y,'Clientes principais'); y=pdfTable(doc,y,['#','Cliente','NIF','Documentos','Vendas'],named.slice(0,15).map((c,i)=>[String(i+1),c.name,c.nif,n0(c.docs),n2(c.net)]),{columnStyles:{0:{cellWidth:8},3:{halign:'right'},4:{halign:'right'}}});
+  if(A.byC.length){ y=pdfH(doc,y,'Saldos de clientes em aberto a '+ref); y=pdfTable(doc,y,['Cliente','NIF','0–30','31–60','61–90','91–180','>180','Total'],A.byC.slice(0,25).map(x=>[x.name,x.nif,...x.b.map(v=>v?n2(v):''),n2(x.t)]),{columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right',fontStyle:'bold'}}}); }
+  const rt=Object.values(F.wht.c).filter(w=>Math.abs(w.v)>=0.01); if(rt.length){ y=pdfH(doc,y,'Retenções na fonte sofridas'); y=pdfTable(doc,y,['Cliente','NIF','Retido'],rt.map(w=>[w.name,w.nif,n2(w.v)]),{columnStyles:{2:{halign:'right'}}}); }
+  const sums=S.cloud.on?S.history.filter(h=>h.nif===nif&&(h.start||'').slice(0,7)>=S.ctx.from&&(h.end||'').slice(0,7)<=S.ctx.to).sort((a,b)=>a.start.localeCompare(b.start)):[];
+  if(sums.length){ y=pdfH(doc,y,'Validação dos ficheiros SAF-T'); y=pdfTable(doc,y,['Período','Pontuação','Estado','Críticos','Erros','Avisos','Correções'],sums.map(h=>[monthOf(h)?ymLabel(monthOf(h)):h.start+' a '+h.end,String(h.score),STATUS_TXT[h.estado],String(h.alertas.crit),String(h.alertas.err),String(h.alertas.warn),String((h.correcoes||[]).length)]),{columnStyles:{1:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}}); }
+  y=pdfP(doc,y,'Notas: valores calculados a partir dos ficheiros SAF-T de faturação da empresa. Não incluem compras nem gastos. Os saldos de clientes consideram apenas os recibos emitidos no programa de faturação.',7.5,PC.mut);
+  pdfFrame(doc,`${emp}  ·  NIF ${nif}  ·  ${ctxLabel()}`); doc.save(`AuditNux_Dossier_${emp.replace(/[^A-Za-z0-9]+/g,'_').slice(0,40)}_${S.ctx.from}_${S.ctx.to}.pdf`); }
+
+document.addEventListener('DOMContentLoaded',()=>{ const ref=$('.nav[data-v="evolucao"]'); if(ref&&!$('.nav[data-v="financeiro"]')){ ref.insertAdjacentHTML('afterend',`<div class="nav" data-v="financeiro"><svg class="i"><use href="#i-scale"/></svg>Financeiro</div>`); const n=$('.nav[data-v="financeiro"]'); n.onclick=()=>go('financeiro'); }
+  if(!$('#v-financeiro')) $('.content').insertAdjacentHTML('beforeend','<section class="view" id="v-financeiro"></section>'); });
 </script>
 </body>
 </html>
