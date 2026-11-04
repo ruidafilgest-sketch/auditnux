@@ -444,10 +444,11 @@ async function parse(file){
     let series=null, numb=null;
     if(no){ const m=/^(.*)\/(\d+)$/.exec(no); if(m){ series=m[1]; numb=parseInt(m[2],10);} }
     const d={i:R.docs.length,sec,no,type,series,num:numb,date,status:status||'',statusDate,src,user,
-      atcud:tag(head,'ATCUD'),hash:(tag(head,'Hash')||'').length,period:tag(head,'Period'),sys:tag(head,'SystemEntryDate'),
+      atcud:tag(head,'ATCUD'),hash:(tag(head,'Hash')||'').length,period:tag(head,'Period'),sysRaw:tag(head,'SystemEntryDate'),
       cust:tag(head,'CustomerID')||tag(head,'SupplierID'),
       net:num(tag(totals,'NetTotal')),tax:num(tag(totals,'TaxPayable')),gross:num(tag(totals,'GrossTotal')),
       hasTotals: totals!=='', l0:R.lines.length, ln:0, hasRefs:false, wht:0};
+    d.sys= d.sysRaw&&d.sysRaw.slice(0,4)>='2010'? d.sysRaw : null; // datas de registo fictícias (ex.: 2001-01-01 na autofaturação) são ignoradas
     const wh=blocks(body,'WithholdingTax'); for(const w of wh){ d.wht+=num(tag(w,'WithholdingTaxAmount')); }
     if(sec==='PY'){ d.payMech=tag(body,'PaymentMechanism'); d.pay=blocks(body,'PaymentMethod').map(b=>[tag(b,'PaymentMechanism')||'?',num(tag(b,'PaymentAmount'))]); }
     else if(totals){ const pb=blocks(totals,'Payment'); if(pb.length) d.pay=pb.map(b=>[tag(b,'PaymentMechanism')||'?',num(tag(b,'PaymentAmount'))]); }
@@ -601,7 +602,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -861,10 +862,12 @@ function analyse(){
   add('T05','warn','Totais de controlo de conferência ou recibos não coincidem','Diferença nos totais de controlo de WorkingDocuments ou Payments. Não afeta a importação das vendas.',hdrItems.filter(x=>x.sec!=='SI'));
   // Documentos
   const it=(f)=>{ const out=[]; for(const d of SI) { const r=f(d); if(r) out.push(r===true?{d:d.i}:Object.assign({d:d.i},r)); } return out; };
-  add('D01','crit','Total líquido do documento ≠ soma das linhas','O NetTotal do documento não corresponde à soma dos valores das linhas.', it(d=>d.hasTotals&&Math.abs(d.net-d.sumL)>0.011?{m:`NetTotal ${n2(d.net)} vs linhas ${n2(d.sumL)}`,v:r2(d.net-d.sumL)}:null));
+  const lineTol=d=>Math.max(0.011,Math.min(0.5,0.005*d.ln)); const netDiff=d=>Math.abs(d.net-d.sumL);
+  add('D01','crit','Total líquido do documento ≠ soma das linhas','O NetTotal do documento difere da soma das linhas para além do arredondamento possível (meio cêntimo por linha).', it(d=>d.hasTotals&&netDiff(d)>lineTol(d)?{m:`NetTotal ${n2(d.net)} vs linhas ${n2(d.sumL)}`,v:r2(d.net-d.sumL)}:null));
   const taxDiff=d=>Math.min(Math.abs(d.tax-d.taxRate),Math.abs(d.tax-d.taxLine)); const taxTol=d=>0.011+0.01*d.nRates;
   add('D02','err','IVA do documento ≠ IVA calculado','O TaxPayable difere do IVA calculado sobre as linhas para além do arredondamento normal.', it(d=>d.hasTotals&&taxDiff(d)>taxTol(d)?{m:`TaxPayable ${n2(d.tax)} vs calculado ${n2(d.taxRate)}`,v:r2(d.tax-d.taxRate)}:null));
-  add('D20','info','Diferenças de arredondamento no IVA (cêntimos)','Pequenas diferenças típicas de vendas a dinheiro com preços com IVA incluído (o IVA é extraído do total). Normalmente não impedem a importação.', it(d=>d.hasTotals&&taxDiff(d)>0.011&&taxDiff(d)<=taxTol(d)?{m:`TaxPayable ${n2(d.tax)} vs calculado ${n2(d.taxRate)}`,v:r2(d.tax-d.taxRate)}:null));
+  add('D20','info','Arredondamentos nos totais dos documentos (cêntimos)','Pequenas diferenças entre os totais do documento e as linhas, típicas de preços com IVA incluído (o programa calcula a partir do total). Não impedem a importação.', it(d=>{ if(!d.hasTotals) return null; const a=taxDiff(d), b=netDiff(d); if((a>0.011&&a<=taxTol(d))||(b>0.011&&b<=lineTol(d))) return {m:`Líquido ${n2(d.net)} vs linhas ${n2(d.sumL)} · IVA ${n2(d.tax)} vs ${n2(d.taxRate)}`,v:r2(Math.max(a,b))}; return null; }));
+  add('D21','info','Autofaturação','Documentos emitidos pelo adquirente em nome da empresa (estado S — por exemplo comissões PagAqui, Payshop). Contam como vendas normais.', it(d=>d.status==='S'?{m:custName(d),v:d.gross}:null));
   add('D03','err','Total bruto ≠ líquido + IVA','O GrossTotal deve ser igual a NetTotal + TaxPayable.', it(d=>d.hasTotals&&Math.abs(d.gross-(d.net+d.tax))>0.011?{m:`${n2(d.gross)} vs ${n2(d.net+d.tax)}`,v:r2(d.gross-d.net-d.tax)}:null));
   // Duplicados e numeração
   const seen=new Map(), dup=[]; for(const d of SI){ const k=d.no; if(seen.has(k)) dup.push({d:d.i,m:'Documento repetido: '+k}); else seen.set(k,d.i); }
@@ -1840,7 +1843,7 @@ function fichaEmpresa(nif){ const el=$('#v-historico'); const g=groupCompanies(S
   const ytd=g.list.filter(h=>monthOf(h)&&h.start.startsWith(yr)); const tot=ytd.reduce((s,h)=>s+h.vendas,0), totIva=ytd.reduce((s,h)=>s+h.iva,0);
   el.innerHTML=`<div class="toolbar"><button class="btn" id="fBack">‹ Todas as empresas</button><span class="sp"></span><button class="btn pri" id="fEvo">${ico('chart')} Evolução & comparativos</button></div>
    <div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">${esc(g.empresa)}</h2><div class="hint mono">NIF ${esc(g.nif)}</div></div><div class="gauge">${gauge(g.last.score,g.last.estado)}</div></div></div>
-   <div class="grid g6" style="margin-top:16px">${kpi('Último período',monthOf(g.last)?ymLabel(monthOf(g.last)):esc(g.last.start.slice(0,7))+' → '+esc(g.last.end.slice(0,7)),STATUS_TXT[g.last.estado])}${kpi('Vendas '+yr,eur(tot),n0(ytd.length)+' meses analisados')}${kpi('IVA '+yr,eur(totIva),'')}${kpi('Análises',n0(g.list.length),'desde '+esc(g.list[g.list.length-1].start))}${kpi('Correções',n0(g.corr),'todas as análises')}${kpi('Programa',esc((g.last.software||'').slice(0,22)),'cert. '+esc(g.last.certificado||'—'))}</div>
+   <div class="grid g6" style="margin-top:16px">${kpi('Último período',monthOf(g.last)?ymLabel(monthOf(g.last)):esc(g.last.start.slice(0,7))+' → '+esc(g.last.end.slice(0,7)),STATUS_TXT[g.last.estado])}${kpi('Vendas '+yr,eur(tot),n0(new Set(ytd.map(monthOf)).size)+' meses analisados')}${kpi('IVA '+yr,eur(totIva),'')}${kpi('Análises',n0(g.list.length),'desde '+esc(g.list[g.list.length-1].start))}${kpi('Correções',n0(g.corr),'todas as análises')}${kpi('Programa',esc((g.last.software||'').slice(0,22)),'cert. '+esc(g.last.certificado||'—'))}</div>
    <div class="card" style="margin-top:16px"><h3>${ico('dash')} Mapa de meses</h3>${years.map(y=>`<div class="row" style="margin:8px 0;gap:14px"><b class="mono" style="width:44px">${y}</b><span class="strip big">${[...Array(12)].map((_,i)=>{ const ym=y+'-'+String(i+1).padStart(2,'0'); const c=monthCell(g,ym); return `<span class="msb" data-ym="${ym}" style="background:${c?ST_COL[c.estado]:'var(--bg2)'};${c?'cursor:pointer':'border:1px dashed var(--line2)'}" title="${c?STATUS_TXT[c.estado]+' · '+eur(c.vendas):'sem análise'}">${MESES[i]}</span>`; }).join('')}</span></div>`).join('')}</div>
    <div class="card" style="margin-top:16px"><h3>${ico('file')} Todos os períodos analisados</h3><div id="fT"></div></div>`;
   table($('#fT'),{size:60,rows:g.list,cols:[{k:'start',l:'Período',f:(v,h)=>monthOf(h)?ymLabel(monthOf(h)):esc(h.start+' → '+h.end)},{k:'vendas',l:'Vendas',num:1,f:n2},{k:'iva',l:'IVA',num:1,f:n2},
@@ -2081,7 +2084,7 @@ function ratesRows(M){ return Object.values(M.rates).map(r=>({...r,base:r2(r.bas
 RENDER.iva=function(){ periodView('iva',async(el,M,X)=>{ const rows=ratesRows(M); const base=r2(rows.reduce((s,r)=>s+r.base,0)), iva=r2(rows.reduce((s,r)=>s+r.iva,0));
   const single=!multiMonth(); const REGN={'PT':'Continente','PT-AC':'Açores','PT-MA':'Madeira'};
   const sums=S.cloud.on? S.history.filter(h=>h.nif===S.ctx.nif&&monthOf(h)&&monthOf(h)>=S.ctx.from&&monthOf(h)<=S.ctx.to) : [];
-  const sumOf=ym=>{ if(S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif&&(S.R.header.StartDate||'').slice(0,7)===ym&&(S.R.header.EndDate||'').slice(0,7)===ym) return {local:true,dp:S.dp}; return sums.find(h=>monthOf(h)===ym)||null; };
+  const sumOf=ym=>{ if(S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif&&(S.R.header.StartDate||'').slice(0,7)===ym&&(S.R.header.EndDate||'').slice(0,7)===ym) return {local:true,dp:S.dp}; const l=sums.filter(h=>monthOf(h)===ym); return l.find(h=>h.dp&&Object.keys(h.dp).length)||l[0]||null; };
   el.innerHTML=`<div class="grid g4" style="margin-top:16px">${kpi('Base tributável',eur(base),ctxLabel())}${kpi('IVA (mapa por taxa)',eur(iva),'base × taxa')}${kpi('IVA (documentos)',eur(M.tax),'TaxPayable')}${kpi('Diferença',eur(r2(M.tax-iva)),'arredondamentos')}</div>
    ${rows.some(r=>r.tt==='IVA'&&validRates(r.reg)&&!validRates(r.reg).includes(r.pct))?`<div class="card" style="margin-top:16px;border-color:var(--crit)"><b class="st-crit">${ico('alert')} Há bases a taxas de IVA inválidas neste período.</b> <span class="hint">Abra o SAF-T do mês em causa e corrija em Validação / Correções; os meses já corrigidos atualizam-se ao voltar a carregar.</span></div>`:''}
    <div class="card" style="margin-top:16px"><h3>${ico('percent')} Mapa por região e taxa — ${esc(ctxLabel())} <span class="r"><button class="btn sm" id="ivCsv">${ico('down')} Excel</button><button class="btn sm" onclick="pdfIVA()">${ico('pdf')} PDF</button></span></h3><div id="ivMap"></div></div>
@@ -2193,7 +2196,7 @@ function pAuditoria(el,M,X){ const bn=M.benf.reduce((s,v)=>s+v,0); const bexp=[0
   for(let k=1;k<=9;k++){ const x=pl+(k-1)*gw+gw*0.2, w=gw*0.6; g+=`<rect x="${x}" y="${y(bobs[k])}" width="${w}" height="${Math.max(1,y(0)-y(bobs[k]))}" rx="3" fill="var(--bar)"/><line x1="${x-3}" x2="${x+w+3}" y1="${y(bexp[k])}" y2="${y(bexp[k])}" stroke="var(--gold)" stroke-width="2.5"/><text class="ax" x="${x+w/2}" y="${H-8}" text-anchor="middle">${k}</text>`; }
   box.innerHTML=`<div class="row" style="gap:16px;font-size:12px;margin-bottom:4px"><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:var(--bar);display:inline-block"></i>Observado</span><span class="row" style="gap:6px"><i style="width:14px;height:3px;background:var(--gold);display:inline-block"></i>Esperado</span></div><div class="chart"><svg viewBox="0 0 ${W} ${H}" height="${H}">${g}</svg></div>`;
   table($('#pz3'),{rows:sums,empty:S.cloud.on?'Sem análises guardadas no período':'Disponível com a nuvem ligada',cols:[{k:'start',l:'Período',f:(v,h)=>monthOf(h)?ymLabel(monthOf(h)):h.start+' → '+h.end},{k:'score',l:'Pont.',num:1,html:h=>`<b class="mono st-${h.estado}">${h.score}</b>`},{k:'al',l:'Alertas',html:h=>['crit','err','warn'].map(s=>h.alertas[s]?`<span class="badge ${SEV[s].c}">${h.alertas[s]}</span>`:'').join(' ')},{k:'c',l:'Correções',num:1,v:h=>(h.correcoes||[]).length,f:n0},{k:'dp',l:'DP',html:h=>dpStatus(h)}],onRow:openSummary}); }
-function trendModal(kind,x){ const X={cubes:Object.values(S.cubes).filter(c=>c.nif===S.ctx.nif&&c.ym>=S.ctx.from&&c.ym<=S.ctx.to).sort((a,b)=>a.ym.localeCompare(b.ym))};
+function trendModal(kind,x){ const X={cubes:(S.lastCubes||[]).filter(c=>c.nif===S.ctx.nif&&c.ym>=S.ctx.from&&c.ym<=S.ctx.to)};
   const rows=X.cubes.map(c=>{ const it=kind==='prod'?c.prods.find(p=>p.k===x.k):c.custs.find(p=>p.id===x.id); return {ym:c.ym,v:it?(kind==='prod'?it.base:it.net):0,q:it?(kind==='prod'?it.q:it.docs):0}; });
   modal(`${ico(kind==='prod'?'box':'users')} ${esc(kind==='prod'?(x.desc||x.code):x.name)}`,`<div class="kv"><div>${kind==='prod'?'Código':'NIF'}<b class="mono">${esc(kind==='prod'?x.code:x.nif)}</b></div><div>Vendas no período<b class="mono">${eur(kind==='prod'?x.base:x.net)}</b></div><div>${kind==='prod'?'Quantidade':'Documentos'}<b class="mono">${kind==='prod'?n2(x.q):n0(x.docs)}</b></div><div>Período<b>${esc(ctxLabel())}</b></div></div><div id="trC"></div><div id="trT"></div>
     ${S.R&&S.R.header.TaxRegistrationNumber===S.ctx.nif?`<p class="hint">O detalhe documento a documento está disponível para o ficheiro aberto (${esc(S.R.header.StartDate)} a ${esc(S.R.header.EndDate)}).</p>`:''}`,
@@ -2239,7 +2242,7 @@ RENDER.relatorios=function(){ periodView('relatorios',(el,M)=>{ const o=S.repO||
      <button class="btn" onclick="pdfFixes()" ${fileOk&&S.fixLog.length?'':'disabled'}>${ico('pdf')} Registo de correções</button><button class="btn" onclick="go('correcoes')" ${fileOk?'':'disabled'}>${ico('down')} SAF-T corrigido</button>
      <button class="btn" onclick="go('documentos');setTimeout(()=>$('#dfCsv').click(),80)" ${fileOk?'':'disabled'}>Documentos</button><button class="btn" onclick="go('documentos');setTimeout(()=>$('#dfCsvL').click(),80)" ${fileOk?'':'disabled'}>Linhas</button><button class="btn" onclick="exportAlertsCSV()" ${fileOk?'':'disabled'}>Alertas</button></div></div></div>`;
   $$('[data-o]',el).forEach(c=>c.onchange=()=>o[c.dataset.o]=c.checked);
-  $('#rMes').onclick=()=>csvDownload(`AuditNux_mes_a_mes_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,[{label:'Mês',k:'ym'},{label:'Vendas líquidas',k:'net'},{label:'IVA',k:'tax'},{label:'Total',k:'gross'},{label:'Nº vendas',k:'docs'},{label:'Notas de crédito',k:'ncv'},{label:'Anulados',k:'anul'},{label:'Clientes',k:'nCusts'}],Object.values(S.cubes).filter(c=>c.nif===S.ctx.nif&&c.ym>=S.ctx.from&&c.ym<=S.ctx.to).sort((a,b)=>a.ym.localeCompare(b.ym)));
+  $('#rMes').onclick=()=>csvDownload(`AuditNux_mes_a_mes_${S.ctx.nif}_${S.ctx.from}_${S.ctx.to}.csv`,[{label:'Mês',k:'ym'},{label:'Vendas líquidas',k:'net'},{label:'IVA',k:'tax'},{label:'Total',k:'gross'},{label:'Nº vendas',k:'docs'},{label:'Notas de crédito',k:'ncv'},{label:'Anulados',k:'anul'},{label:'Clientes',k:'nCusts'}],(S.lastCubes||[]).filter(c=>c.nif===S.ctx.nif&&c.ym>=S.ctx.from&&c.ym<=S.ctx.to));
 }); };
 
 /* ---------- PDF por período (substituem as versões do ficheiro) ---------- */
@@ -2477,7 +2480,7 @@ async function delCube(id){ delete S.cubes[id]; if(S.cloud.on){ try{ await wsCol
 async function deletePeriod(h,silent){ if(!silent&&!confirm(`Apagar a análise de ${h.empresa}\n${monthOf(h)?ymLong(monthOf(h)):h.start+' a '+h.end}?\n\nApaga o resumo, as correções registadas, os valores da DP e os dados mensais desse período. O ficheiro SAF-T original não é afetado e pode voltar a carregá-lo quando quiser.`)) return false;
   try{ await wsCol('resumos').doc(h.id).delete(); }catch(e){ toast(esc(e.message),'err'); return false; }
   S.history=S.history.filter(x=>x.id!==h.id); const rest=S.history.filter(x=>x.nif===h.nif);
-  for(const ym of monthsBetween((h.start||'').slice(0,7),(h.end||'').slice(0,7))){ if(!rest.some(x=>covers(x,ym))) await delCube(h.nif+'_'+ym); }
+  for(const ym of monthsBetween((h.start||'').slice(0,7),(h.end||'').slice(0,7))){ if(!rest.some(x=>covers(x,ym)&&(x.src||'')===(h.src||''))){ await delCube(h.nif+'_'+ym+(h.src?'_'+h.src:'')); if(!rest.some(x=>covers(x,ym))) await delCube(h.nif+'_'+ym); } }
   S.historyDirty=true; S.ctxDirty=true; if(!silent) toast(ico('trash')+' Análise apagada','ok'); return true; }
 async function deleteCompany(nif,name){ const typed=prompt(`ATENÇÃO: apagar TODOS os dados de ${name} (NIF ${nif})?\n\nApaga todas as análises, correções, valores da DP e dados mensais desta empresa. Os ficheiros SAF-T originais não são afetados.\n\nPara confirmar, escreva o NIF:`);
   if(typed==null) return; if(typed.replace(/\D/g,'')!==nif){ toast('NIF diferente — nada foi apagado.','err'); return; }
@@ -2500,6 +2503,70 @@ const _fichaBase=fichaEmpresa; fichaEmpresa=function(nif){ _fichaBase(nif); cons
   const old=g.list.filter(h=>(h.versao||'0')<'1.5'); if(old.length) $('#fT').insertAdjacentHTML('beforebegin',`<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b class="st-warn">${ico('alert')} ${old.length} análise(s) feitas com uma versão anterior (regras antigas e sem dados financeiros).</b> <span class="hint">Volte a carregar esses SAF-T: a análise do mesmo período é substituída automaticamente, não fica duplicada.</span></div>`); };
 // a ficha da empresa precisa do histórico atualizado (ex.: logo a seguir a um lote)
 const _rhBase=RENDER.historico; RENDER.historico=async function(){ if(S.cloud.on&&(S.historyDirty||!S.history.length)){ try{ await cloudLoadHistory(); }catch(e){} } return _rhBase(); };
+
+/* =====================================================================
+   VÁRIOS SAF-T NO MESMO MÊS (fontes) — cada ficheiro é uma fonte; o mês é a soma
+   ===================================================================== */
+function hash36(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
+function computeSrc(R){ const ser=[...new Set(R.docs.filter(d=>d.sec==='SI').map(d=>d.series||d.type))].sort(); const base=ser.length?ser:[...new Set(R.docs.map(d=>d.series||d.type))].sort();
+  const cert=(R.header.SoftwareCertificateNumber||'0').replace(/\D/g,'')||'0'; const prog=String(R.header.ProductID||'').split('/').pop().replace(/\b(SA|Lda|S\.A\.|Software|Solutions|Business)\b/gi,'').trim().slice(0,24)||'Programa';
+  return {src:cert+'-'+hash36(base.join('|')).slice(0,6), label:prog+(base.length?' · '+base.slice(0,3).join(', ')+(base.length>3?'…':''):'')}; }
+function fileTag(){ const h=S.R&&S.R.header||{}; const b=(h.TaxRegistrationNumber||'')+'_'+(h.StartDate||'')+'_'+(h.EndDate||''); return S.R&&S.R.src? b+'_'+S.R.src : b; }
+function legacyTag(){ const h=S.R&&S.R.header||{}; return (h.TaxRegistrationNumber||'')+'_'+(h.StartDate||'')+'_'+(h.EndDate||''); }
+const _analyseBase=analyse; analyse=function(){ if(S.R&&!S.R.src){ const x=computeSrc(S.R); S.R.src=x.src; S.R.srcLabel=x.label; } return _analyseBase(); };
+const _bsBase=buildSummary; buildSummary=function(){ const s=_bsBase(); s.src=S.R.src||''; s.srcLabel=S.R.srcLabel||''; return s; };
+// gravação de resumos: remove a versão antiga (sem fonte) do mesmo período, para não duplicar
+async function dropLegacySummary(sm){ const leg=sm.nif+'_'+sm.start+'_'+sm.end; if(!sm.src||leg===sm.id) return; try{ const d=await wsCol('resumos').doc(leg).get(); if(d.exists){ await wsCol('resumos').doc(leg).delete(); S.history=S.history.filter(h=>h.id!==leg); } }catch(e){} }
+const _cssBase=cloudSaveSummary; cloudSaveSummary=async function(silent){ const ok=await _cssBase(silent); if(ok&&S.R) await dropLegacySummary(buildSummary()); return ok; };
+const _cssoBase=cloudSaveSummaryObj; cloudSaveSummaryObj=async function(sm){ const ok=await _cssoBase(sm); if(ok) await dropLegacySummary(sm); return ok; };
+
+// resumos mensais por fonte
+const _bcSrc=buildCubes; buildCubes=function(){ const before=Object.assign({},S.cubes); const r=_bcSrc(); const out=[];
+  for(const c of r){ if(!S.R.src) { out.push(c); continue; } const legacyId=c.id; const newId=legacyId+'_'+S.R.src;
+    if(S.cubes[legacyId]===c) delete S.cubes[legacyId]; if(before[legacyId]&&before[legacyId]!==c) S.cubes[legacyId]=before[legacyId];
+    c.id=newId; c.src=S.R.src; c.srcLabel=S.R.srcLabel; c.legacyId=legacyId;
+    const old=before[newId]; if(!c.completo&&old&&old.completo){ S.cubes[newId]=old; continue; } S.cubes[newId]=c; out.push(c); }
+  return out; };
+const _scBase=saveCubes; saveCubes=async function(list){ list=list||Object.values(S.cubes).filter(c=>S.R&&c.nif===S.R.header.TaxRegistrationNumber&&c.src===S.R.src);
+  for(const c of list){ let tries=0; while(JSON.stringify(packCube(c)).length>900000&&tries<8){ c.prods=c.prods.slice(0,Math.floor(c.prods.length*0.8)); if(c.custs.length>800) c.custs=c.custs.slice(0,Math.floor(c.custs.length*0.8)); if(c.fin){ c.fin.inv=c.fin.inv.slice(0,Math.floor(c.fin.inv.length*0.9)); } c.trimmed=true; tries++; } }
+  await _scBase(list);
+  for(const c of list){ if(!c.legacyId) continue; delete S.cubes[c.legacyId]; if(S.cloud.on){ try{ await wsCol('cubos').doc(c.legacyId).delete(); }catch(e){} } else { const k='auditnux_cubos_'+(S.ws||'local'); const all=lsGet(k,{}); if(all[c.legacyId]){ delete all[c.legacyId]; try{ localStorage.setItem(k,JSON.stringify(all)); }catch(e){} } } } };
+
+// junção das fontes do mesmo mês num único resumo mensal
+const SUMARR=new Set(['byHour','byWd','benf']);
+function combineVal(k,a,b){ if(a==null) return b; if(b==null) return a;
+  if(typeof a==='number'&&typeof b==='number') return k==='nProds'?Math.max(a,b):r2(a+b);
+  if(typeof a==='boolean') return a||b;
+  if(typeof a==='string') return k==='ficheiro'?a+' + '+b:a;
+  if(Array.isArray(a)){ if(SUMARR.has(k)) return a.map((v,i)=>r2(v+(b[i]||0)));
+    if(k==='heat') return a.map((r,i)=>{ const x=String(r).split(',').map(Number), y=String(b[i]||'').split(',').map(Number); return x.map((v,j)=>r2(v+(y[j]||0))).join(','); });
+    if(k==='bands') return a.map((s,i)=>{ const [n1,v1]=String(s).split(':').map(Number), [n2_,v2]=String(b[i]||'0:0').split(':').map(Number); return (n1+n2_)+':'+r2(v1+v2); });
+    if(k==='custIds') return [...new Set([...a,...b])];
+    if(k==='prods'){ const m=new Map(a.map(p=>[p.k,{...p,r:[...(p.r||[])]}])); for(const p of b){ const x=m.get(p.k); if(!x){ m.set(p.k,{...p}); continue; } ['q','base','n','docs','zero','disc'].forEach(f=>x[f]=r2((x[f]||0)+(p[f]||0))); if(p.pmin>0) x.pmin=x.pmin>0?Math.min(x.pmin,p.pmin):p.pmin; x.pmax=Math.max(x.pmax||0,p.pmax||0); x.np=Math.max(x.np||0,p.np||0); x.r=[...new Set([...(x.r||[]),...(p.r||[])])]; } return [...m.values()].sort((x,y)=>y.base-x.base); }
+    if(k==='custs'){ const m=new Map(a.map(p=>[p.id,{...p}])); for(const p of b){ const x=m.get(p.id); if(!x){ m.set(p.id,{...p}); continue; } x.net=r2(x.net+p.net); x.gross=r2((x.gross||0)+(p.gross||0)); x.docs+=p.docs; if((p.last||'')>(x.last||'')) x.last=p.last; } return [...m.values()].sort((x,y)=>y.net-x.net); }
+    return a.concat(b); }
+  if(typeof a==='object'){ const o=Object.assign({},a); for(const kk in b) o[kk]=combineVal(kk,a[kk],b[kk]); return o; }
+  return a; }
+function combineCubes(list){ if(list.length===1){ const c=list[0]; if(!c.sources) c.sources=[{src:c.src||'',label:c.srcLabel||c.ficheiro||'',ficheiro:c.ficheiro,net:c.net}]; return c; }
+  let o=null; for(const c of list){ if(!o){ o=JSON.parse(JSON.stringify(c)); continue; } for(const k in c){ if(['id','nif','empresa','ym','v','src','srcLabel','legacyId','em','operador'].includes(k)) continue; o[k]=combineVal(k,o[k],c[k]); } }
+  o.nCusts=(o.custIds||[]).length||o.nCusts; o.id=o.nif+'_'+o.ym; o.completo=list.some(c=>c.completo); o.sources=list.map(c=>({src:c.src||'',label:c.srcLabel||c.ficheiro||'',ficheiro:c.ficheiro,net:c.net,completo:c.completo})); return o; }
+const _lcBase=loadCubes; loadCubes=async function(nif){ const raw=await _lcBase(nif); const by={}; for(const c of raw) (by[c.ym]||(by[c.ym]=[])).push(c);
+  // se existir uma versão antiga (sem fonte) e versões por fonte do mesmo mês, a antiga é ignorada
+  const res=Object.keys(by).sort().map(ym=>{ let l=by[ym]; if(l.some(c=>c.src)) l=l.filter(c=>c.src); return combineCubes(l); }); S.lastCubes=res; return res; };
+
+// Multi-empresa: o estado de um mês junta todas as fontes desse mês
+function monthCell(g,ym){ const hs=g.list.filter(h=>covers(h,ym)); if(!hs.length) return null; const mon=hs.filter(h=>monthOf(h)===ym); if(mon.length<=1) return mon[0]||hs[0];
+  const ord={crit:0,warn:1,ok:2}; const w=mon.slice().sort((a,b)=>ord[a.estado]-ord[b.estado])[0]; const withDp=mon.find(h=>h.dp&&Object.keys(h.dp).length);
+  return Object.assign({},w,{multi:mon,estado:w.estado,score:Math.min(...mon.map(h=>h.score)),vendas:r2(mon.reduce((s,h)=>s+h.vendas,0)),iva:r2(mon.reduce((s,h)=>s+h.iva,0)),
+    alertas:{crit:mon.reduce((s,h)=>s+h.alertas.crit,0),err:mon.reduce((s,h)=>s+h.alertas.err,0),warn:mon.reduce((s,h)=>s+h.alertas.warn,0),info:mon.reduce((s,h)=>s+(h.alertas.info||0),0)},dp:withDp?withDp.dp:{},dpCalc:withDp?withDp.dpCalc:w.dpCalc,correcoes:mon.flatMap(h=>h.correcoes||[])}); }
+const _osSrc=openSummary; openSummary=function(h){ if(!h.multi) return _osSrc(h);
+  modal(`${ico('layers')} ${esc(h.empresa)} — ${esc(ymLong(monthOf(h.multi[0])))}`,`<p class="hint">Este mês tem ${h.multi.length} ficheiros SAF-T (fontes). Os totais do mês são a soma das fontes.</p><div class="kv"><div>Vendas do mês<b class="mono">${eur(h.vendas)}</b></div><div>IVA<b class="mono">${eur(h.iva)}</b></div><div>Pior estado<b class="st-${h.estado}">${STATUS_TXT[h.estado]}</b></div><div>Fontes<b>${h.multi.length}</b></div></div><div id="srcT"></div>`,`<button class="btn pri" onclick="closeModal()">Fechar</button>`);
+  table($('#srcT'),{rows:h.multi,cols:[{k:'srcLabel',l:'Fonte',v:x=>x.srcLabel||x.software},{k:'ficheiro',l:'Ficheiro',html:x=>`<span class="hint">${esc(x.ficheiro)}</span>`},{k:'vendas',l:'Vendas',num:1,f:n2},{k:'score',l:'Pont.',num:1,html:x=>`<b class="mono st-${x.estado}">${x.score}</b>`}],onRow:x=>{ closeModal(); _osSrc(x); }}); };
+// a ficha da empresa mostra a fonte de cada análise
+const _fichaSrc=fichaEmpresa; fichaEmpresa=function(nif){ _fichaSrc(nif); const g=groupCompanies(S.history).find(x=>x.nif===nif); if(!g) return; const tb=$('#fT table'); if(!tb) return;
+  const multi=new Set(); const cnt={}; for(const h of g.list){ const m=monthOf(h); if(m) cnt[m]=(cnt[m]||0)+1; } for(const m in cnt) if(cnt[m]>1) multi.add(m);
+  if(multi.size) $('#fT').insertAdjacentHTML('beforebegin',`<div class="card" style="margin-bottom:10px"><b>${ico('layers')} ${multi.size} mês(es) com vários SAF-T</b> <span class="hint">(${[...multi].sort().map(ymLabel).join(', ')}) — os totais desses meses somam todas as fontes.</span></div>`);
+  };
 </script>
 </body>
 </html>
