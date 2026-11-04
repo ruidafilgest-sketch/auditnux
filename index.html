@@ -601,7 +601,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -2461,6 +2461,45 @@ async function pdfDossier(){ const X=await ensureCtx(); if(!X||!X.M) return; con
 
 document.addEventListener('DOMContentLoaded',()=>{ const ref=$('.nav[data-v="evolucao"]'); if(ref&&!$('.nav[data-v="financeiro"]')){ ref.insertAdjacentHTML('afterend',`<div class="nav" data-v="financeiro"><svg class="i"><use href="#i-scale"/></svg>Financeiro</div>`); const n=$('.nav[data-v="financeiro"]'); n.onclick=()=>go('financeiro'); }
   if(!$('#v-financeiro')) $('.content').insertAdjacentHTML('beforeend','<section class="view" id="v-financeiro"></section>'); });
+
+/* =====================================================================
+   GESTÃO DE DADOS — proteção de meses completos e eliminação de análises
+   ===================================================================== */
+// 1) Um ficheiro que só cobre parte de um mês nunca substitui um mês completo já guardado
+const _bcFin=buildCubes; buildCubes=function(){ const before={}; for(const k in S.cubes) before[k]=S.cubes[k]; const r=_bcFin();
+  for(const c of r){ const old=before[c.id]; if(!c.completo&&old&&old.completo){ S.cubes[c.id]=old; c._skip=true; } } return r.filter(c=>!c._skip); };
+async function saveCubes(list){ list=(list||Object.values(S.cubes).filter(c=>c.nif===(S.R&&S.R.header.TaxRegistrationNumber))).filter(c=>!c._skip);
+  if(S.cloud.on){ try{ for(const c of list){ if(!c.completo){ const ex=await wsCol('cubos').doc(c.id).get(); if(ex.exists&&ex.data().completo){ S.cubes[c.id]=unpackCube(ex.data()); continue; } } await wsCol('cubos').doc(c.id).set(packCube(c)); } }catch(e){ toast('Nuvem (resumos mensais): '+esc(e.message),'err'); } }
+  else { const k='auditnux_cubos_'+(S.ws||'local'); const all=lsGet(k,{}); for(const c of list){ if(!c.completo&&all[c.id]&&all[c.id].completo) continue; all[c.id]=packCube(c); } try{ localStorage.setItem(k,JSON.stringify(all)); }catch(e){} } }
+
+// 2) Eliminar análises (um período ou a empresa toda)
+async function delCube(id){ delete S.cubes[id]; if(S.cloud.on){ try{ await wsCol('cubos').doc(id).delete(); }catch(e){} } else { const k='auditnux_cubos_'+(S.ws||'local'); const all=lsGet(k,{}); delete all[id]; try{ localStorage.setItem(k,JSON.stringify(all)); }catch(e){} } }
+async function deletePeriod(h,silent){ if(!silent&&!confirm(`Apagar a análise de ${h.empresa}\n${monthOf(h)?ymLong(monthOf(h)):h.start+' a '+h.end}?\n\nApaga o resumo, as correções registadas, os valores da DP e os dados mensais desse período. O ficheiro SAF-T original não é afetado e pode voltar a carregá-lo quando quiser.`)) return false;
+  try{ await wsCol('resumos').doc(h.id).delete(); }catch(e){ toast(esc(e.message),'err'); return false; }
+  S.history=S.history.filter(x=>x.id!==h.id); const rest=S.history.filter(x=>x.nif===h.nif);
+  for(const ym of monthsBetween((h.start||'').slice(0,7),(h.end||'').slice(0,7))){ if(!rest.some(x=>covers(x,ym))) await delCube(h.nif+'_'+ym); }
+  S.historyDirty=true; S.ctxDirty=true; if(!silent) toast(ico('trash')+' Análise apagada','ok'); return true; }
+async function deleteCompany(nif,name){ const typed=prompt(`ATENÇÃO: apagar TODOS os dados de ${name} (NIF ${nif})?\n\nApaga todas as análises, correções, valores da DP e dados mensais desta empresa. Os ficheiros SAF-T originais não são afetados.\n\nPara confirmar, escreva o NIF:`);
+  if(typed==null) return; if(typed.replace(/\D/g,'')!==nif){ toast('NIF diferente — nada foi apagado.','err'); return; }
+  const list=S.history.filter(h=>h.nif===nif); for(const h of list) await deletePeriod(h,true);
+  if(S.cloud.on){ try{ const snap=await wsCol('cubos').where('nif','==',nif).get(); for(const d of snap.docs) await delCube(d.id); }catch(e){} }
+  else { const k='auditnux_cubos_'+(S.ws||'local'); const all=lsGet(k,{}); for(const id of Object.keys(all)) if(all[id].nif===nif) delete all[id]; try{ localStorage.setItem(k,JSON.stringify(all)); }catch(e){} }
+  for(const id of Object.keys(S.cubes)) if(S.cubes[id].nif===nif) delete S.cubes[id];
+  if(S.ctx&&S.ctx.nif===nif) S.ctx=null; S.hisCo=null; S.historyDirty=true; toast(ico('trash')+` ${esc(name)}: ${list.length} análise(s) apagada(s)`,'ok'); RENDER.historico(); }
+
+// 3) Botões na ficha da empresa e no resumo
+const _openSummaryBase=openSummary; openSummary=function(h){ _openSummaryBase(h); const b=$('#sDel'); if(b) b.onclick=async()=>{ if(await deletePeriod(h)){ closeModal(); RENDER.historico(); } }; };
+const _fichaBase=fichaEmpresa; fichaEmpresa=function(nif){ _fichaBase(nif); const g=groupCompanies(S.history).find(x=>x.nif===nif); if(!g) return;
+  const tb=$('#v-historico .toolbar'); if(tb) tb.insertAdjacentHTML('beforeend',`<button class="btn danger" id="fDelAll">${ico('trash')} Apagar todos os dados da empresa</button>`);
+  const b=$('#fDelAll'); if(b) b.onclick=()=>deleteCompany(g.nif,g.empresa);
+  table($('#fT'),{size:60,rows:g.list,cols:[{k:'start',l:'Período',f:(v,h)=>monthOf(h)?ymLabel(monthOf(h)):esc(h.start+' → '+h.end)+' <span class="badge b-warn" title="Ficheiro que não corresponde a um mês completo">período parcial</span>'},{k:'ficheiro',l:'Ficheiro',html:h=>`<span class="hint" style="font-size:11px">${esc(h.ficheiro||'')}</span>`},{k:'vendas',l:'Vendas',num:1,f:n2},{k:'iva',l:'IVA',num:1,f:n2},
+    {k:'score',l:'Pont.',num:1,html:h=>`<b class="mono st-${h.estado}">${h.score}</b>`},{k:'al',l:'Alertas',v:h=>h.alertas.crit*1e6+h.alertas.err*1e3+h.alertas.warn,html:h=>['crit','err','warn'].map(s=>h.alertas[s]?`<span class="badge ${SEV[s].c}">${h.alertas[s]}</span>`:'').join(' ')},
+    {k:'v',l:'Versão',html:h=>`<span class="hint mono">${esc(h.versao||'—')}</span>`},{k:'atualizadoEm',l:'Atualizado',f:v=>new Date(v).toLocaleString('pt-PT')},
+    {k:'_',l:'',html:h=>`<button class="btn sm danger" data-del="${esc(h.id)}" title="Apagar esta análise">${ico('trash')}</button>`}],onRow:openSummary,
+    after:t=>$$('[data-del]',t).forEach(bt=>bt.onclick=async e=>{ e.stopPropagation(); const h=g.list.find(x=>x.id===bt.dataset.del); if(h&&await deletePeriod(h)) RENDER.historico(); })});
+  const old=g.list.filter(h=>(h.versao||'0')<'1.5'); if(old.length) $('#fT').insertAdjacentHTML('beforebegin',`<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b class="st-warn">${ico('alert')} ${old.length} análise(s) feitas com uma versão anterior (regras antigas e sem dados financeiros).</b> <span class="hint">Volte a carregar esses SAF-T: a análise do mesmo período é substituída automaticamente, não fica duplicada.</span></div>`); };
+// a ficha da empresa precisa do histórico atualizado (ex.: logo a seguir a um lote)
+const _rhBase=RENDER.historico; RENDER.historico=async function(){ if(S.cloud.on&&(S.historyDirty||!S.history.length)){ try{ await cloudLoadHistory(); }catch(e){} } return _rhBase(); };
 </script>
 </body>
 </html>
