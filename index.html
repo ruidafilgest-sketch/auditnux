@@ -631,7 +631,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.8.3';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -2776,6 +2776,9 @@ async function glDeleteNif(nif){ const X=await glIndex(true); for(const id of Ob
 
 /* ---------- Entrada a partir da importação ---------- */
 async function glLoaded(R,file,batch){ const Y=glBuild(R); S.GL={R,Y,file}; delete S.GLY[Y.id];
+  const old=(await glIndex())[Y.id]; // o mesmo exercício substitui o anterior; avisa se o novo ficheiro tiver menos meses
+  if(old&&(old.maxP||0)>Y.maxP) toast(`${ico('alert')} ${esc(Y.empresa)} ${Y.ano}: o ficheiro agora carregado tem dados até ${GL_MES[Y.maxP-1].toLowerCase()} e substituiu um que ia até ${GL_MES[old.maxP-1].toLowerCase()}. Se foi engano, volte a carregar o ficheiro mais recente.`,'err');
+  else if(old) toast(`${ico('check')} ${esc(Y.empresa)} ${Y.ano}: dados substituídos pelo ficheiro novo (até ${GL_MES[Y.maxP-1].toLowerCase()}).`,'ok');
   const ok=await glSave(Y); await glIndex(); if(S.GLX) S.GLX[Y.id]=glMeta(Y);
   const U=S.glU; U.nif=Y.nif; U.ano=Y.ano; U.from=1; U.to=Y.maxP; U.enc=1; U.acc='';
   if(!batch){ toast(`${ico('check')} ${esc(Y.empresa)} — contabilidade de ${Y.ano}: ${n0(Y.nTx)} lançamentos lidos${ok?' e resumo guardado':''}`,'ok'); go('contabilidade'); }
@@ -3503,7 +3506,7 @@ function apResumoAcc(A){ // resumo do ano anterior para o comparativo (balanço 
   const B=apBalanco(A,null).v; const rend=A.filter(a=>a.classe===7).reduce((s,a)=>s-a.saldo,0), gastos=A.filter(a=>a.classe===6).reduce((s,a)=>s+a.saldo,0);
   return {rend,gastos,resultado:rend-gastos,ativoTotal:B['=at'],passivoTotal:B['=p'],capitalProprio:B['=cp'],liquidezGeral:B['=pc']?B['=ac']/B['=pc']:null,autonomiaFinanceira:B['=at']?B['=cp']/B['=at']:null}; }
 async function apFromSaft(nif,ano,to,enc,keep){ const Y=await glLoad(nif+'_'+ano); if(!Y) return toast('Exercício não encontrado.','err');
-  to=+to||Y.maxP; enc=to===12?+enc:0; const ap=keep&&S.ap.nif===nif&&S.ap.ano===String(ano)?S.ap:apNew();
+  to=+to||Y.maxP; enc=to===12?+enc:0; const same=keep&&S.ap.nif===nif&&S.ap.ano===String(ano); const sameDate=same&&S.ap.src&&+S.ap.src.to===to; const ap=same?S.ap:apNew();
   ap.empresa=Y.empresa; ap.nif=nif; ap.ano=String(ano); ap.data=lastDay(ano+'-'+String(to).padStart(2,'0'));
   ap.src={kind:'saft',nif,ano:String(ano),to,enc,label:`SAF-T de contabilidade ${ano} · janeiro a ${GL_MES[to-1].toLowerCase()}${enc===1&&(Y.has13||Y.closed)?' · com regularizações de fim de ano':enc===2?' · após apuramento de resultados':''}`,ficheiro:Y.ficheiro};
   ap.accounts=apAccFromBal(Y,glBal(Y,1,to,enc)); ap.mapa=null;
@@ -3513,7 +3516,7 @@ async function apFromSaft(nif,ano,to,enc,keep){ const Y=await glLoad(nif+'_'+ano
       if(to<12&&!F2.cevcAp&&(F2.compras31||F2.saldoA)&&(Yp.closed||Yp.has13)){ const A2f=apAccFromBal(Yp,glBal(Yp,1,12,1)); ap.comp={fonte:'saft',modo:'duodecimos',accounts2:A2f,resumo2:apResumoAcc(A2f),label:`SAF-T de contabilidade ${+ano-1} · exercício completo (resultados em duodécimos ${to}/12, balanço a 31/12/${+ano-1})`}; }
       else ap.comp={fonte:'saft',modo:'mesmoperiodo',accounts2:A2,resumo2:apResumoAcc(A2),label:`SAF-T de contabilidade ${+ano-1} · mesmo período`}; } }
   else if(!keep||ap.comp.fonte==='saft') ap.comp={fonte:'',modo:'mesmoperiodo',accounts2:[],resumo2:null,label:''};
-  apPrefill(ap,true); S.ap=ap; return ap; }
+  apPrefill(ap,!sameDate); S.ap=ap; return ap; } // mesma empresa e ano: mantém parâmetros, correções e prejuízos; mesmo mês: mantém também existências e amortizações
 async function apReadSheet(file){ const X=await xlsxLib(); const wb=X.read(new Uint8Array(await file.arrayBuffer()),{type:'array'}); return {wb,X}; }
 async function apFromExcel(file,sheet){ try{ const {wb,X}=await apReadSheet(file); const nm=sheet&&wb.SheetNames.includes(sheet)?sheet:wb.SheetNames[0];
     const rows=X.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:true,defval:''}); const res=apProcessar(rows); if(res.erro||!res.contas.length) throw new Error(res.erro||'Não foram encontradas contas neste ficheiro.');
@@ -3644,7 +3647,7 @@ async function apTabBal(el){ const ap=S.ap; const X=await glIndex(); const metas
      <div class="card" style="margin-top:16px"><h3>${ico('file')} Balancete classificado <span class="r"><span class="chip">${n0(ap.accounts.length)} contas</span></span></h3><div id="abT2"></div></div>${apNext('exist')}`:''}`;
   apBind(el,()=>{ if(ap.comp.resumo2) RENDER.apuramento(); });
   if($('#abN')){ $('#abN').onchange=e=>{ sel.nif=e.target.value; sel.ano=''; sel.to=0; apTabBal(el); }; $('#abA').onchange=e=>{ sel.ano=e.target.value; sel.to=0; apTabBal(el); }; $('#abT').onchange=e=>{ sel.to=+e.target.value; apTabBal(el); }; if($('#abE')) $('#abE').onchange=e=>{ sel.enc=+e.target.value; };
-    $('#abGo').onclick=async()=>{ if(+sel.enc===2&&+sel.to===12&&!confirm('Com o apuramento de resultados incluído, as classes 6 e 7 ficam saldadas e o resultado não pode ser calculado. Continuar mesmo assim?')) return; await apFromSaft(sel.nif,sel.ano,sel.to,+sel.to===12?sel.enc:0); toast(`${ico('check')} Balancete de ${esc(S.ap.empresa)} carregado`,'ok'); RENDER.apuramento(); }; }
+    $('#abGo').onclick=async()=>{ if(+sel.enc===2&&+sel.to===12&&!confirm('Com o apuramento de resultados incluído, as classes 6 e 7 ficam saldadas e o resultado não pode ser calculado. Continuar mesmo assim?')) return; await apFromSaft(sel.nif,sel.ano,sel.to,+sel.to===12?sel.enc:0,true); toast(`${ico('check')} Balancete de ${esc(S.ap.empresa)} carregado`,'ok'); RENDER.apuramento(); }; }
   const z=$('#abX'); z.onclick=()=>apPickFile('.xlsx,.xls,.csv',async f=>{ if(await apFromExcel(f)) RENDER.apuramento(); });
   z.ondragover=e=>{ e.preventDefault(); z.classList.add('over'); }; z.ondragleave=()=>z.classList.remove('over'); z.ondrop=async e=>{ e.preventDefault(); z.classList.remove('over'); if(e.dataTransfer.files.length&&await apFromExcel(e.dataTransfer.files[0])) RENDER.apuramento(); };
   $('#abC').onclick=()=>apPickFile('.xlsx,.xls,.csv,.pdf',apCompFile); if($('#abCx')) $('#abCx').onclick=()=>{ ap.comp={fonte:'',modo:ap.comp.modo,accounts2:[],resumo2:null,label:''}; RENDER.apuramento(); };
