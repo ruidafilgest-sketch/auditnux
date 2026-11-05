@@ -631,7 +631,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -3015,7 +3015,7 @@ document.addEventListener('DOMContentLoaded',()=>{ const ref=$('.nav[data-v="fin
 const _fichaGL=fichaEmpresa; fichaEmpresa=function(nif){ _fichaGL(nif); glIndex().then(X=>{ const ys=Object.values(X).filter(m=>m.nif===nif).map(m=>m.ano).sort(); const tb=$('#v-historico .toolbar'); if(!ys.length||!tb||$('#fGL')) return;
   tb.insertAdjacentHTML('beforeend',`<button class="btn" id="fGL">${ico('book')} Contabilidade ${ys.join(' · ')}</button>`); $('#fGL').onclick=()=>{ S.glU.nif=nif; S.glU.ano=ys[ys.length-1]; S.glU.to=0; go('contabilidade'); }; }); };
 // ao mudar de espaço (sessão), limpa a cache
-const _enterGL=enterApp; enterApp=function(){ S.GLX=null; S.GLY={}; S.GL=null; return _enterGL.apply(this,arguments); };
+const _enterGL=enterApp; enterApp=function(){ S.GLX=null; S.GLY={}; S.GL=null; S.apAuto=false; return _enterGL.apply(this,arguments); };
 
 /* =====================================================================
    MOTOR DE APURAMENTO — núcleo de cálculo transportado sem alterações do
@@ -3592,7 +3592,11 @@ const apBanner=(t,k)=>`<div class="card" style="border-color:var(--${k||'acc'});
 const apIn=(k,v,o={})=>`<label class="fld" style="${o.w?'max-width:'+o.w+'px':''}">${o.l||''}${o.h?`<span class="hint" style="text-transform:none;letter-spacing:0">${o.h}</span>`:''}<input class="inp" data-ap="${k}" type="${o.t||'number'}" step="${o.s||'0.01'}" value="${v==null?'':esc(v)}" ${o.dis?'disabled':''}></label>`;
 function apSet(path,val){ const p=path.split('.'); let o=S.ap; for(let i=0;i<p.length-1;i++) o=o[p[i]]; const last=p[p.length-1]; const cur=o[last]; o[last]= typeof cur==='number'||(cur===''&&/valor|base|taxa/.test(last))? (val===''?0:parseFloat(val)) : typeof cur==='boolean'? !!val : val; }
 function apBind(el,after){ $$('[data-ap]',el).forEach(i=>{ const ev=i.type==='checkbox'||i.tagName==='SELECT'?'change':'input'; i.addEventListener(ev,()=>{ apSet(i.dataset.ap,i.type==='checkbox'?i.checked:i.value); if(after) after(); }); }); }
-RENDER.apuramento=async function(){ const el=$('#v-apuramento'), ap=S.ap, t=S.apTab;
+RENDER.apuramento=async function(){ const el=$('#v-apuramento');
+  // sem balancete: abre sozinho o SAF-T de contabilidade mais recente (o que está aberto, ou o último carregado)
+  if(!S.ap.accounts.length&&!S.apAuto){ S.apAuto=true; try{ const X=await glIndex(); const ms=Object.values(X); if(ms.length){ const m=S.GL?S.GL.Y:ms.sort((a,b)=>(b.carregadoEm||'').localeCompare(a.carregadoEm||''))[0];
+      await apFromSaft(m.nif,m.ano,m.maxP||12,1); S.apSel={nif:m.nif,ano:m.ano,to:m.maxP||12,enc:1}; toast(`${ico('check')} Balancete de ${esc(m.empresa)} (${m.ano}, até ${GL_MES[(m.maxP||12)-1].toLowerCase()}) carregado do SAF-T — pode escolher outra empresa ou período no passo 1`,'ok'); } }catch(e){ console.error(e); } }
+  const ap=S.ap, t=S.apTab;
   const has=ap.accounts.length>0;
   el.innerHTML=`<div class="card pbar"><div class="toolbar" style="margin:0">
      <label class="fld" style="flex:1;min-width:220px">Empresa<input class="inp" data-ap="empresa" type="text" value="${esc(ap.empresa)}" placeholder="Nome da entidade"></label>
@@ -3604,7 +3608,7 @@ RENDER.apuramento=async function(){ const el=$('#v-apuramento'), ap=S.ap, t=S.ap
   apBind($('.pbar',el)); $('#vSub').textContent=VIEWS.apuramento[1]+(ap.empresa?' · '+ap.empresa:'');
   $$('#apTabs .tab').forEach(x=>x.onclick=()=>{ S.apTab=x.dataset.t; RENDER.apuramento(); });
   $('#apSv').onclick=()=>apSave(); $('#apLs').onclick=apPanel; $('#apPd').onclick=()=>apPdf(); $('#apJo').onclick=apJsonOut; $('#apJi').onclick=apJsonIn;
-  $('#apNw').onclick=()=>{ if(has&&!confirm('Começar uma análise nova? Os dados não guardados desta análise perdem-se.')) return; S.ap=apNew(); S.apTab='bal'; RENDER.apuramento(); };
+  $('#apNw').onclick=()=>{ if(has&&!confirm('Começar uma análise nova? Os dados não guardados desta análise perdem-se.')) return; S.ap=apNew(); S.apTab='bal'; S.apAuto=true; RENDER.apuramento(); };
   const body=$('#apBody'); if(!has&&t!=='bal'){ S.apTab='bal'; return RENDER.apuramento(); }
   await ({bal:apTabBal,exist:apTabExist,fisc:apTabFisc,corr:apTabCorr,dem:apTabDem,irc:apTabIrc,rac:apTabRac,par:apTabPar})[t](body); };
 const apNext=(n,l)=>`<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn pri" onclick="S.apTab='${n}';RENDER.apuramento()">${l||'Continuar'} →</button></div>`;
@@ -3620,7 +3624,7 @@ async function apTabBal(el){ const ap=S.ap; const X=await glIndex(); const metas
        <label class="fld">Até<select class="inp" id="abT">${GL_MES.map((m,i)=>`<option value="${i+1}" ${i+1===+sel.to?'selected':''}>${m}</option>`).join('')}</select></label>
        ${meta&&(meta.closed||meta.has13)&&+sel.to===12?`<label class="fld">Encerramento<select class="inp" id="abE">${GL_ENC.filter(([k])=>k!=='2'||meta.closed).map(([k,l])=>`<option value="${k}" ${String(sel.enc)===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>
        <p class="hint">Balancete acumulado de janeiro até ao mês escolhido, já validado pela auditoria da contabilidade. ${co.anos.some(m=>+m.ano===+sel.ano-1)?`O comparativo usa automaticamente o SAF-T de ${+sel.ano-1}, no mesmo período.`:`Carregue o SAF-T de ${+sel.ano-1} em Contabilidade para ter o comparativo automático.`}</p>
-       <button class="btn pri" id="abGo">${ico('check')} Usar este balancete</button>`:`<p class="hint">Ainda não há SAF-T de contabilidade carregados. Carregue-os em <b>Importar SAF-T</b> (o programa reconhece o tipo sozinho).</p><button class="btn" onclick="go('importar')">${ico('upload')} Importar SAF-T</button>`}</div>
+       <button class="btn pri" id="abGo">${ico('check')} Carregar este balancete</button>`:`<p class="hint">Ainda não há SAF-T de contabilidade carregados. Carregue-os em <b>Importar SAF-T</b> (o programa reconhece o tipo sozinho).</p><button class="btn" onclick="go('importar')">${ico('upload')} Importar SAF-T</button>`}</div>
    <div class="card"><h3>${ico('file')} Balancete em Excel</h3><p class="hint">Para empresas sem SAF-T de contabilidade: o Excel exportado do programa de contabilidade, com código de conta, descrição e saldos (devedor/credor ou débito/crédito). As colunas são detetadas sozinhas.</p>
      <div class="drop" id="abX" style="padding:22px"><div class="big">${ico('upload')}</div><h4>Arraste o Excel do balancete para aqui</h4><div class="hint">ou clique para escolher · .xlsx / .xls / .csv</div></div></div></div>
    <div id="abMap"></div>
