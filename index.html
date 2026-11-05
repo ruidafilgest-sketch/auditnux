@@ -631,7 +631,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -3356,7 +3356,9 @@ function apPrefill(ap,reset){ const F=apFlags(ap.accounts), E=ap.existencias; E.
   if(F.amAp) E.amort=r2(F.amPosto); else if(reset) E.amort=0; }
 
 /* ---------- Cálculo (transcrição do calcularTudo do Motor, sem DOM) ---------- */
-function apCalc(ap){ const A=ap.accounts, F=apFlags(A), E=ap.existencias, P=ap.parametros, n=v=>{ const x=parseFloat(v); return isNaN(x)?0:x; };
+const apRate=v=>{ let x=parseFloat(v); if(isNaN(x)) return 0; return x>1? x/100 : x; }; // 1,5 escrito como percentagem → 0,015
+function apCalc(ap){ const A=ap.accounts, F=apFlags(A), E=ap.existencias, P0=ap.parametros, n=v=>{ const x=parseFloat(v); return isNaN(x)?0:x; };
+  const P={...P0,taxaGeral:apRate(P0.taxaGeral),taxaPME:apRate(P0.taxaPME),derramaMun:apRate(P0.derramaMun),limitPrej:apRate(P0.limitPrej)};
   let rend=A.filter(a=>a.classe===7).reduce((s,a)=>s-a.saldo,0);
   let gastos=A.filter(a=>a.classe===6&&!a.conta.startsWith('812')).reduce((s,a)=>s+a.saldo,0);
   const cmvmc=F.cevcAp? F.cevcPosto : (n(E.aIniciais)+n(E.aCompras)-n(E.aFinais));
@@ -3379,7 +3381,7 @@ function apCalc(ap){ const A=ap.accounts, F=apFlags(A), E=ap.existencias, P=ap.p
   const derramaMunicipal=baseDerramaMun*n(P.derramaMun);
   const derramaEstadual=apDerramaEst(Math.max(0,lucroTributavel));
   const agravamento=P.agravamento&&lucroTributavel<0?0.10:0;
-  const autonomas=ap.autonomas.map(a=>({desc:String(a.desc||'').trim(),base:n(a.base),taxa:n(a.taxa)})).filter(a=>a.base>0);
+  const autonomas=ap.autonomas.map(a=>({desc:String(a.desc||'').trim(),base:n(a.base),taxa:apRate(a.taxa)})).filter(a=>a.base>0);
   const totalAutonomas=autonomas.reduce((s,a)=>s+a.base*(a.taxa+agravamento),0);
   const totalImposto=irc+derramaMunicipal+derramaEstadual+totalAutonomas;
   const resultadoLiquidoFinal=resultadoContabilistico-totalImposto;
@@ -3506,7 +3508,10 @@ async function apFromSaft(nif,ano,to,enc,keep){ const Y=await glLoad(nif+'_'+ano
   ap.src={kind:'saft',nif,ano:String(ano),to,enc,label:`SAF-T de contabilidade ${ano} · janeiro a ${GL_MES[to-1].toLowerCase()}${enc===1&&(Y.has13||Y.closed)?' · com regularizações de fim de ano':enc===2?' · após apuramento de resultados':''}`,ficheiro:Y.ficheiro};
   ap.accounts=apAccFromBal(Y,glBal(Y,1,to,enc)); ap.mapa=null;
   const X=await glIndex(); const pid=nif+'_'+(+ano-1);
-  if(X[pid]){ const Yp=await glLoad(pid); if(Yp){ const A2=apAccFromBal(Yp,glBal(Yp,1,to,enc)); ap.comp={fonte:'saft',modo:'mesmoperiodo',accounts2:A2,resumo2:apResumoAcc(A2),label:`SAF-T de contabilidade ${+ano-1} · mesmo período`}; } }
+  if(X[pid]){ const Yp=await glLoad(pid); if(Yp){ const A2=apAccFromBal(Yp,glBal(Yp,1,to,enc)); const F2=apFlags(A2);
+      // a meio do ano o CMVMC do ano anterior não está apurado: comparar com o exercício anterior completo (resultados em duodécimos, balanço a 31/12)
+      if(to<12&&!F2.cevcAp&&(F2.compras31||F2.saldoA)&&(Yp.closed||Yp.has13)){ const A2f=apAccFromBal(Yp,glBal(Yp,1,12,1)); ap.comp={fonte:'saft',modo:'duodecimos',accounts2:A2f,resumo2:apResumoAcc(A2f),label:`SAF-T de contabilidade ${+ano-1} · exercício completo (resultados em duodécimos ${to}/12, balanço a 31/12/${+ano-1})`}; }
+      else ap.comp={fonte:'saft',modo:'mesmoperiodo',accounts2:A2,resumo2:apResumoAcc(A2),label:`SAF-T de contabilidade ${+ano-1} · mesmo período`}; } }
   else if(!keep||ap.comp.fonte==='saft') ap.comp={fonte:'',modo:'mesmoperiodo',accounts2:[],resumo2:null,label:''};
   apPrefill(ap,true); S.ap=ap; return ap; }
 async function apReadSheet(file){ const X=await xlsxLib(); const wb=X.read(new Uint8Array(await file.arrayBuffer()),{type:'array'}); return {wb,X}; }
@@ -3589,9 +3594,10 @@ function apPickFile(accept,cb){ const fi=$('#fileIn'); fi.multiple=false; fi.acc
 
 /* ---------- Vista ---------- */
 const apBanner=(t,k)=>`<div class="card" style="border-color:var(--${k||'acc'});margin:0 0 12px;padding:12px 14px">${t}</div>`;
-const apIn=(k,v,o={})=>`<label class="fld" style="${o.w?'max-width:'+o.w+'px':''}">${o.l||''}${o.h?`<span class="hint" style="text-transform:none;letter-spacing:0">${o.h}</span>`:''}<input class="inp" data-ap="${k}" type="${o.t||'number'}" step="${o.s||'0.01'}" value="${v==null?'':esc(v)}" ${o.dis?'disabled':''}></label>`;
+const apPctIn=v=>v===''||v==null?'':String(r2(v*100*1000)/1000).replace('.',',');
+const apIn=(k,v,o={})=>`<label class="fld" style="${o.w?'max-width:'+o.w+'px':''}">${o.l||''}${o.h?`<span class="hint" style="text-transform:none;letter-spacing:0">${o.h}</span>`:''}${o.pct?`<div style="display:flex;align-items:center;gap:6px"><input class="inp" data-ap="${k}" data-pct="1" type="text" inputmode="decimal" value="${apPctIn(v)}" ${o.dis?'disabled':''}><b>%</b></div>`:`<input class="inp" data-ap="${k}" type="${o.t||'number'}" step="${o.s||'0.01'}" value="${v==null?'':esc(v)}" ${o.dis?'disabled':''}>`}</label>`;
 function apSet(path,val){ const p=path.split('.'); let o=S.ap; for(let i=0;i<p.length-1;i++) o=o[p[i]]; const last=p[p.length-1]; const cur=o[last]; o[last]= typeof cur==='number'||(cur===''&&/valor|base|taxa/.test(last))? (val===''?0:parseFloat(val)) : typeof cur==='boolean'? !!val : val; }
-function apBind(el,after){ $$('[data-ap]',el).forEach(i=>{ const ev=i.type==='checkbox'||i.tagName==='SELECT'?'change':'input'; i.addEventListener(ev,()=>{ apSet(i.dataset.ap,i.type==='checkbox'?i.checked:i.value); if(after) after(); }); }); }
+function apBind(el,after){ $$('[data-ap]',el).forEach(i=>{ const ev=i.type==='checkbox'||i.tagName==='SELECT'?'change':'input'; i.addEventListener(ev,()=>{ if(i.dataset.pct){ const x=parseFloat(String(i.value).replace(/\s/g,'').replace(',','.')); apSet(i.dataset.ap,isNaN(x)?0:x/100); } else apSet(i.dataset.ap,i.type==='checkbox'?i.checked:i.value); if(after) after(); }); }); }
 RENDER.apuramento=async function(){ const el=$('#v-apuramento');
   // sem balancete: abre sozinho o SAF-T de contabilidade mais recente (o que está aberto, ou o último carregado)
   if(!S.ap.accounts.length&&!S.apAuto){ S.apAuto=true; try{ const X=await glIndex(); const ms=Object.values(X); if(ms.length){ const m=S.GL?S.GL.Y:ms.sort((a,b)=>(b.carregadoEm||'').localeCompare(a.carregadoEm||''))[0];
@@ -3629,7 +3635,7 @@ async function apTabBal(el){ const ap=S.ap; const X=await glIndex(); const metas
      <div class="drop" id="abX" style="padding:22px"><div class="big">${ico('upload')}</div><h4>Arraste o Excel do balancete para aqui</h4><div class="hint">ou clique para escolher · .xlsx / .xls / .csv</div></div></div></div>
    <div id="abMap"></div>
    <div class="card" style="margin-top:16px"><h3>${ico('layers')} Comparativo com o ano anterior <span class="r"><span class="badge b-info">opcional</span></span></h3>
-     <div class="toolbar"><label class="fld">Tipo de comparação<select class="inp" data-ap="comp.modo"><option value="mesmoperiodo" ${ap.comp.modo!=='duodecimos'?'selected':''}>Mesmo período do ano anterior (comparação direta — mais rigorosa)</option><option value="duodecimos" ${ap.comp.modo==='duodecimos'?'selected':''}>Duodécimos, a partir do balancete final de dezembro (só Rendimentos/Gastos; assume atividade linear)</option></select></label>
+     <div class="toolbar">${ap.comp.fonte==='saft'?`<span class="hint" style="max-width:640px">Comparação escolhida automaticamente: ${ap.comp.modo==='duodecimos'?'o mesmo período do ano anterior não tem o CMVMC apurado, por isso compara-se com o exercício anterior completo (resultados proporcionais aos meses; balanço a 31/12).':'mesmo período do ano anterior.'}</span>`:`<label class="fld">Tipo de comparação<select class="inp" data-ap="comp.modo"><option value="mesmoperiodo" ${ap.comp.modo!=='duodecimos'?'selected':''}>Mesmo período do ano anterior (comparação direta — mais rigorosa)</option><option value="duodecimos" ${ap.comp.modo==='duodecimos'?'selected':''}>Duodécimos, a partir do balancete final de dezembro (só Rendimentos/Gastos; assume atividade linear)</option></select></label>`}
        <span class="sp"></span><button class="btn" id="abC" style="margin-top:14px">${ico('upload')} Carregar balancete (Excel) ou IES (PDF) do ano anterior</button>${ap.comp.resumo2?`<button class="btn sm danger" id="abCx" style="margin-top:14px">${ico('x')}</button>`:''}</div>
      <div id="abCs">${ap.comp.resumo2?apBanner(`${ico('check')} <b>${esc(ap.comp.label)}</b> — resultado desse período: ${eur(ap.comp.resumo2.resultado)}. O comparativo aparece nas Demonstrações e no relatório.${ap.comp.modo==='duodecimos'&&ap.comp.fonte==='excel'&&!ap.comp.accounts2.some(a=>/^61[12]/.test(a.conta)&&a.saldo!==0)?'<br><span class="st-warn">Este balancete não parece ter o CEVC apurado (conta 611/612 vazia) — em modo Duodécimos precisa do balancete FINAL de dezembro, já fechado.</span>':''}`,'good'):'<p class="hint">Sem comparativo. Com a fonte SAF-T, o ano anterior entra sozinho quando existir.</p>'}</div></div>
    ${ap.accounts.length?`<div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('scale')} Resumo por classe</h3><div id="abK"></div></div><div class="card"><h3>${ico('shield')} Deteções no balancete</h3>
@@ -3667,27 +3673,28 @@ function apTabExist(el){ const ap=S.ap, E=ap.existencias, F=apFlags(ap.accounts)
      <div class="grid g3">${apIn('existencias.amort',E.amort,{l:'Amortizações do período',h:F.amAp?'já lançado (classe 64)':'a indicar',dis:F.amAp})}</div></div>${apNext('fisc')}`;
   apBind(el,tot); tot(); }
 
-function apRows(list,kind){ return list.map((x,i)=>kind==='aut'?`<div class="toolbar" style="margin:0 0 6px"><input class="inp grow" data-ap="autonomas.${i}.desc" type="text" value="${esc(x.desc||'')}" placeholder="Categoria (ex.: viaturas ligeiras)"><input class="inp" style="width:160px" data-ap="autonomas.${i}.base" type="number" step="0.01" value="${x.base||''}" placeholder="Base tributável €"><input class="inp" style="width:110px" data-ap="autonomas.${i}.taxa" type="number" step="0.001" value="${x.taxa}" placeholder="Taxa"><span class="hint">taxa decimal</span><button class="btn sm danger" data-rm="autonomas.${i}">${ico('x')}</button></div>`
+function apRows(list,kind){ return list.map((x,i)=>kind==='aut'?`<div class="toolbar" style="margin:0 0 6px"><input class="inp grow" data-ap="autonomas.${i}.desc" type="text" value="${esc(x.desc||'')}" placeholder="Categoria (ex.: viaturas ligeiras)"><input class="inp" style="width:160px" data-ap="autonomas.${i}.base" type="number" step="0.01" value="${x.base||''}" placeholder="Base tributável €"><input class="inp" style="width:90px" data-ap="autonomas.${i}.taxa" data-pct="1" type="text" inputmode="decimal" value="${apPctIn(x.taxa)}" placeholder="Taxa"><b>%</b><button class="btn sm danger" data-rm="autonomas.${i}">${ico('x')}</button></div>`
    :kind==='cor'?`<div class="toolbar" style="margin:0 0 6px"><select class="inp" data-ap="correcoes.${i}.tipo"><option value="acrescimo" ${x.tipo==='acrescimo'?'selected':''}>Acréscimo (+)</option><option value="deducao" ${x.tipo==='deducao'?'selected':''}>Dedução (−)</option></select><input class="inp grow" data-ap="correcoes.${i}.desc" type="text" value="${esc(x.desc||'')}" placeholder="Descrição (ex.: multas não dedutíveis)"><input class="inp" style="width:160px" data-ap="correcoes.${i}.valor" type="number" step="0.01" value="${x.valor||''}" placeholder="Valor €"><button class="btn sm danger" data-rm="correcoes.${i}">${ico('x')}</button></div>`
    :`<div class="toolbar" style="margin:0 0 6px"><input class="inp" style="width:120px" data-ap="prejuizos.${i}.ano" type="number" value="${x.ano||''}" placeholder="Ano"><input class="inp" style="width:180px" data-ap="prejuizos.${i}.valor" type="number" step="0.01" value="${x.valor||''}" placeholder="Valor €"><button class="btn sm danger" data-rm="prejuizos.${i}">${ico('x')}</button></div>`).join(''); }
 function apRowBind(el,re){ $$('[data-rm]',el).forEach(b=>b.onclick=()=>{ const [k,i]=b.dataset.rm.split('.'); S.ap[k].splice(+i,1); re(); }); $$('[data-add]',el).forEach(b=>b.onclick=()=>{ const k=b.dataset.add; S.ap[k].push(k==='autonomas'?{desc:'',base:0,taxa:0.10}:k==='correcoes'?{tipo:'acrescimo',desc:'',valor:0}:{ano:'',valor:0}); re(); }); }
 function apTabFisc(el){ const P=S.ap.parametros; const re=()=>apTabFisc(el);
   el.innerHTML=`<p class="hint" style="margin:0 0 12px">Valores pré-preenchidos com a legislação considerada no Motor para 2026 — confirme e ajuste ao caso concreto (município, regime, taxas). Estes números mudam todos os anos.</p>
    <div class="grid g2"><div class="card"><h3>${ico('percent')} IRC</h3><label class="chk"><input type="checkbox" data-ap="parametros.isPME" ${P.isPME?'checked':''}> É PME / Small Mid Cap (taxa reduzida na primeira parte da matéria coletável)</label>
-     <div class="grid g3">${apIn('parametros.taxaGeral',P.taxaGeral,{l:'Taxa geral IRC',s:'0.001'})}${apIn('parametros.taxaPME',P.taxaPME,{l:'Taxa reduzida PME',s:'0.001'})}${apIn('parametros.limiarPME',P.limiarPME,{l:'Limiar da taxa reduzida (€)',s:'1000'})}</div></div>
-   <div class="card"><h3>${ico('percent')} Derramas</h3><div class="grid g2">${apIn('parametros.derramaMun',P.derramaMun,{l:'Derrama municipal',h:'taxa do município, até 1,5% (ex.: 0.015)',s:'0.001'})}<label class="fld">Base da derrama municipal<select class="inp" data-ap="parametros.derramaBase"><option value="materiaColetavel" ${P.derramaBase!=='lucroTributavel'?'selected':''}>Matéria coletável</option><option value="lucroTributavel" ${P.derramaBase==='lucroTributavel'?'selected':''}>Lucro tributável (antes de prejuízos)</option></select></label></div>
+     <div class="grid g3">${apIn('parametros.taxaGeral',P.taxaGeral,{l:'Taxa geral IRC',pct:1})}${apIn('parametros.taxaPME',P.taxaPME,{l:'Taxa reduzida PME',pct:1})}${apIn('parametros.limiarPME',P.limiarPME,{l:'Limiar da taxa reduzida (€)',s:'1000'})}</div></div>
+   <div class="card"><h3>${ico('percent')} Derramas</h3><div class="grid g2">${apIn('parametros.derramaMun',P.derramaMun,{l:'Derrama municipal',h:'taxa do município, no máximo 1,5 (escreva 1,5 para 1,5%)',pct:1})}<label class="fld">Base da derrama municipal<select class="inp" data-ap="parametros.derramaBase"><option value="materiaColetavel" ${P.derramaBase!=='lucroTributavel'?'selected':''}>Matéria coletável</option><option value="lucroTributavel" ${P.derramaBase==='lucroTributavel'?'selected':''}>Lucro tributável (antes de prejuízos)</option></select></label></div>
      <p class="hint">Derrama estadual automática pelos escalões legais: 3% acima de 1,5 M€, 5% acima de 7,5 M€, 9% acima de 35 M€, sobre o lucro tributável.</p></div></div>
-   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('undo')} Dedução de prejuízos fiscais</h3><div class="grid g2">${apIn('parametros.limitPrej',P.limitPrej,{l:'Limite de dedução (% do lucro tributável)',h:'decimal, ex.: 0.65'})}<label class="fld">Majoração para prejuízos de 2020/2021<select class="inp" data-ap="parametros.majoracao"><option value="0" ${String(P.majoracao)==='0'?'selected':''}>Sem majoração</option><option value="0.10" ${String(P.majoracao)==='0.10'?'selected':''}>+10 p.p. (limite 75%)</option></select></label></div><p class="hint">Sem limitação temporal de reporte desde 2023 — os prejuízos disponíveis indicam-se no passo 4.</p></div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('undo')} Dedução de prejuízos fiscais</h3><div class="grid g2">${apIn('parametros.limitPrej',P.limitPrej,{l:'Limite de dedução',h:'% do lucro tributável',pct:1})}<label class="fld">Majoração para prejuízos de 2020/2021<select class="inp" data-ap="parametros.majoracao"><option value="0" ${String(P.majoracao)==='0'?'selected':''}>Sem majoração</option><option value="0.10" ${String(P.majoracao)==='0.10'?'selected':''}>+10 p.p. (limite 75%)</option></select></label></div><p class="hint">Sem limitação temporal de reporte desde 2023 — os prejuízos disponíveis indicam-se no passo 4.</p></div>
    <div class="card"><h3>${ico('alert')} Tributações autónomas <span class="r"><span class="badge b-info">opcional</span></span></h3><label class="chk"><input type="checkbox" data-ap="parametros.agravamento" ${P.agravamento?'checked':''}> Agravar taxas em +10 p.p. por prejuízo fiscal no exercício <span class="hint">(suspenso para 2026 — confirmar o OE do ano)</span></label>
      ${apRows(S.ap.autonomas,'aut')}<button class="btn sm" data-add="autonomas">+ Adicionar categoria</button></div></div>${apNext('corr')}`;
   apBind(el); apRowBind(el,re); }
 function apTabCorr(el){ const re=()=>apTabCorr(el);
-  el.innerHTML=`<div class="card"><h3>${ico('wrench')} Correções ao resultado contabilístico <span class="r"><span class="badge b-info">Quadro 07</span></span></h3><p class="hint">Ex.: tributações autónomas contabilizadas como gasto, multas e coimas não dedutíveis, donativos fora dos limites, mais/menos-valias fiscais vs. contabilísticas, benefícios fiscais (RFAI, SIFIDE, DLRR).</p>${apRows(S.ap.correcoes,'cor')}<button class="btn sm" data-add="correcoes">+ Adicionar linha</button></div>
+  el.innerHTML=`<div class="card"><h3>${ico('wrench')} Correções ao resultado contabilístico <span class="r"><span class="badge b-info">Quadro 07</span></span></h3><p class="hint">Ex.: tributações autónomas contabilizadas como gasto, multas e coimas não dedutíveis, donativos fora dos limites, mais/menos-valias fiscais vs. contabilísticas, majorações de gastos do EBF. <b>RFAI, SIFIDE II e DLRR são deduções à coleta</b> (abatem ao imposto, não ao lucro): não se registam aqui.</p>${apRows(S.ap.correcoes,'cor')}<button class="btn sm" data-add="correcoes">+ Adicionar linha</button></div>
    <div class="card" style="margin-top:16px"><h3>${ico('undo')} Prejuízos fiscais reportáveis</h3><p class="hint">Um saldo por ano de origem. A dedução é feita pela ordem FIFO (mais antigos primeiro), respeitando o limite legal.</p>${apRows(S.ap.prejuizos,'pre')}<button class="btn sm" data-add="prejuizos">+ Adicionar ano</button></div>${apNext('dem','Ver demonstrações')}`;
   apBind(el); apRowBind(el,re); }
 
 function apAll(){ const ap=S.ap; const r=apCalc(ap); r._E=ap.existencias; const D=apDR(ap.accounts,r), Bl=apBalanco(ap.accounts,r); const R=apRatios(ap,r,Bl,D);
-  const c=ap.comp; let D2=null,B2=null; if(c.resumo2&&c.fonte!=='ies'&&c.accounts2.length){ D2=apDR(c.accounts2,null); B2=apBalanco(c.accounts2,null).v; }
+  const c=ap.comp; let D2=null,B2=null; if(c.resumo2&&c.fonte!=='ies'&&c.accounts2.length){ D2=apDR(c.accounts2,null); B2=apBalanco(c.accounts2,null).v;
+    if(c.modo==='duodecimos'){ const f=(+String(ap.data||'').slice(5,7)||12)/12; for(const k in D2) D2[k]=r2(D2[k]*f); } }
   const dc=apDRcheck(D,r); return {ap,r,D,Bl,R,D2,B2,dc}; }
 function apDRcheck(D,r){ return Math.abs(D['=rai']-r2(r.resultadoContabilistico))<0.01; }
 function apWarnings(ap,r){ const w=[]; const A=ap.accounts;
@@ -3695,6 +3702,8 @@ function apWarnings(ap,r){ const w=[]; const A=ap.accounts;
   if(!r.F.cevcAp&&(r.F.saldoA||r.F.compras31)&&!(+ap.existencias.aFinais)) w.push(['warn',`CMVMC calculado sem existência final (passo 2): todas as compras e a existência inicial (${eur(r.cmvmc)}) estão a ser consideradas gasto.`]);
   if(!r.F.varAp&&r.F.saldoB&&!(+ap.existencias.bFinais)) w.push(['warn',`Variação da produção calculada sem existência final (passo 2): a existência inicial de produtos (${eur(r.F.saldoB)}) está a ser considerada consumida.`]);
   if(!r.F.amAp&&!(+ap.existencias.amort)&&A.some(a=>/^4[34]/.test(a.conta)&&a.saldo>0)) w.push(['warn','Há ativos fixos no balancete mas não estão indicadas amortizações do período (passo 2): o resultado e o IRC ficam sobrestimados.']);
+  const P=ap.parametros; if(apRate(P.derramaMun)>0.015+1e-9) w.push(['crit',`Derrama municipal de ${apPct(apRate(P.derramaMun))}: o máximo legal é 1,5% — confirme a taxa no passo 3.`]);
+  if(r.lucroTributavel>0&&r.irc+r.derramaMunicipal+r.derramaEstadual>r.lucroTributavel*0.5) w.push(['crit',`O IRC e as derramas (${eur(r.irc+r.derramaMunicipal+r.derramaEstadual)}) excedem metade do lucro tributável (${eur(r.lucroTributavel)}) — há uma taxa errada no passo 3.`]);
   if(r.materiaColetavel===0&&r.lucroTributavel>0&&r.dedPrej.deduzido<r.lucroTributavel) w.push(['info',`Ainda há prejuízos fiscais reportáveis por utilizar em exercícios futuros (limite de ${apPct(r.limitePrej)} atingido neste exercício).`]);
   if(r.resultadoContabilistico<0&&r.totalAutonomas>0) w.push(['warn',`Empresa em prejuízo contabilístico mas com tributações autónomas a pagar (${eur(r.totalAutonomas)}) — incidem independentemente do resultado.`]);
   if(r.autonomas.length===0&&A.some(a=>a.conta.startsWith('6242')||a.conta.startsWith('6252'))) w.push(['info','Há possíveis contas de viaturas/deslocações no balancete mas não há tributações autónomas configuradas — confirme se aplicável.']);
@@ -3705,13 +3714,14 @@ function apStmt(defs,v,v2,yr,yr2,opts){ const rows=defs.map(([k,l])=>{ if(k==='h
     if(!tot&&opts.hideZero&&Math.abs(v[k])<0.005&&(!v2||Math.abs(v2[k]||0)<0.005)) return '';
     const big=/TOTAL|Resultado líquido|Resultado antes de impostos/.test(l); return `<tr class="${tot?'glagg':''}"><td style="${tot?'font-weight:700':'padding-left:18px'}${big?';font-size:13.5px':''}">${esc(l)}${opts.note&&opts.note[k]?` <span class="hint">${opts.note[k]}</span>`:''}</td><td class="num" style="${tot?'font-weight:700':''}">${n2(v[k])}</td>${v2?`<td class="num muted">${v2[k]==null?'':n2(v2[k])}</td>`:''}</tr>`; }).join('');
   return `<div class="tbl-wrap"><table class="t"><thead><tr><th></th><th class="num">${esc(yr)}</th>${v2?`<th class="num">${esc(yr2)}</th>`:''}</tr></thead><tbody>${rows}</tbody></table></div>`; }
-function apTabDem(el){ const {ap,r,D,Bl,D2,B2,dc}=apAll(); const yr=apDataPT(ap.data), yr2=ap.comp.label?String(+ap.ano-1):'';
+const apYr2=(ap,kind)=>{ if(!ap.comp.label) return ''; const a=+ap.ano-1, m=+String(ap.data||'').slice(5,7)||12; return ap.comp.modo==='duodecimos'? (kind==='dr'?`${a} (${m}/12)`:`31/12/${a}`) : String(a); };
+function apTabDem(el){ const {ap,r,D,Bl,D2,B2,dc}=apAll(); const yr=apDataPT(ap.data), yr2=apYr2(ap,'dr'), yb2=apYr2(ap,'bal');
   const nD={cmv:!r.F.cevcAp&&r.cmvmc?'(calculado: EI + compras − EF)':'',dep:!r.F.amAp&&r.amortizacao?'(indicadas no passo 2)':'',var:!r.F.varAp&&r.variacaoProducao?'(calculada: EF − EI)':'',imp:'(estimado — passo 6)'};
   const nB={ajp:Math.abs(Bl.v.ajp)>=0.005?'⚠ ver nota':''};
   el.innerHTML=apWarnHtml(apWarnings(ap,r))+apKpis(r)+`
    <div class="grid g2" style="margin-top:16px;align-items:start"><div class="card"><h3>${ico('chart')} Demonstração dos resultados por naturezas <span class="r">${dc?'<span class="badge b-ok">Confere com o apuramento</span>':'<span class="badge b-crit">Não confere</span>'}</span></h3>${apStmt(AP_DR,D,D2,yr,yr2,{hideZero:true,note:nD})}
-       ${D2?`<p class="hint">Coluna ${yr2}: mesmo período do ano anterior, sem ajustamentos manuais (imposto = o contabilizado na 812).</p>`:''}</div>
-     <div class="card"><h3>${ico('scale')} Balanço <span class="r">${Bl.ok?'<span class="badge b-ok">Ativo = Capital próprio + Passivo</span>':'<span class="badge b-crit">Não fecha</span>'}</span></h3>${apStmt(AP_BAL,Bl.v,B2,yr,yr2,{hideZero:true,note:nB})}
+       ${D2?`<p class="hint">${ap.comp.modo==='duodecimos'?`Coluna ${yr2}: exercício ${+ap.ano-1} completo (já com o CMVMC apurado) × ${+String(ap.data).slice(5,7)}/12 — o mesmo período de ${+ap.ano-1} não tinha o CMVMC apurado e não seria comparável.`:`Coluna ${yr2}: mesmo período do ano anterior, sem ajustamentos manuais (imposto = o contabilizado na 812).`}</p>`:''}</div>
+     <div class="card"><h3>${ico('scale')} Balanço <span class="r">${Bl.ok?'<span class="badge b-ok">Ativo = Capital próprio + Passivo</span>':'<span class="badge b-crit">Não fecha</span>'}</span></h3>${apStmt(AP_BAL,Bl.v,B2,yr,yb2,{hideZero:true,note:nB})}
        ${Bl.notas.length||Math.abs(Bl.v.ajp)>=0.005?`<div class="hint" style="margin-top:8px">${Bl.notas.map(n=>'• '+esc(n)).join('<br>')}${Math.abs(Bl.v.ajp)>=0.005?`<br><b class="st-warn">• Ajustamentos de encerramento pendentes: ${eur(Bl.v.ajp)}.</b> Diferença entre os valores indicados nos passos 2 a 6 e os saldos do balancete (ex.: existência inicial ou compras alteradas à mão). Fica no capital próprio para o balanço fechar; deve ser regularizada no encerramento.`:''}</div>`:''}
        <p class="hint" style="margin-top:6px">Financiamentos obtidos (25) apresentados no passivo não corrente — segregar a parte corrente quando aplicável.</p></div></div>
    ${apCompHtml(ap,r,Bl)}${apNext('irc','Ver imposto')}`; }
@@ -3757,7 +3767,8 @@ function apTabPar(el){ const {ap,r,R}=apAll(); const P=apParecer(ap,r,R);
 /* ---------- Relatório PDF ---------- */
 function apPdf(){ const {ap,r,D,Bl,R,D2,B2,dc}=apAll(); if(!ap.accounts.length) return toast('Carregue primeiro um balancete.','err');
   if(!Bl.ok) return toast('O balanço não fecha — relatório não gerado.','err'); // regra absoluta: nunca apresentar um balanço desequilibrado
-  const doc=pdfNew('Relatório de Análise Económico-Financeira'); if(!doc) return; const W=doc.internal.pageSize.getWidth(); let y=26; const yr=apDataPT(ap.data), yr2=D2?String(+ap.ano-1):'';
+  const crit=apWarnings(ap,r).filter(w=>w[0]==='crit'); if(crit.length) return toast('Relatório não gerado: '+esc(crit[0][1]),'err');
+  const doc=pdfNew('Relatório de Análise Económico-Financeira'); if(!doc) return; const W=doc.internal.pageSize.getWidth(); let y=26; const yr=apDataPT(ap.data), yr2=D2?apYr2(ap,'dr'):'', yb2=D2?apYr2(ap,'bal'):'';
   const fx=t=>String(t||'').replace(/≥/g,'>=').replace(/≠/g,'<>').replace(/−/g,'-').replace(/×/g,'x').replace(/÷/g,'/');
   doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...PC.ink); doc.text(T(ap.empresa||'Entidade'),12,y); y+=6; doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...PC.mut);
   doc.text(T(`${ap.nif?'NIF '+ap.nif+'  ·  ':''}Data de referência ${yr}  ·  Exercício ${ap.ano}  ·  ${ap.src?ap.src.label:''}`),12,y); y+=8;
@@ -3767,7 +3778,8 @@ function apPdf(){ const {ap,r,D,Bl,R,D2,B2,dc}=apAll(); if(!ap.accounts.length) 
     return [{content:T((k[0]==='='?'':'   ')+l),styles:{fontStyle:b}},{content:n2(v[k]),styles:{halign:'right',fontStyle:b}}].concat(v2?[{content:v2[k]==null?'':n2(v2[k]),styles:{halign:'right',textColor:PC.mut}}]:[]); });
   y=pdfH(doc,y,'Demonstração dos resultados por naturezas'); y=pdfTable(doc,y,['Rubricas',yr].concat(D2?[yr2]:[]),stmt(AP_DR,D,D2),{columnStyles:{1:{cellWidth:34},2:{cellWidth:30}}});
   if(!dc) y=pdfP(doc,y,'Atenção: a demonstração não confere com o resultado do apuramento.',8,PC.crit);
-  doc.addPage(); y=26; y=pdfH(doc,y,'Balanço'); y=pdfTable(doc,y,['Rubricas',yr].concat(B2?[yr2]:[]),stmt(AP_BAL,Bl.v,B2),{columnStyles:{1:{cellWidth:34},2:{cellWidth:30}},styles:{fontSize:7.4,cellPadding:1.3}});
+  if(D2&&ap.comp.modo==='duodecimos') y=pdfP(doc,y,`Coluna ${yr2}: exercício ${+ap.ano-1} completo, com o CMVMC apurado, proporcional a ${+String(ap.data).slice(5,7)} meses (o mesmo período do ano anterior não tinha o CMVMC apurado).`,7.5,PC.mut);
+  doc.addPage(); y=26; y=pdfH(doc,y,'Balanço'); y=pdfTable(doc,y,['Rubricas',yr].concat(B2?[yb2]:[]),stmt(AP_BAL,Bl.v,B2),{columnStyles:{1:{cellWidth:34},2:{cellWidth:30}},styles:{fontSize:7.4,cellPadding:1.3}});
   y=pdfP(doc,y,`Verificação: Total do ativo ${n2(Bl.v['=at'])} = Total do capital próprio e do passivo ${n2(Bl.v['=cpp'])}.`+(Bl.notas.length?' Notas: '+Bl.notas.join(' '):'')+(Math.abs(Bl.v.ajp)>=0.005?` Ajustamentos de encerramento pendentes de ${n2(Bl.v.ajp)} €: diferença entre os valores indicados manualmente e os saldos do balancete, a regularizar no encerramento.`:'')+' Financiamentos obtidos apresentados no passivo não corrente.',7.5,PC.mut);
   y=pdfH(doc,y,'Apuramento do imposto (estimativa)'); const P=r.paramsIRC;
   y=pdfTable(doc,y,['Rubrica','Valor'],[['Resultado contabilístico',n2(r.resultadoContabilistico)],...r.correcoes.map(c=>[(c.tipo==='acrescimo'?'+ ':'- ')+(c.desc||'(sem descrição)'),n2(c.valor)]),[{content:'Lucro tributável / Prejuízo fiscal',styles:{fontStyle:'bold'}},{content:n2(r.lucroTributavel),styles:{fontStyle:'bold'}}],['- Dedução de prejuízos fiscais (FIFO)',n2(r.dedPrej.deduzido)],[{content:'Matéria coletável',styles:{fontStyle:'bold'}},{content:n2(r.materiaColetavel),styles:{fontStyle:'bold'}}],
