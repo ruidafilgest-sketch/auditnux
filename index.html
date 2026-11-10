@@ -631,7 +631,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.8.3';
+const APP_VERSION = '1.8.4';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -2567,8 +2567,10 @@ const _scBase=saveCubes; saveCubes=async function(list){ list=list||Object.value
 
 // junção das fontes do mesmo mês num único resumo mensal
 const SUMARR=new Set(['byHour','byWd','benf']);
+// campos que identificam uma linha (ex.: a taxa de IVA) — nunca se somam ao juntar ficheiros do mesmo mês
+const COMBINE_KEEP=new Set(['pct']);
 function combineVal(k,a,b){ if(a==null) return b; if(b==null) return a;
-  if(typeof a==='number'&&typeof b==='number') return k==='nProds'?Math.max(a,b):r2(a+b);
+  if(typeof a==='number'&&typeof b==='number') return COMBINE_KEEP.has(k)? a : k==='nProds'?Math.max(a,b):r2(a+b);
   if(typeof a==='boolean') return a||b;
   if(typeof a==='string') return k==='ficheiro'?a+' + '+b:a;
   if(Array.isArray(a)){ if(SUMARR.has(k)) return a.map((v,i)=>r2(v+(b[i]||0)));
