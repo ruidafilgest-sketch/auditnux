@@ -402,6 +402,11 @@ function num(s){ if(s==null||s==='') return 0; const v=parseFloat(s); return isN
 function blocks(b,t){ const out=[]; const o='<'+t+'>', c='</'+t+'>'; let i=0;
   while(true){ const s=b.indexOf(o,i); if(s<0) break; const e=b.indexOf(c,s); if(e<0) break; out.push(b.substring(s+o.length,e)); i=e+c.length; } return out; }
 
+// Alguns programas escrevem as etiquetas com prefixo de namespace (<ns:Header>) ou com atributos (<Header xmlns="...">).
+// Normaliza-se para <Header> antes de ler. Só se aplica aos ficheiros que precisam (os outros não são tocados).
+const TAGNORM=/<(\/?)(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)(?:\s[^<>]*?)?(\/?)>/g;
+function normTags(s){ return s.replace(TAGNORM,(m,a,n,c)=>'<'+a+n+c+'>'); }
+function needsNorm(s){ const probe=s.slice(0,400000); return /<\/?[A-Za-z_][\w.-]*:[A-Za-z_]/.test(probe) || /<(?!AuditFile[\s>])[A-Za-z_][\w.-]*\s+[\w.:-]+\s*=/.test(probe.replace(/^[\s\S]*?<AuditFile[^>]*>/,'')); }
 function detectEncoding(bytes){
   const head=new TextDecoder('latin1').decode(bytes.subarray(0,Math.min(400,bytes.length)));
   if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF) return 'utf-8';
@@ -422,7 +427,7 @@ async function parse(file){
     gl:{acc:[],jr:[],tx:[],la:[],lv:[],ld:[],head:null,taxonomy:''}};
   const G=R.gl; let cj=-1;
   const reader=file.stream().getReader();
-  let first=true, dec=null, buf='', read=0, lastPost=0;
+  let first=true, dec=null, buf='', read=0, lastPost=0, norm=null;
   const t0=Date.now();
   const handle=(name,body)=>{
     switch(name){
@@ -515,6 +520,9 @@ async function parse(file){
       read+=value.length; buf+=dec.decode(value,{stream:true});
     }
     if(done){ buf+=dec?dec.decode():''; }
+    if(norm===null&&!done&&buf.length<=200000) continue; // decidir com o início do ficheiro antes de ler blocos
+    if(norm===null&&(buf.length>200000||done)){ norm=needsNorm(buf); R.normalized=norm; }
+    if(norm) buf=normTags(buf);
     // processar blocos completos
     let pos=0;
     START.lastIndex=0;
@@ -631,7 +639,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.8.4';
+const APP_VERSION = '1.8.5';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -3807,6 +3815,33 @@ document.addEventListener('DOMContentLoaded',()=>{ const ref=$('.nav[data-v="con
   if(ref&&!$('.nav[data-v="apuramento"]')){ ref.insertAdjacentHTML('afterend',`<div class="nav" data-v="apuramento"><svg class="i"><use href="#i-scale"/></svg>Demonstrações &amp; IRC<span class="badge b-acc">Novo</span></div>`); $('.nav[data-v="apuramento"]').onclick=()=>go('apuramento'); }
   if(!$('#v-apuramento')) $('.content').insertAdjacentHTML('beforeend','<section class="view" id="v-apuramento"></section>'); });
 async function apGoFromContab(Y,to,enc){ await apFromSaft(Y.nif,Y.ano,to,enc); S.apSel={nif:Y.nif,ano:Y.ano,to,enc}; S.apTab='exist'; go('apuramento'); }
+
+/* =====================================================================
+   LEITURA ROBUSTA — linhas de IVA sem percentagem (ex.: SAF-T emitidos por
+   bancos em autofaturação, que só indicam o código NOR/INT/RED e o montante)
+   ===================================================================== */
+function fixMissingRates(R){ const inf=[];
+  for(const d of R.docs){ if(d.sec!=='SI'&&d.sec!=='WD') continue;
+    for(let k=d.l0;k<d.l0+d.ln;k++){ const L=R.lines[k]; if(L.tt!=='IVA'||L.pct!=null) continue; const code=String(L.code||'').toUpperCase();
+      const t=rateOf(L.reg||'PT'); let p=null;
+      if(code==='ISE') p=0;
+      else if(t&&t[code]!=null) p= Math.abs(d.tax)<0.005 ? 0 : t[code]; // documento sem imposto: linha isenta; com imposto: taxa legal do código
+      if(p==null) continue; L.pct=p; L.pctRaw=String(p); L.pctInf=true; inf.push({d:d.i,l:k,m:`${d.no} · linha ${L.n}: código ${code}${L.exc?' · '+L.exc:''} sem percentagem → considerada ${p}%`}); } }
+  R.inferred=inf; return R; }
+const _parseFileFx=parseFile; parseFile=async function(file,onP){ const R=await _parseFileFx(file,onP); try{ if(R&&R.docs) fixMissingRates(R); }catch(e){ console.error(e); } return R; };
+const _analyseFx=analyse; analyse=function(){ const r=_analyseFx.apply(this,arguments); const R=S.R, A=S.A;
+  if(R&&A&&R.inferred&&R.inferred.length&&!A.rules.find(x=>x.id==='L11')){ A.rules.push({id:'L11',sev:'info',title:'Linhas de IVA sem percentagem (taxa deduzida do código)',desc:'O ficheiro indica só o código de IVA (NOR/INT/RED) sem a percentagem. O AuditNux usa a taxa legal desse código se o documento tem imposto, ou 0% se não tem. Confirme com o emitente se o valor não bater com o portal.',items:R.inferred.slice(0,500),n:R.inferred.length}); A.counts.info++; }
+  return r; };
+
+/* ---------- Mapa de IVA: que ficheiros estão incluídos em cada mês (para confrontar com o portal) ---------- */
+function ivaSourcesCard(sel){ if(!sel||!sel.length) return ''; let rows='', tot=0;
+  for(const c of sel.slice().sort((a,b)=>a.ym.localeCompare(b.ym))){ const src=c.sources&&c.sources.length?c.sources:[{label:c.srcLabel||c.ficheiro||'',ficheiro:c.ficheiro,net:c.net,completo:c.completo}];
+    src.forEach((s,i)=>{ tot+=+s.net||0; rows+=`<tr><td>${i?'':ymLabel(c.ym)}</td><td>${esc(s.label||'—')}</td><td class="hint">${esc(s.ficheiro||'')}</td><td>${s.completo===false?'<span class="badge b-warn">parcial</span>':''}</td><td class="num">${n2(s.net)}</td></tr>`; }); }
+  return `<div class="card" style="margin-top:16px"><h3>${ico('layers')} Ficheiros SAF-T incluídos neste mapa</h3>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Mês</th><th>Fonte (programa · séries)</th><th>Ficheiro</th><th></th><th class="num">Vendas líquidas</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${n2(r2(tot))}</td></tr></tfoot></table></div>
+    <p class="hint" style="margin-top:8px">O portal das Finanças soma <b>todos</b> os SAF-T comunicados com o NIF da empresa: o do programa de faturação e também os de <b>autofaturação</b> emitidos por clientes em nome da empresa (bancos, terminais de pagamento, PagAqui, grandes clientes…). Se um destes ficheiros não estiver na lista acima, o mapa não bate com o portal — carregue-o em Importar SAF-T.</p></div>`; }
+const _pvFx=periodView; periodView=function(id,draw){ if(id!=='iva'||draw._src) return _pvFx(id,draw);
+  const d2=async(el,M,X)=>{ await draw(el,M,X); el.insertAdjacentHTML('beforeend',ivaSourcesCard(X.sel)); }; d2._src=true; return _pvFx(id,d2); };
 </script>
 </body>
 </html>
