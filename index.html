@@ -639,7 +639,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.8.5';
+const APP_VERSION = '1.9.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -2742,6 +2742,13 @@ function glAudit(R,Y){ const G=R.gl, out=[]; const jd=t=>(G.jr[t.j]||{}).desc||'
   const bad=[]; const chkN=(o,kind)=>{ const n=String(o.nif||'').replace(/\s/g,''); const pt=!o.country||o.country==='PT'; if(!n||n==='999999990'||!pt) return; if(/^\d{9}$/.test(n)&&!nifValid(n)) bad.push({a:o.acc||'',m:`${kind} · ${o.name||o.id} · NIF ${n}`}); };
   for(const c of Object.values(R.customers||{})) chkN(c,'Cliente'); for(const c of Object.values(R.suppliersM||{})) chkN(c,'Fornecedor');
   add('M05','warn','Clientes ou fornecedores com NIF inválido','NIF português com dígito de controlo errado na ficha do terceiro.',bad);
+  // fundos de sócios e outros credores (origem a comprovar)
+  const fReg=[], fEnt=[]; G.tx.forEach((t,i)=>{ const j=jd(t); if(/^imp|apura/i.test(j)) return; let cr=0, bank=0; const oth=new Set();
+    for(let k=t.l0;k<t.l0+t.ln;k++){ const a=G.la[k], v=G.lv[k]; if(/^(26|278)/.test(a)){ if(v<0) cr-=v; } else if(v>0){ if(a.startsWith('12')) bank+=v; else oth.add(a.slice(0,a[0]==='2'?3:2)); } }
+    if(cr<2500) return; const base={d:t.d,v:r2(cr),x:i};
+    if(oth.size) fReg.push({...base,m:`${t.desc} · ${j} · contrapartida ${[...oth].sort().join(', ')}${bank?' e bancos ('+n2(bank)+')':''}`}); else fEnt.push({...base,m:`${t.desc} · ${j} · entrada por bancos`}); });
+  add('F01','warn','Regularizações a crédito de sócios ou outros credores sem entrada bancária (≥ 2 500 €)','Lançamentos manuais que creditam sócios (26) ou outros credores (278) por contrapartida de pessoal, Estado, caixa, fornecedores ou outras contas. A origem destes fundos tem de ser provada (extratos do sócio, contrato de suprimento); numa inspeção podem ser tratados como rendimentos não declarados. Se a 278 for uma conta de passagem (confirming, factoring, cartões), confirme apenas que fica saldada.',fReg.sort((a,b)=>b.v-a.v));
+  add('F02','info','Entradas por bancos a crédito de sócios ou outros credores (≥ 2 500 €)','Fundos entrados por bancos e registados como dívida a sócios ou a terceiros. Arquive o comprovativo da origem (conta do sócio ou do credor) e o contrato.',fEnt.sort((a,b)=>b.v-a.v));
   return out; }
 function glCross(Y,Yp){ // regra entre anos: abertura N = encerramento N-1
   if(!Yp) return null; const it=[]; const ids=new Set([...Object.keys(Y.acc),...Object.keys(Yp.acc)]);
@@ -2853,7 +2860,7 @@ RENDER.contabilidade=async function(){ const el=$('#v-contabilidade'); const U=S
   $('#glPdf').onclick=()=>glPdf(Y,Yp);
   $('#glDel').onclick=async()=>{ if(!confirm(`Apagar a contabilidade de ${Y.empresa} — exercício ${Y.ano}?\n\nApaga o resumo guardado (saldos por conta e por mês e a auditoria). O ficheiro SAF-T original não é afetado e pode voltar a carregá-lo quando quiser.`)) return; await glDelete(Y.id); U.ano=''; toast(ico('trash')+' Exercício apagado','ok'); re(); };
   const body=$('#glBody'); const ctx={Y,Yp,U,full,B:glBal(Y,U.from,U.to,U.enc)};
-  ({resumo:glTabResumo,balancete:glTabBal,razao:glTabRazao,terceiros:glTabTerc,iva:glTabIva,cruz:glTabCruz,auditoria:glTabAud})[U.tab](body,ctx); };
+  (({resumo:glTabResumo,balancete:glTabBal,razao:glTabRazao,terceiros:glTabTerc,iva:glTabIva,cruz:glTabCruz,auditoria:glTabAud,risco:glTabRisco})[U.tab]||glTabResumo)(body,ctx); };
 
 function glPrevB(ctx){ const {Yp,U}=ctx; return Yp? glBal(Yp,U.from,U.to,U.enc) : null; }
 function glMonthly(Y,from,to){ const per=[]; for(let p=from;p<=to;p++) per.push({p,v:0,r:0,g:0}); const idx=p=>p-from;
@@ -3842,6 +3849,122 @@ function ivaSourcesCard(sel){ if(!sel||!sel.length) return ''; let rows='', tot=
     <p class="hint" style="margin-top:8px">O portal das Finanças soma <b>todos</b> os SAF-T comunicados com o NIF da empresa: o do programa de faturação e também os de <b>autofaturação</b> emitidos por clientes em nome da empresa (bancos, terminais de pagamento, PagAqui, grandes clientes…). Se um destes ficheiros não estiver na lista acima, o mapa não bate com o portal — carregue-o em Importar SAF-T.</p></div>`; }
 const _pvFx=periodView; periodView=function(id,draw){ if(id!=='iva'||draw._src) return _pvFx(id,draw);
   const d2=async(el,M,X)=>{ await draw(el,M,X); el.insertAdjacentHTML('beforeend',ivaSourcesCard(X.sel)); }; d2._src=true; return _pvFx(id,d2); };
+
+/* =====================================================================
+   RISCO FISCAL — indicadores que uma inspeção usaria para pôr em causa
+   a contabilidade (custos vs vendas, obras em curso, fundos sem origem,
+   salários e Segurança Social em atraso, capital próprio).
+   Funciona com o resumo guardado (não precisa do ficheiro SAF-T).
+   ===================================================================== */
+GL_TABS.push(['risco','Risco fiscal']);
+const RK_LV={crit:{l:'Crítico',c:'b-crit',v:'crit',o:0},warn:{l:'Atenção',c:'b-warn',v:'warn',o:1},ok:{l:'OK',c:'b-ok',v:'good',o:2},na:{l:'Sem dados',c:'b-info',v:'info',o:3}};
+const rkPct=v=>(v*100).toFixed(0)+'%';
+const rkX=v=>v.toFixed(2).replace('.',',')+'×';
+// ficheiro sem saldos de abertura (ano ainda sem abertura feita) → usa o fecho do ano anterior, se existir
+function rkNoOpen(Y){ let s=0; for(const id in Y.acc) s+=Math.abs(Y.acc[id].o||0); return s<1; }
+function rkBal(Y,Yp,from,to,enc){ const B=glBal(Y,from,to,enc); if(!(rkNoOpen(Y)&&Yp)) return B;
+  for(const id in Yp.acc){ const c=glSaldoAte(Yp.acc[id],99,true); if(Math.abs(c)<0.005) continue; const b=B[id]||(B[id]={si:0,d:0,c:0,sf:0}); b.si=r2(b.si+c); b.sf=r2(b.sf+c); }
+  return B; }
+function rkSide(B,pres,sign){ let t=0; for(const id in B){ if(!pres.some(p=>id.startsWith(p))) continue; const v=B[id].sf; if(sign<0?v<0:v>0) t+=v; } return r2(t); }
+
+function rkCalc(Y,Yp,from,to,enc){ enc=Math.min(1,+enc||0); /* fluxos antes do apuramento de resultados */ const B=rkBal(Y,Yp,from,to,enc), s=glSumP(B); const n=Math.max(1,to-from+1), an=12/n;
+  const V=r2(-(s('71').mv+s('72').mv)), Va=V*an;
+  const c61=s('61').mv, c31=s('31').mv, semCmv=Math.abs(c61)<Math.max(1,0.2*Math.max(0,c31));
+  const mat=r2(c61+(c31>0?c31:0)), fse=s('62').mv, pes=s('63').mv, CP=r2(mat+fse+pes);
+  const invP=['33','34','35','36']; const invF=r2(invP.reduce((a,p)=>a+s(p).sf,0)), invI=r2(invP.reduce((a,p)=>a+s(p).si,0));
+  const out=[]; const add=(id,lvl,t,val,lines,why,ref)=>out.push({id,lvl,t,val,lines,why,ref});
+  // R1 — custos de produção / vendas
+  { const r=V>0?CP/V:null; const lim=semCmv?[2,1.3]:[1.5,1.1];
+    const lvl=CP<1000&&V<=0?'na':V<=0?'crit':r>lim[0]?'crit':r>lim[1]?'warn':'ok';
+    add('R1',lvl,'Custos de produção face às vendas',r==null?(V<=0&&CP>=1000?'sem vendas':'—'):rkX(r),
+      [`Custos de produção ${eur(CP)} · vendas ${eur(V)}`,`${semCmv?'Compras (CMVMC ainda por apurar)':'CMVMC'} ${eur(mat)} · FSE ${eur(fse)} · pessoal ${eur(pes)}`],
+      'Uma empresa que gasta sistematicamente mais do que fatura só se mantém com dinheiro de fora ou com vendas não declaradas. É o primeiro indicador que a AT cruza.',
+      semCmv?'Sem o CMVMC apurado, as compras ainda incluem o que está em armazém ou em obra: confirme no fecho.':'Art. 87.º a 90.º da LGT (avaliação indireta).'); }
+  // R2 — obras em curso / produção em inventário
+  { const r=Va>0?invF/Va:null; const dI=r2(invF-invI); const gap=r2(CP-dI-V);
+    const lvl=invF<1000&&invI<1000?'na':r==null?'crit':r>1?'crit':r>0.5?'warn':'ok';
+    add('R2',lvl,'Obras em curso e produção em inventário',r==null?eur(invF):rkPct(r)+' das vendas',
+      [`Inventário de produção (33 a 36) ${eur(invI)} → ${eur(invF)} (${dI>=0?'+':''}${eur(dI)})`,`Vendas anualizadas ${eur(Va)}`,
+       gap>0?`Custo de produção entregue sem faturação que o cubra: ${eur(gap)} (margem 0%)${semCmv?' — antes do apuramento de fim de ano':''}`:`Vendas cobrem o custo de produção entregue (margem de ${eur(-gap)})`],
+      'Obras em curso que crescem todos os anos e valem mais do que as vendas de um ano indicam custos "parqueados" em inventário em vez de faturados.',
+      'Art. 19.º do CIRC: obras de construção pela percentagem de acabamento.'); }
+  // R3 — fundos de sócios e outros credores
+  { const f=-rkSide(B,['26','278'],-1); const r=Va>0?f/Va:null; const F1=(Y.aud||[]).find(x=>x.id==='F01'); const nReg=F1?F1.n:0; const vReg=F1?r2(F1.items.reduce((a,x)=>a+(x.v||0),0)):0;
+    let lvl=f<1000?'ok':r==null?'crit':r>0.5?'crit':r>0.2?'warn':'ok'; if(nReg&&lvl==='ok') lvl='warn'; if(Va>0&&vReg>0.1*Va) lvl='crit';
+    add('R3',lvl,'Fundos de sócios e outros credores',eur(f),[`${r==null?'—':rkPct(r)} das vendas anualizadas`,
+      F1?(nReg?`${n0(nReg)} regularização(ões) sem entrada bancária a crédito de sócios/outros credores · ${eur(vReg)}`:'Sem regularizações sem entrada bancária neste exercício'):'Volte a carregar o SAF-T para analisar os lançamentos (regra F01).'],
+      'Dinheiro que entra sem venda tem de ter origem provada (extratos do sócio, contrato de suprimento). Sem prova, a AT pode tratá-lo como rendimento não declarado.',
+      'Art. 89.º-A da LGT (acréscimos patrimoniais não justificados, do lado do sócio).'); }
+  // R4 — salários e Segurança Social por pagar
+  { const sal=-rkSide(B,['231','232'],-1), ss=-rkSide(B,['245'],-1); const rem=(s('631').mv+s('632').mv)/n, enc_=s('635').mv/n+0.11*rem; /* a 245 inclui a parte do trabalhador (11%) */
+    const mS=rem>0?sal/rem:0, mSS=enc_>0?ss/enc_:0;
+    const lvl=rem<=0&&enc_<=0?'na':(mS>1.5||mSS>2)?'crit':(mS>0.75||mSS>1.5)?'warn':'ok';
+    add('R4',lvl,'Salários e Segurança Social por pagar',eur(sal+ss),[`Salários a pagar ${eur(sal)} (${mS.toFixed(1).replace('.',',')} meses de remunerações)`,`Segurança Social ${eur(ss)} (${mSS.toFixed(1).replace('.',',')} meses de contribuições)`],
+      'Salários processados e não pagos durante meses sugerem pagamentos por fora da contabilidade. A dívida à Segurança Social pode reverter sobre o gerente.',
+      'Normal: até 1 mês de Segurança Social por pagar.'); }
+  // R5 — capital próprio (art. 35.º CSC)
+  { const cp=r2(-(s('5').sf+s('6').sf+s('7').sf+s('8').sf)), cap=r2(-s('51').sf);
+    const lvl=cap<=0&&Math.abs(cp)<1?'na':cp<0?'crit':cp<cap/2?'warn':'ok';
+    add('R5',lvl,'Capital próprio',eur(cp),[`Capital social ${eur(cap)}`,cp<cap/2?'Capital próprio inferior a metade do capital social':'Acima de metade do capital social'],
+      'Com o capital próprio abaixo de metade do capital social, a gerência tem de propor ao(s) sócio(s) medidas de reforço.',
+      'Art. 35.º do Código das Sociedades Comerciais.'); }
+  // R6 — tesouraria
+  { const bk=s('12').sf, cx=s('11').sf; const lvl=bk<-0.005?(Va>0&&-bk>0.1*Va?'crit':'warn'):cx<-0.005?'warn':'ok';
+    add('R6',lvl,'Bancos e caixa',eur(bk+cx),[`Depósitos ${eur(bk)} · caixa ${eur(cx)}`,bk<0?'Saldo bancário credor: entradas por registar ou descoberto não classificado':'Sem saldos credores'],
+      'Pagamentos registados sem a entrada de dinheiro correspondente: a origem desse dinheiro tem de ficar registada e documentada.','Conciliação bancária mensal.'); }
+  // R7 — IVA a recuperar
+  { const iv=r2(s('2437').sf>0?s('2437').sf:0); const r=Va>0?iv/Va:null; const lvl=iv<1000?'ok':r==null||r>0.15?'warn':'ok';
+    add('R7',lvl,'IVA a recuperar acumulado',eur(iv),[`${r==null?'—':rkPct(r)} das vendas anualizadas`],
+      'Um crédito de IVA persistente leva, no pedido de reembolso, a uma inspeção às contas.','Art. 22.º do CIVA (reembolsos).'); }
+  const cnt={crit:0,warn:0,ok:0,na:0}; for(const x of out) cnt[x.lvl]++;
+  const nivel=cnt.crit>=2?'Elevado':cnt.crit||cnt.warn>=2?'Moderado':'Baixo';
+  return {out,cnt,nivel,V,CP,invF,noOpen:rkNoOpen(Y),usedPrev:rkNoOpen(Y)&&!!Yp,semCmv}; }
+
+// evolução de todos os exercícios carregados desta empresa
+async function rkYears(Y){ const X=await glIndex(); const anos=Object.values(X).filter(m=>m.nif===Y.nif).map(m=>m.ano).sort(); const rows=[]; let prev=null;
+  for(const a of anos){ const Ya=a===Y.ano?Y:await glLoad(Y.nif+'_'+a); if(!Ya) continue; const to=Ya.maxP||12; const k=rkCalc(Ya,prev&&+prev.ano===+a-1?prev:null,1,to,1);
+    const g=id=>k.out.find(x=>x.id===id); rows.push({ano:a,to,V:k.V,CP:k.CP,inv:k.invF,fund:g('R3').val,cp:g('R5').val,r1:g('R1').val,nivel:k.nivel}); prev=Ya; }
+  return rows; }
+
+function glTabRisco(el,ctx){ const {Y,Yp,U}=ctx; const K=rkCalc(Y,Yp,U.from,U.to,U.enc); const col={Elevado:'crit',Moderado:'warn',Baixo:'good'}[K.nivel];
+  el.innerHTML=`<div class="card" style="border-color:var(--${col})"><div class="row" style="gap:14px;align-items:center">
+      <div style="width:54px;height:54px;border-radius:50%;background:var(--${col});box-shadow:0 0 0 6px color-mix(in srgb,var(--${col}) 22%,transparent);flex:none"></div>
+      <div style="flex:1"><div class="hint" style="text-transform:uppercase;letter-spacing:.12em">Risco fiscal · ${esc(glPerLabel(U,Y))}</div><h2 style="margin:2px 0 4px">Nível ${K.nivel.toLowerCase()}</h2>
+      <div class="row" style="gap:6px"><span class="badge b-crit">${K.cnt.crit} crítico(s)</span><span class="badge b-warn">${K.cnt.warn} atenção</span><span class="badge b-ok">${K.cnt.ok} OK</span></div></div>
+      <button class="btn pri" id="rkPdf">${ico('pdf')} PDF de risco fiscal</button></div>
+      ${K.usedPrev?`<p class="hint" style="margin-top:10px">${ico('alert')} O SAF-T de ${Y.ano} não tem saldos de abertura: os saldos de balanço somam o fecho de ${Yp.ano} aos movimentos de ${Y.ano}.</p>`:K.noOpen&&+Y.ano>2000?`<p class="hint st-warn" style="margin-top:10px">${ico('alert')} O SAF-T não tem saldos de abertura e não há SAF-T de ${+Y.ano-1} carregado: os indicadores de balanço mostram só os movimentos do ano.</p>`:''}</div>
+    <div class="grid g2" style="margin-top:16px">${K.out.map(x=>`<div class="card" style="border-left:4px solid var(--${RK_LV[x.lvl].v})"><div class="row" style="gap:8px"><span class="badge ${RK_LV[x.lvl].c}">${RK_LV[x.lvl].l}</span><span class="mono muted">${x.id}</span><b style="flex:1">${esc(x.t)}</b><b class="mono" style="font-size:17px">${esc(x.val)}</b></div>
+      <div style="margin:8px 0 6px">${x.lines.map(l=>`<div class="hint" style="color:var(--ink)">${esc(l)}</div>`).join('')}</div><div class="hint">${esc(x.why)}</div><div class="hint" style="margin-top:4px;font-style:italic">${esc(x.ref)}</div></div>`).join('')}</div>
+    <div class="card" style="margin-top:16px"><h3>${ico('chart')} Evolução dos exercícios carregados</h3><div id="rkY"><div class="hint">A calcular…</div></div></div>
+    <div class="card" style="margin-top:16px"><h3>${ico('alert')} Regularizações a crédito de sócios e outros credores</h3><div id="rkF"></div></div>
+    <p class="hint" style="margin-top:10px">Os indicadores são sinais de alerta para preparar a defesa das contas, não conclusões. Período: ${esc(glPerLabel(U,Y))}${U.to===12&&U.enc?' (com regularizações de fim de ano)':''}.</p>`;
+  $('#rkPdf').onclick=()=>rkPdf(Y,Yp,U);
+  const F1=(Y.aud||[]).find(x=>x.id==='F01'), F2=(Y.aud||[]).find(x=>x.id==='F02'); const fl=[...(F1?F1.items.map(x=>({...x,k:'Sem entrada bancária'})):[]),...(F2?F2.items.map(x=>({...x,k:'Entrada por bancos'})):[])];
+  if(!F1) $('#rkF').innerHTML='<div class="hint">Esta análise usa os lançamentos: volte a carregar o SAF-T de contabilidade deste exercício.</div>';
+  else if(!fl.length) $('#rkF').innerHTML=`<div class="row"><span class="badge b-ok">OK</span><span>Sem lançamentos a crédito de sócios ou outros credores acima de 2 500 €.</span></div>`;
+  else table($('#rkF'),{size:15,rows:fl,cols:[{k:'d',l:'Data'},{k:'k',l:'Tipo'},{k:'m',l:'Lançamento'},{k:'v',l:'Valor',num:1,f:n2}],onRow:x=>{ if(x.x!=null&&ctx.full) glTxModal(x.x); }});
+  rkYears(Y).then(rows=>{ const box=$('#rkY'); if(!box) return; if(rows.length<2){ box.innerHTML=`<div class="hint">Carregue também o SAF-T de contabilidade de outros exercícios desta empresa para ver a evolução.</div>`; if(!rows.length) return; }
+    table(box,{rows,cols:[{k:'ano',l:'Exercício',f:(v,r)=>v+(r.to<12?` (até ${GL_MES[r.to-1].slice(0,3).toLowerCase()})`:'')},{k:'V',l:'Vendas',num:1,f:n2},{k:'CP',l:'Custos de produção',num:1,f:n2},{k:'r1',l:'Custos / vendas'},{k:'inv',l:'Inventário produção',num:1,f:n2},{k:'fund',l:'Sócios e credores'},{k:'cp',l:'Capital próprio'},{k:'nivel',l:'Nível'}]}); }); }
+
+async function rkPdf(Y,Yp,U){ const K=rkCalc(Y,Yp,U.from,U.to,U.enc); const doc=pdfNew('Análise de Risco Fiscal'); if(!doc) return; const sub=`${Y.empresa}  ·  NIF ${Y.nif}  ·  ${glPerLabel(U,Y)}`; let y=26;
+  const fx=t=>String(t||'').replace(/≥/g,'>=').replace(/−/g,'-').replace(/×/g,'x').replace(/→/g,'->');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...PC.ink); doc.text(T(Y.empresa),12,y); y+=6; doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...PC.mut);
+  doc.text(T(`NIF ${Y.nif}  ·  Exercício ${Y.ano}  ·  ${glPerLabel(U,Y)}  ·  análise a partir do SAF-T de contabilidade`),12,y); y+=8;
+  const lc=K.nivel==='Elevado'?PC.crit:K.nivel==='Moderado'?PC.warn:PC.ok; doc.setFillColor(...lc); doc.roundedRect(12,y,186,14,2,2,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text(T(`Nível de risco fiscal: ${K.nivel.toUpperCase()}`),17,y+9); doc.setFontSize(9); doc.text(T(`${K.cnt.crit} crítico(s)  ·  ${K.cnt.warn} atenção  ·  ${K.cnt.ok} OK`),193,y+9,{align:'right'}); y+=20;
+  if(K.usedPrev) y=pdfP(doc,y,`O SAF-T de ${Y.ano} não tem saldos de abertura: os saldos de balanço somam o fecho de ${Yp.ano} aos movimentos de ${Y.ano}.`,8,PC.mut);
+  y=pdfH(doc,y,'Indicadores de risco');
+  y=pdfTable(doc,y,['','Indicador','Valor','Nível','Leitura'],K.out.map(x=>[x.id,fx(x.t),fx(x.val),RK_LV[x.lvl].l,fx(x.lines.join(' · '))]),{columnStyles:{0:{cellWidth:9},1:{cellWidth:42},2:{cellWidth:28,halign:'right'},3:{cellWidth:17}},styles:{fontSize:7.6},
+    didParseCell:d=>{ if(d.section==='body'&&d.column.index===3){ const x=K.out[d.row.index]; d.cell.styles.textColor=x.lvl==='crit'?PC.crit:x.lvl==='warn'?PC.warn:x.lvl==='ok'?PC.ok:PC.mut; d.cell.styles.fontStyle='bold'; } }});
+  y=pdfH(doc,y,'Porque importa e base legal'); for(const x of K.out.filter(x=>x.lvl==='crit'||x.lvl==='warn')) y=pdfP(doc,y,fx(`${x.id} ${x.t}: ${x.why} ${x.ref}`),8);
+  const rows=await rkYears(Y); if(rows.length>1){ y=pdfH(doc,y,'Evolução dos exercícios carregados');
+    y=pdfTable(doc,y,['Exercício','Vendas','Custos de produção','Custos / vendas','Inventário produção','Sócios e credores','Capital próprio','Nível'],rows.map(r=>[r.ano+(r.to<12?` (ate ${GL_MES[r.to-1].slice(0,3).toLowerCase()})`:''),n2(r.V),n2(r.CP),fx(r.r1),n2(r.inv),fx(r.fund),fx(r.cp),r.nivel]),{styles:{fontSize:7.4},columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}}); }
+  const F1=(Y.aud||[]).find(x=>x.id==='F01'); if(F1&&F1.n){ y=pdfH(doc,y,`Regularizações sem entrada bancária a crédito de sócios / outros credores (${n0(F1.n)})`);
+    y=pdfTable(doc,y,['Data','Lançamento','Valor'],F1.items.slice(0,30).map(x=>[x.d||'',fx(x.m),n2(x.v)]),{columnStyles:{0:{cellWidth:20},2:{cellWidth:26,halign:'right'}}}); }
+  y=pdfH(doc,y,'Documentos a pedir à gerência');
+  for(const t of ['1. Lista de obras em curso a fim do período: cliente, orçamento, percentagem executada e custos imputados.','2. Extratos bancários completos e prova da origem de cada entrada de fundos de sócios ou terceiros (contrato de suprimento).','3. Contratos, autos de medição e comprovativos de pagamento das subempreitadas.','4. Declaração de responsabilidade da gerência sobre a totalidade da faturação emitida e dos inventários.']) y=pdfP(doc,y,t,8.5);
+  y=pdfP(doc,y,'Notas: indicadores calculados pelo AuditNux a partir do SAF-T de contabilidade. São sinais de alerta para preparar a defesa das contas, não conclusões; não substituem a análise do Contabilista Certificado nem o parecer jurídico em caso de inspeção.',7.5,PC.mut);
+  pdfFrame(doc,sub); doc.save(`AuditNux_Risco_Fiscal_${glSafe(Y.empresa)}_${Y.ano}_${String(U.from).padStart(2,'0')}-${String(U.to).padStart(2,'0')}.pdf`); }
 </script>
 </body>
 </html>
