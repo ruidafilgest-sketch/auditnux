@@ -639,7 +639,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -4498,6 +4498,223 @@ async function relExec(nif){ await empLoad(); const f=S.EMP[nif]; if(!f) return 
   const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w) toast('O navegador bloqueou a nova janela: autorize as janelas de contexto (pop-ups) para o AuditNux.','err'); S._relHtml=html; return html; }
 // botão também no Risco fiscal e na ficha do Multi-empresa
 const _rkTabQ=glTabRisco; glTabRisco=async function(el,ctx){ await _rkTabQ(el,ctx); const b=$('#rkPdf',el); if(b&&!$('#rkRel',el)){ b.insertAdjacentHTML('afterend',`<button class="btn" id="rkRel" style="margin-left:8px">${ico('pdf')} Relatório executivo</button>`); $('#rkRel',el).onclick=()=>relExec(ctx.Y.nif); } };
+
+/* =========================================================================
+   1.14 — GUIA & COMO FAZER
+   Conteúdo único usado pela vista "Guia & Como fazer" (pesquisa, índice,
+   botões "Ir para") e pelo Guia completo em PDF (capa + índice + capítulos).
+   ========================================================================= */
+VIEWS.guia=['Guia & Como fazer','Tudo o que o AuditNux faz, passo a passo, com atalho para cada ecrã'];
+
+/* ir: [vista, separador]  — o separador é aplicado antes de abrir a vista */
+const GUIA=[
+ {id:'inicio',n:'01',t:'Primeiros passos',ic:'logo',v:'painel',
+  intro:'O AuditNux lê ficheiros SAF-T (faturação e contabilidade) e IES, guarda os resumos de cada empresa na nuvem do seu espaço e transforma tudo em mapas, alertas e relatórios. Este capítulo deixa o programa pronto a usar.',
+  tp:[
+   {t:'Entrar no programa',q:'Sempre que abre o AuditNux.',p:['Abra o endereço do AuditNux no navegador (Chrome ou Edge).','Escreva o email e a palavra-passe do seu espaço e clique em <b>Entrar</b>.','No canto inferior esquerdo aparece o nome do <b>Espaço</b>: todos os dados ficam guardados nesse espaço.'],d:'Para mudar a palavra-passe: menu <b>Definições</b> › cartão <b>Conta</b> › <b>Alterar palavra-passe</b>.'},
+   {t:'Preencher os dados do gabinete (uma única vez)',q:'Antes de imprimir o primeiro relatório: estes dados aparecem na capa e no rodapé de todos os PDF.',p:['Clique no menu <b>Definições</b> (lado esquerdo, em baixo).','No cartão <b>Gabinete</b> escreva o nome do gabinete.','Preencha <b>Responsável</b> (ex.: o seu nome) e <b>Título</b> (ex.: Contabilista Certificado — Inscrito na OCC n.º …).','Se quiser, carregue o logótipo em <b>Logótipo</b>.','Clique em <b>Guardar definições</b>.'],ir:['definicoes']},
+   {t:'Como está organizado o menu',q:'Para saber onde está cada coisa.',p:['<b>Comando</b> — Painel, Importar SAF-T, Multi-empresa e Empresas (a base de dados).','<b>Auditoria</b> — Validação, Mapa IVA & DP e Correções (precisam de um SAF-T de faturação aberto).','<b>Exploração</b> — Documentos, Artigos, Clientes, Análises de gestão, Evolução, Financeiro, Contabilidade e Demonstrações & IRC.','<b>Saídas</b> — Relatórios & Exportações, Definições e este Guia.','Os menus a cinzento só ficam ativos depois de abrir um SAF-T de faturação.'],d:'Em qualquer ecrã, o botão <b>Como fazer</b> no topo abre o guia diretamente no capítulo desse ecrã.'},
+   {t:'O que fica guardado (e o que não fica)',q:'Para saber o que vai para a nuvem.',p:['Ficam guardados os <b>resumos</b> de cada SAF-T (totais por mês, taxa, artigo, cliente, conta), as fichas das empresas, as IES lidas e as análises de IRC.','O <b>ficheiro SAF-T completo nunca é enviado</b> para a nuvem: é lido no seu computador.','Com a <b>Leitura rápida</b> ligada (menu Importar) nada é gravado — serve para ver e imprimir.']}
+  ]},
+ {id:'painel',n:'02',t:'Painel',ic:'dash',v:'painel',
+  intro:'Centro de comando do ficheiro aberto: pontuação de auditoria, totais, gráficos e os principais alertas.',
+  tp:[
+   {t:'Ler o painel de um SAF-T',q:'Logo depois de importar um SAF-T de faturação.',p:['Importe o ficheiro (capítulo 03).','Clique em <b>Painel</b>.','No topo vê a empresa, o NIF, o período e a <b>Pontuação</b> (0–100): verde está bem, laranja pede atenção, vermelho tem erros.','Desça até <b>Principais alertas</b>; o detalhe completo de cada alerta está no menu <b>Validação</b>.'],ir:['painel']}
+  ]},
+ {id:'importar',n:'03',t:'Importar SAF-T',ic:'upload',v:'importar',
+  intro:'Porta de entrada de todos os ficheiros. O AuditNux reconhece sozinho se é um SAF-T de faturação ou de contabilidade e lê ficheiros de qualquer tamanho.',
+  tp:[
+   {t:'Importar um ficheiro',q:'Para analisar um SAF-T de uma empresa.',p:['Clique em <b>Importar SAF-T</b>.','Arraste o ficheiro .xml para o cartão <b>Ficheiro individual</b> (ou clique nele e escolha o ficheiro).','Aguarde a barra de progresso.','Faturação: abre o Painel. Contabilidade: fica disponível no menu <b>Contabilidade</b>.','Se a empresa ainda não existir na base, é criada automaticamente a ficha (aparece um aviso).'],ir:['importar']},
+   {t:'Importar vários ficheiros de uma vez (lote)',q:'Vários meses da mesma empresa ou várias empresas de seguida.',p:['Clique em <b>Importar SAF-T</b>.','Selecione todos os ficheiros (Ctrl+A na pasta) e arraste-os para <b>Importação em lote</b>.','A tabela do lote mostra cada ficheiro, a empresa, o período, as vendas e a pontuação.','Clique numa linha concluída para abrir esse ficheiro.'],d:'Cada ficheiro fica guardado mês a mês: depois pode analisar um mês, um trimestre ou o ano inteiro nos mapas.',ir:['importar']},
+   {t:'Leitura rápida (sem gravar nada)',q:'ENI, consulta pontual, ou um ficheiro que não quer guardar no histórico.',p:['Clique em <b>Importar SAF-T</b>.','No cartão do topo, marque <b>Leitura rápida</b>.','Importe o ficheiro normalmente.','Consulte e imprima (ex.: Mapa de IVA). Nada é gravado e não é criada ficha de empresa.','Desmarque a caixa para voltar ao modo normal.'],d:'Os ENI (NIF começado por 1, 2 ou 3) nunca criam ficha automática: aparecem como «ENI · leitura simples».',ir:['importar']}
+  ]},
+ {id:'empresas',n:'04',t:'Empresas — a base de dados',ic:'users',v:'empresas',
+  intro:'Uma ficha por empresa com CAE, setor, normativo, concelho, regime de IVA, PME e o histórico das IES. Tudo o resto no programa parte daqui: limites de risco por setor, derrama, IRC, comparação com o setor e relatório executivo.',
+  tp:[
+   {t:'Carregar as IES (cria e completa as fichas)',q:'Para dar ao programa o histórico de cada empresa. Recomendado: últimos 3 a 5 anos.',p:['Clique em <b>Empresas</b>.','Clique em <b>Carregar IES</b>.','Selecione um ou vários PDF da IES (podem ser de várias empresas e anos).','O AuditNux lê o NIF, nome, CAE, normativo, serviço de finanças (concelho), a Demonstração dos Resultados e o Balanço completos.','Cada IES é validada: se as somas da DR ou do Balanço não fecharem, aparece um aviso nessa linha.'],d:'Se carregou IES numa versão anterior à 1.13, volte a carregá-las: a leitura das rubricas de detalhe ficou mais rigorosa.',ir:['empresas']},
+   {t:'Abrir e corrigir a ficha de uma empresa',q:'Confirmar CAE, concelho, PME, responsável ou estado.',p:['Clique em <b>Empresas</b>.','Use a pesquisa ou os filtros (setor, responsável, cessadas) e clique na empresa.','Na ficha, corrija o que for preciso: <b>CAE</b>, <b>Setor</b> (só se o automático não servir), <b>Concelho</b>, <b>PME</b>, <b>Regime de IVA</b>, <b>Responsável</b>, <b>Estado</b>.','Clique em <b>Guardar</b>.'],d:'O setor decide os limites de risco (ex.: obras em curso só contam na construção). Se o setor estiver errado, os alertas também estarão.',ir:['empresas']},
+   {t:'Apagar um ano de IES ou uma empresa',q:'IES carregada por engano ou empresa criada sem querer.',p:['Abra a ficha da empresa (menu <b>Empresas</b> › clicar na empresa).','Para apagar uma IES: no <b>Histórico das IES</b> clique no <b>⨯</b> desse ano.','Para apagar a empresa: clique em <b>Eliminar empresa</b> e confirme.','Se a empresa tiver SAF-T guardados, o programa pergunta se também quer apagar esses dados.'],ir:['empresas']},
+   {t:'Derrama municipal por concelho',q:'Confirmar a taxa de derrama que vai para o IRC.',p:['Clique em <b>Empresas</b> e desça até <b>Derrama municipal por concelho</b>.','A tabela traz as taxas oficiais (Ofício circulado da AT) de todos os concelhos: taxa geral, taxa reduzida e isenções com o respetivo critério de volume de negócios.','Na ficha de cada empresa, o campo <b>Concelho</b> mostra a taxa que se aplica e porquê (geral, reduzida ou isenção pelo volume de negócios do ano anterior).','Só se precisar, escreva uma taxa manual para um concelho: a taxa manual tem prioridade.'],ir:['empresas']},
+   {t:'Carregar um SAF-T a partir da ficha',q:'Abrir os ficheiros de uma empresa sem andar à procura no menu.',p:['Abra a ficha da empresa.','Clique em <b>Carregar SAF-T</b> e escolha o ficheiro.','O ficheiro é importado e fica associado a essa empresa.'],ir:['empresas']},
+   {t:'Relatório executivo da empresa',q:'Reunião com o cliente, banca ou sócios.',p:['Abra a ficha da empresa (ou o separador <b>Risco fiscal</b> da Contabilidade).','Clique em <b>Relatório executivo</b>.','Abre uma nova janela com: capa, sumário com indicadores, evolução com a DR completa, Balanço até 5 anos, comparação com o setor (Banco de Portugal) e risco fiscal do ano corrente.','Clique em <b>Imprimir / Guardar PDF</b>, escolha <b>Guardar como PDF</b>, papel A4, sem margens.'],d:'Se a janela não abrir, autorize as janelas de contexto (pop-ups) para o AuditNux no navegador.',ir:['empresas']}
+  ]},
+ {id:'multi',n:'05',t:'Multi-empresa',ic:'layers',v:'historico',
+  intro:'Visão da carteira: todas as empresas, o último estado de cada uma, a contabilidade disponível e o setor.',
+  tp:[
+   {t:'Ver a carteira e exportar para Excel',q:'Controlo mensal do gabinete.',p:['Clique em <b>Multi-empresa</b>.','Filtre por <b>setor</b>, <b>responsável</b> ou marque <b>incluir cessadas</b>.','Clique numa empresa para abrir a última análise (ou a ficha, se só existir na base).','Clique em <b>Excel</b> para exportar a lista com setor e contabilidade.'],ir:['historico']}
+  ]},
+ {id:'validacao',n:'06',t:'Validação',ic:'shield',v:'validacao',need:1,
+  intro:'Auditoria automática do SAF-T de faturação com mais de 30 regras: numeração, datas, NIF, taxas de IVA, isenções, totais, documentos anulados e de conferência.',
+  tp:[
+   {t:'Rever os alertas de um ficheiro',q:'Antes de entregar a DP ou de fechar o mês.',p:['Abra um SAF-T de faturação.','Clique em <b>Validação</b>.','Os alertas estão ordenados por gravidade: crítico, erro, aviso, informação.','Clique num alerta para ver os documentos envolvidos.','As taxas de IVA erradas corrigem-se no menu <b>Correções</b> (capítulo 08).'],ir:['validacao']}
+  ]},
+ {id:'iva',n:'07',t:'Mapa de IVA & Declaração Periódica',ic:'percent',v:'iva',need:1,
+  intro:'Apuramento por região e taxa para qualquer período (mês, trimestre, ano) e confronto com o Quadro 06 da DP.',
+  tp:[
+   {t:'Fazer o mapa de IVA de um período',q:'Preparar a Declaração Periódica.',p:['Importe os SAF-T do período.','Clique em <b>Mapa IVA & DP</b>.','Na barra do período escolha a empresa e os meses (de / até).','Confira o <b>Mapa por região e taxa</b> e as <b>Isentas e não sujeitas</b> (por motivo).','O cartão da ficha mostra o regime de IVA (mensal/trimestral) e avisa se o período não bate certo.'],ir:['iva']},
+   {t:'Confrontar com a DP entregue',q:'Depois de submeter a DP, para garantir que bate com a faturação.',p:['No Mapa de IVA desça até <b>Confronto com a Declaração Periódica (Quadro 06)</b>.','Escreva os valores da DP entregue.','Clique em <b>Guardar valores da DP</b>.','As diferenças aparecem a vermelho com o valor em falta ou em excesso.'],ir:['iva']},
+   {t:'Imprimir o mapa de IVA',q:'Para arquivo ou para o cliente.',p:['Clique em <b>Relatórios & Exportações</b>.','No cartão <b>Mapa de IVA & DP</b> clique em <b>Gerar PDF</b>.'],ir:['relatorios']}
+  ]},
+ {id:'correcoes',n:'08',t:'Correções',ic:'wrench',v:'correcoes',need:1,
+  intro:'Corrige taxas de IVA inválidas e incoerências e exporta um SAF-T corrigido, sempre com registo de tudo o que foi alterado.',
+  tp:[
+   {t:'Corrigir taxas e exportar o SAF-T corrigido',q:'Ficheiro com taxas erradas antes de submeter.',p:['Clique em <b>Correções</b>.','Use <b>Corrigir taxas inválidas</b> (corrige todas de uma vez) ou corrija documento a documento.','Em <b>Artigos</b> pode usar <b>Uniformizar taxa deste artigo</b>.','Clique em <b>Exportar SAF-T corrigido</b>.','Guarde o <b>Registo de correções (PDF)</b> ou <b>Registo (Excel)</b> para o dossier.'],d:'O ficheiro original nunca é alterado: o corrigido é um ficheiro novo.',ir:['correcoes']}
+  ]},
+ {id:'exploracao',n:'09',t:'Documentos, Artigos e Clientes',ic:'search',v:'documentos',need:1,
+  intro:'Exploração do ficheiro ao detalhe, com filtros e exportação para Excel.',
+  tp:[
+   {t:'Procurar documentos',q:'Encontrar uma fatura, uma série ou documentos anulados.',p:['Clique em <b>Documentos</b>.','Use os filtros no topo da lista para encontrar o que procura.','Clique num documento para ver as linhas.','<b>Excel</b> exporta os documentos; <b>Linhas (Excel)</b> exporta as linhas.'],ir:['documentos']},
+   {t:'Vendas por artigo e coerência de taxas',q:'Ver o que se vende e se cada artigo tem sempre a mesma taxa.',p:['Clique em <b>Artigos</b>.','Ordene por vendas, quantidade ou taxa.','Um artigo com taxas diferentes fica assinalado; clique e use <b>Uniformizar taxa deste artigo</b> se for erro.'],ir:['artigos']},
+   {t:'Vendas por cliente e NIF',q:'Ver os maiores clientes e NIF inválidos.',p:['Clique em <b>Clientes</b>.','Os NIF inválidos ficam assinalados.','Clique em <b>Excel</b> para exportar.'],ir:['clientes']}
+  ]},
+ {id:'analises',n:'10',t:'Análises de gestão',ic:'chart',v:'analises',need:1,
+  intro:'Indicadores e gráficos de vendas para o período escolhido, prontos para conversar com o cliente.',
+  tp:[
+   {t:'Vendas, clientes e artigos (ABC)',q:'Perceber de onde vem a faturação.',p:['Clique em <b>Análises de gestão</b>.','Separador <b>Vendas</b>: mês a mês, dia da semana, hora do dia e mapa de calor.','Separador <b>Clientes</b>: carteira, concentração e frequência de compra.','Separador <b>Artigos & ABC</b>: curva de Pareto e artigos por classe.'],ir:['analises','vendas']},
+   {t:'Preços, pagamentos e auditoria de vendas',q:'Descontos fora do normal, meios de pagamento, sinais de manipulação.',p:['Separador <b>Preços & descontos</b>: variação de preços e descontos.','Separador <b>Pagamentos & recebimentos</b>: meios de pagamento e recebimentos.','Separador <b>Auditoria</b>: Lei de Benford, distribuição das vendas por valor, por operador / posto e por série / caixa.'],ir:['analises','auditoria']}
+  ]},
+ {id:'evolucao',n:'11',t:'Evolução & Comparativos',ic:'layers',v:'evolucao',
+  intro:'Compara dois períodos da mesma empresa: o que subiu, o que desceu, o que é novo.',
+  tp:[
+   {t:'Comparar dois períodos',q:'Este mês vs. o mesmo mês do ano passado, ou ano vs. ano.',p:['Clique em <b>Evolução & Comparativos</b>.','Escolha a empresa e os dois períodos (A e B).','Use os separadores: <b>Artigos</b>, <b>Clientes</b>, <b>Taxas de IVA</b>, <b>Dia da semana</b>, <b>Horas</b>, <b>Operadores</b>.','Filtre por <b>Maiores subidas</b>, <b>Maiores descidas</b>, <b>Novos</b> ou <b>Todos</b>.','Para imprimir: <b>Relatórios & Exportações</b> › <b>Relatório de evolução</b>.'],ir:['evolucao']}
+  ]},
+ {id:'financeiro',n:'12',t:'Financeiro',ic:'scale',v:'financeiro',
+  intro:'A faturação lida do lado financeiro e fiscal: diário SNC, conta corrente, mercados, IVA completo, retenções, projeção e dossier anual.',
+  tp:[
+   {t:'Lançamento resumo e conta corrente',q:'Contabilizar as vendas e ver saldos de clientes.',p:['Clique em <b>Financeiro</b>.','<b>Diário de vendas (SNC)</b>: lançamento resumo do período pronto a lançar.','<b>Conta corrente & antiguidade</b>: saldos por cliente e antiguidade.'],ir:['financeiro','diario']},
+   {t:'Mercados, recapitulativa e IVA completo',q:'Vendas intracomunitárias e exportações; IVA por mês.',p:['Separador <b>Mercados & Recapitulativa</b>: vendas por mercado e pré-Declaração Recapitulativa.','Separador <b>IVA completo</b>: Quadro 06 por mês ou trimestre e enquadramento das isentas.','Separador <b>Retenções</b>: retenções por cliente.'],ir:['financeiro','mercados']},
+   {t:'Projeção do ano e dossier anual',q:'Estimar o fecho do ano e preparar o dossier.',p:['Separador <b>Projeção do ano</b>: real e projetado até dezembro.','Separador <b>Dossier anual</b>: resumo completo da empresa para o período escolhido.'],ir:['financeiro','proj']}
+  ]},
+ {id:'contab',n:'13',t:'Contabilidade (SAF-T de contabilidade)',ic:'book',v:'contabilidade',
+  intro:'Com o SAF-T de contabilidade o AuditNux constrói o balancete, o razão, terceiros, o IVA pela contabilidade, cruza com a faturação e audita os lançamentos.',
+  tp:[
+   {t:'Abrir a contabilidade de uma empresa',q:'Depois de importar o SAF-T de contabilidade.',p:['Clique em <b>Contabilidade</b>.','Escolha a empresa, o ano e o mês até onde quer ver.','Escolha o encerramento: <b>Sem encerramento</b>, <b>Com regularizações de fim de ano</b> ou <b>Final (após apuramento de resultados)</b>.','No Resumo pode ver o comparativo com o ano anterior.','O botão <b>Demonstrações & IRC</b> leva este balancete diretamente para o apuramento.'],ir:['contabilidade','resumo']},
+   {t:'Balancete, razão e terceiros',q:'Conferir saldos e movimentos.',p:['Separador <b>Balancete</b>: escolha o nível de conta; o botão <b>Balancete Excel</b> exporta o balancete acumulado.','Separador <b>Razão</b>: escreva a conta e veja todos os movimentos.','Separador <b>Clientes & Fornecedores</b>: saldos e maiores movimentos por terceiro.'],ir:['contabilidade','balancete']},
+   {t:'IVA pela contabilidade e cruzamento com a faturação',q:'Confirmar que o que foi faturado está contabilizado.',p:['Separador <b>IVA</b>: IVA por mês pela contabilidade.','Separador <b>Cruzamento com a faturação</b>: faturação × contabilidade mês a mês (precisa dos SAF-T de faturação do mesmo ano).','As diferenças relevantes aparecem destacadas.'],ir:['contabilidade','cruz']},
+   {t:'Auditoria dos lançamentos',q:'Detetar lançamentos estranhos antes de uma inspeção.',p:['Separador <b>Auditoria</b>.','Veja as deteções no balancete (saldos de natureza contrária, caixa negativa, sócios, contas de passagem, etc.).','Clique numa deteção para ver os lançamentos.','O botão <b>PDF</b> (no topo da Contabilidade) gera o relatório de auditoria da contabilidade.'],ir:['contabilidade','auditoria']}
+  ]},
+ {id:'risco',n:'14',t:'Risco fiscal',ic:'alert',v:'contabilidade',
+  intro:'Os indicadores que uma inspeção tributária usaria, com limites ajustados ao setor da empresa (CAE) e comparação com o Banco de Portugal.',
+  tp:[
+   {t:'Ler o risco fiscal de uma empresa',q:'Antes do fecho de contas ou de uma inspeção.',p:['Clique em <b>Contabilidade</b> e escolha a empresa e o ano.','Clique no separador <b>Risco fiscal</b>.','Confirme a linha do setor no topo (se estiver errado, mude-o ali ou na ficha).','Leia os indicadores R1 a R9: rendibilidade, inventários/obras em curso, contas de passagem, caixa, capital próprio, sócios, margem comercial e contas atípicas.','Cada indicador tem nível (OK, Atenção, Crítico) e a explicação.'],d:'Sem saldos de abertura no SAF-T, o programa usa os saldos de fecho do ano anterior.',ir:['contabilidade','risco']},
+   {t:'Comparação com o setor (Banco de Portugal)',q:'Saber se a empresa está dentro do normal do setor.',p:['No separador <b>Risco fiscal</b>, veja o cartão <b>Comparação com o setor</b>.','Prazos médios, autonomia financeira, liquidez, rendibilidades: empresa vs. setor.','A mesma comparação aparece na ficha da empresa e no relatório executivo.'],ir:['contabilidade','risco']},
+   {t:'PDF de risco e documentos a pedir',q:'Preparar a empresa para a inspeção.',p:['No separador <b>Risco fiscal</b> clique em <b>PDF de risco fiscal</b>.','O relatório traz os indicadores e a lista de documentos a pedir ao cliente, adaptada ao setor.','Para a versão completa para gestão, clique em <b>Relatório executivo</b>.'],ir:['contabilidade','risco']}
+  ]},
+ {id:'irc',n:'15',t:'Demonstrações & IRC',ic:'scale',v:'apuramento',
+  intro:'Do balancete ao imposto em 8 passos: demonstrações financeiras, IRC, derrama, tributações autónomas, rácios para a banca e parecer.',
+  tp:[
+   {t:'Fazer o apuramento a partir do SAF-T de contabilidade',q:'Fecho de contas ou simulação de IRC.',p:['Clique em <b>Demonstrações & IRC</b>.','<b>1 · Balancete</b>: escolha a empresa, o ano e o mês (vem do SAF-T de contabilidade) ou carregue um balancete Excel.','<b>2 · Existências</b>: indique a existência final (sem ela não há resultado fiável).','<b>3 · Parâmetros fiscais</b>: taxa de IRC do ano, PME e derrama já vêm preenchidas da ficha e da tabela fiscal; confirme.','<b>4 · Correções & prejuízos</b>: acréscimos, deduções e prejuízos reportáveis.','Clique em <b>Continuar</b> em cada passo.'],ir:['apuramento','bal']},
+   {t:'Demonstrações, imposto, rácios e parecer',q:'Ver o resultado e preparar a conversa com o cliente ou a banca.',p:['<b>5 · Demonstrações</b>: Balanço e DR por naturezas (o balanço fecha sempre; diferenças vão para ajustamentos de encerramento pendentes, no capital próprio).','<b>6 · Imposto</b>: IRC, derrama, tributações autónomas e resultado líquido.','<b>7 · Rácios & banca</b>: rácios e leitura para a banca, com o setor.','<b>8 · Parecer</b>: texto de parecer pronto a rever.','Clique em <b>Relatório PDF</b> para o documento completo.'],ir:['apuramento','dem']},
+   {t:'Guardar, reabrir e trocar análises',q:'Continuar outro dia ou enviar a outro colega.',p:['Clique em <b>Guardar</b> (fica na nuvem do espaço).','Para reabrir: botão <b>Análises</b> › escolha a análise.','<b>.json</b> exporta/importa uma análise em ficheiro.','<b>Nova</b> começa do zero.'],ir:['apuramento','bal']}
+  ]},
+ {id:'relatorios',n:'16',t:'Relatórios & Exportações',ic:'pdf',v:'relatorios',need:1,
+  intro:'Todos os PDF e mapas Excel do período escolhido num só sítio.',
+  tp:[
+   {t:'Gerar um relatório',q:'Entregar ao cliente ou arquivar.',p:['Clique em <b>Relatórios & Exportações</b>.','Escolha o período na barra.','<b>Mapa de IVA & DP</b> › Gerar PDF.','<b>Relatório de vendas para o cliente</b> › Gerar PDF premium.','<b>Relatório de evolução</b> › compara dois períodos.','<b>Exportações para Excel</b>: Artigos, Clientes, Mapa de IVA, Mês a mês.'],ir:['relatorios']},
+   {t:'Mapa dos relatórios do AuditNux',q:'Saber onde está cada relatório.',p:['Auditoria SAF-T e Mapa de IVA — <b>Relatórios & Exportações</b>.','Auditoria da contabilidade — <b>Contabilidade</b> › Auditoria › PDF.','Risco fiscal — <b>Contabilidade</b> › Risco fiscal › PDF.','Relatório executivo — <b>Empresas</b> › ficha › Relatório executivo.','Demonstrações, IRC e parecer — <b>Demonstrações & IRC</b> › Relatório PDF.','Registo de correções — <b>Correções</b>.']}
+  ]},
+ {id:'definicoes',n:'17',t:'Definições e tabela fiscal',ic:'gear',v:'definicoes',
+  intro:'Preferências do espaço: gabinete, taxas de IVA, classificador, limites e a tabela fiscal por ano (IRC e IVA com datas de vigência).',
+  tp:[
+   {t:'Tabela fiscal por ano (IRC e IVA)',q:'Quando o Orçamento do Estado muda taxas.',p:['Clique em <b>Definições</b>.','Desça até <b>Tabela fiscal por ano</b>.','IRC: para cada ano, taxa geral e taxa PME (e o limite de matéria coletável da taxa PME).','IVA: cada linha tem uma vigência (de / até), a região e as taxas reduzida, intermédia e normal.','Ano novo de IRC: clique em <b>Acrescentar ano</b>. Alteração de taxas de IVA: clique em <b>Acrescentar período</b> e indique a data de início (feche a linha anterior com a data de fim).','Clique em <b>Guardar tabela fiscal</b>.'],d:'Cada SAF-T é validado com as taxas em vigor na data dos documentos, e cada apuramento de IRC usa a taxa do seu ano.',ir:['definicoes']},
+   {t:'Taxas de IVA, classificador e operadores',q:'Ajustar o programa ao gabinete.',p:['<b>Taxas de IVA legais por região</b>: taxas aceites na validação.','<b>Classificador de IVA por descrição</b>: palavras que sugerem a taxa correta de um artigo.','<b>Operadores</b>: nomes dos operadores / postos que aparecem nas análises.','<b>Repor valores de origem</b> volta às definições iniciais.'],ir:['definicoes']}
+  ]},
+ {id:'faq',n:'18',t:'Perguntas frequentes',ic:'search',v:'painel',
+  intro:'Respostas rápidas às situações mais comuns.',
+  tp:[
+   {t:'O relatório não abre',q:'Clico em Relatório executivo ou Guia PDF e nada acontece.',p:['O navegador bloqueou a nova janela.','Clique no ícone de janela bloqueada à direita da barra de endereço.','Escolha <b>Permitir sempre pop-ups</b> para o AuditNux e clique de novo.']},
+   {t:'O balanço tem «Ajustamentos de encerramento pendentes»',q:'Linha no capital próprio.',p:['O balanço é sempre apresentado equilibrado.','Se os dados de origem (IES ou balancete) não fecham, a diferença fica nessa linha, dentro do capital próprio, para ser analisada.','Verifique a IES ou o balancete desse ano.']},
+   {t:'O setor ou os alertas não fazem sentido',q:'Ex.: matérias-primas tratadas como obras em curso.',p:['Abra a ficha da empresa em <b>Empresas</b>.','Confirme o <b>CAE</b>; se necessário escolha o <b>Setor</b> à mão.','Guarde e volte ao Risco fiscal: os limites são recalculados.'],ir:['empresas']},
+   {t:'A derrama não é a que esperava',q:'Taxa diferente da que conhece do concelho.',p:['Abra a ficha e confirme o <b>Concelho</b>.','A taxa reduzida e a isenção dependem do volume de negócios do ano anterior (IES): sem IES o programa usa a taxa geral.','Se o município tiver outra regra, escreva a taxa manual na tabela de derramas.'],ir:['empresas']},
+   {t:'Mudei de computador',q:'Os dados estão lá?',p:['Sim: entre com o mesmo email e espaço.','Fichas, IES, resumos e análises estão na nuvem.','Os ficheiros SAF-T completos não: volte a importá-los se precisar do detalhe documento a documento.']}
+  ]}
+];
+const GUIA_CTX={painel:'painel',importar:'importar',historico:'multi',empresas:'empresas',validacao:'validacao',iva:'iva',correcoes:'correcoes',documentos:'exploracao',artigos:'exploracao',clientes:'exploracao',analises:'analises',evolucao:'evolucao',financeiro:'financeiro',contabilidade:'contab',apuramento:'irc',relatorios:'relatorios',definicoes:'definicoes',guia:'inicio'};
+const GUIA_NOME={painel:'Painel',importar:'Importar SAF-T',historico:'Multi-empresa',empresas:'Empresas',validacao:'Validação',iva:'Mapa IVA & DP',correcoes:'Correções',documentos:'Documentos',artigos:'Artigos',clientes:'Clientes',analises:'Análises de gestão',evolucao:'Evolução',financeiro:'Financeiro',contabilidade:'Contabilidade',apuramento:'Demonstrações & IRC',relatorios:'Relatórios',definicoes:'Definições'};
+
+function guiaIr(v,tab){
+  if(tab){ if(v==='contabilidade') S.glU.tab=tab; else if(v==='apuramento') S.apTab=tab; else if(v==='financeiro') S.finTab=tab; else if(v==='analises') S.anTab=tab; }
+  const n=$(`.nav[data-v="${v}"]`); if(n&&n.classList.contains('need')&&!S.R){ toast('Este ecrã precisa de um SAF-T de faturação aberto: importe primeiro o ficheiro.','warn'); return go('importar'); }
+  go(v); }
+const guiaNorm=s=>String(s||'').replace(/<[^>]+>/g,' ').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const guiaIrBtn=ir=>ir?`<button class="btn sm pri" onclick="guiaIr('${ir[0]}'${ir[1]?`,'${ir[1]}'`:''})">${ico('out')} Ir para ${esc(GUIA_NOME[ir[0]]||ir[0])}</button>`:'';
+
+RENDER.guia=function(){ const el=$('#v-guia'); const q=guiaNorm(S.guiaQ||''); const sel=S.guiaCap||'';
+  const hit=(c,t)=>!q||q.split(/\s+/).every(w=>guiaNorm(c.t+' '+t.t+' '+t.q+' '+t.p.join(' ')+' '+(t.d||'')).includes(w));
+  const caps=GUIA.map(c=>({c,tp:c.tp.filter(t=>hit(c,t))})).filter(x=>x.tp.length&&(!sel||q||x.c.id===sel));
+  const nTot=GUIA.reduce((a,c)=>a+c.tp.length,0);
+  el.innerHTML=`<div class="card gu-hero"><div class="row" style="gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3 style="margin:0">${ico('book')} Guia completo do AuditNux <span class="badge b-acc">v${APP_VERSION}</span></h3><p class="hint" style="margin:6px 0 0">${GUIA.length} capítulos · ${nTot} tarefas explicadas clique a clique. Cada tarefa tem o botão <b>Ir para</b> que abre o ecrã certo.</p></div>
+     <button class="btn pri" id="guPdf">${ico('pdf')} Guia completo (PDF)</button></div>
+     <div class="row" style="margin-top:12px;gap:8px"><input class="inp" id="guQ" placeholder="Pesquisar: ex. derrama, IES, apagar empresa, DP, risco…" value="${esc(S.guiaQ||'')}" style="flex:1;min-width:200px">${q||sel?`<button class="btn" id="guX">Ver tudo</button>`:''}</div></div>
+   <div class="gu-wrap"><nav class="card gu-idx">${GUIA.map(c=>`<a data-c="${c.id}" class="${sel===c.id&&!q?'on':''}"><span>${c.n}</span>${esc(c.t)}</a>`).join('')}</nav>
+   <div class="gu-body">${caps.length?caps.map(({c,tp})=>`<div class="card gu-cap" id="gu-${c.id}"><div class="gu-ch"><span class="gu-n">${c.n}</span><div><h3 style="margin:0">${esc(c.t)}</h3><p class="hint" style="margin:4px 0 0">${c.intro}</p></div></div>
+     ${tp.map(t=>`<div class="gu-tp"><div class="row" style="align-items:flex-start;gap:10px"><div style="flex:1"><h4>${t.t}</h4><div class="hint"><b>Quando:</b> ${t.q}</div></div>${guiaIrBtn(t.ir)}</div>
+       <ol>${t.p.map(s=>`<li>${s}</li>`).join('')}</ol>${t.d?`<div class="gu-d">${ico('bolt')} ${t.d}</div>`:''}</div>`).join('')}</div>`).join(''):`<div class="card empty">Nada encontrado para «${esc(S.guiaQ)}». Experimente outra palavra.</div>`}</div></div>`;
+  const qi=$('#guQ'); let tm; qi.oninput=()=>{ clearTimeout(tm); tm=setTimeout(()=>{ S.guiaQ=qi.value; const p=qi.selectionStart; RENDER.guia(); const n=$('#guQ'); n.focus(); n.setSelectionRange(p,p); },250); };
+  if($('#guX')) $('#guX').onclick=()=>{ S.guiaQ=''; S.guiaCap=''; RENDER.guia(); };
+  $$('.gu-idx a',el).forEach(a=>a.onclick=()=>{ S.guiaQ=''; S.guiaCap=a.dataset.c; RENDER.guia(); $('.content').scrollTop=0; });
+  $('#guPdf').onclick=()=>guiaAbrir(); };
+
+function guiaAbrir(cap){ if(cap){ S.guiaCap=cap; S.guiaQ=''; } go('guia'); }
+function guiaPdf(){ const html=guiaHtml(); const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w) toast('O navegador bloqueou a nova janela: autorize as janelas de contexto (pop-ups) para o AuditNux.','err'); return html; }
+
+/* ---------- Documento premium (capa + índice + capítulos) ---------- */
+function guiaHtml(o){ o=o||{}; const pg=o.pages||{}; const hoje=new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'});
+  const gab=esc((typeof CFG!=='undefined'&&CFG.gabinete)||''); const nTot=GUIA.reduce((a,c)=>a+c.tp.length,0);
+  const css=`@page{size:A4;margin:20mm 16mm 18mm}@page:first{margin:0}*{box-sizing:border-box;margin:0;padding:0}
+   body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1F2937;font-size:9.6pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff}
+   .cv{height:297mm;width:210mm;background:#0B1F3A;color:#fff;position:relative;overflow:hidden;page-break-after:always}
+   .cv .band{position:absolute;left:0;right:0;top:0;height:4mm;background:#B8892B}.cv .g{position:absolute;right:-40mm;top:40mm;width:150mm;height:150mm;border-radius:50%;border:12mm solid rgba(184,137,43,.13)}
+   .cv .in{position:absolute;left:22mm;right:22mm;top:70mm}.cv .k{font-size:8pt;letter-spacing:.32em;text-transform:uppercase;color:#E3C27A;font-weight:700}
+   .cv h1{font-size:40pt;line-height:1.02;font-weight:800;margin:6mm 0 4mm;letter-spacing:-.01em}.cv h1 span{color:#E3C27A}.cv .s{font-size:13pt;color:#D6DEEA;max-width:140mm}
+   .cv .chips{margin-top:10mm;display:flex;gap:3mm;flex-wrap:wrap}.cv .chips div{border:.35mm solid #2C4670;border-radius:1.5mm;padding:2mm 3.5mm;font-size:8pt;color:#D6DEEA}.cv .chips b{color:#fff;font-size:11pt;display:block}
+   .cv .sg{position:absolute;left:22mm;right:22mm;bottom:22mm;border-top:.3mm solid #2C4670;padding-top:5mm;font-size:8.6pt;color:#A9B8D0;display:flex;justify-content:space-between}.cv .sg b{color:#fff}
+   .idx{page-break-after:always}.k2{font-size:7.5pt;letter-spacing:.24em;text-transform:uppercase;color:#B8892B;font-weight:800}
+   h2{font-size:22pt;font-weight:800;color:#0B1F3A;margin:1mm 0 5mm}
+   .il{display:flex;align-items:baseline;gap:3mm;padding:2.1mm 0;border-bottom:.25mm solid #E5E7EB;text-decoration:none;color:#1F2937}.il .n{font-weight:800;color:#B8892B;width:9mm}.il .t{font-weight:700;color:#0B1F3A}.il .d{flex:1;border-bottom:.3mm dotted #C7CDD6;margin:0 2mm;transform:translateY(-1mm)}.il .p{font-weight:700;color:#0B1F3A;min-width:8mm;text-align:right}
+   .il2{padding:.6mm 0 .6mm 12mm;font-size:8.3pt;color:#6B7280}
+   .cap{margin-top:9mm}.idx+.cap{margin-top:0}.grp{break-inside:avoid}
+   .ch{display:flex;gap:5mm;align-items:flex-end;border-bottom:.5mm solid #0B1F3A;padding-bottom:4mm;margin-bottom:5mm}.ch .n{font-size:36pt;font-weight:800;color:#B8892B;line-height:.9}.ch h2{margin:0;font-size:20pt}.ch .m{font-size:7.5pt;letter-spacing:.2em;text-transform:uppercase;color:#6B7280;font-weight:700}
+   .intro{font-size:10.3pt;color:#374151;margin-bottom:5mm;padding:3.5mm 4mm;background:#F5F7FA;border-left:1.2mm solid #B8892B;border-radius:1.5mm}
+   .tp{break-inside:avoid;margin-bottom:5mm;border:.3mm solid #E5E7EB;border-radius:2.5mm;overflow:hidden}.tp .h{background:#0B1F3A;color:#fff;padding:2.4mm 4mm;display:flex;justify-content:space-between;gap:4mm;align-items:baseline}.tp .h b{font-size:10.5pt}.tp .h span{font-size:7.4pt;color:#E3C27A;letter-spacing:.06em;white-space:nowrap}
+   .tp .q{padding:2.4mm 4mm 0;font-size:8.6pt;color:#6B7280}.tp .q b{color:#374151}
+   .tp ol{list-style:none;counter-reset:s;padding:2mm 4mm 3mm}.tp li{counter-increment:s;position:relative;padding:1.2mm 0 1.2mm 9mm}.tp li:before{content:counter(s);position:absolute;left:0;top:1mm;width:5.6mm;height:5.6mm;border-radius:50%;background:#B8892B;color:#fff;font-weight:800;font-size:7.6pt;display:flex;align-items:center;justify-content:center}
+   .tp .d{margin:0 4mm 3.5mm;padding:2.2mm 3mm;background:#FBF6EA;border-radius:1.5mm;font-size:8.5pt;color:#5B4513}.tp .d:before{content:'DICA  ';font-weight:800;letter-spacing:.12em;font-size:7pt;color:#B8892B}
+   .end{margin-top:8mm;padding:4mm;border-radius:2.5mm;background:#0B1F3A;color:#D6DEEA;font-size:8.6pt}.end b{color:#fff}
+   .bar{position:sticky;top:0;background:#0B1F3A;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:5}.bar button{background:#B8892B;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer}
+   @media screen{body{background:#e9edf3}.cv,.sheet{margin:10px auto;box-shadow:0 2px 12px rgba(0,0,0,.12)}.sheet{width:210mm;background:#fff;padding:20mm 16mm}}
+   @media print{.bar{display:none!important}.sheet{padding:0}}`;
+  const irTxt=ir=>ir?`Menu › ${esc(GUIA_NOME[ir[0]]||ir[0])}`:'';
+  const cover=`<section class="cv"><div class="band"></div><div class="g"></div><div class="in"><div class="k">Manual do utilizador · versão ${APP_VERSION}</div><h1>Audit<span>Nux</span><br>Guia completo</h1><div class="s">Tudo o que o programa faz, passo a passo: SAF-T de faturação e contabilidade, IES, base de empresas, IVA, risco fiscal, demonstrações financeiras, IRC e relatórios.</div>
+    <div class="chips"><div><b>${GUIA.length}</b>capítulos</div><div><b>${nTot}</b>tarefas explicadas</div><div><b>clique a clique</b>com atalhos no programa</div></div></div>
+    <div class="sg"><div><b>${gab||'AuditNux'}</b><br>Auditoria SAF-T · Contabilidade · Fiscalidade</div><div style="text-align:right">${hoje}<br>Também disponível no programa: menu <b>Guia & Como fazer</b></div></div></section>`;
+  const idx=`<section class="sheet idx"><div class="k2">Índice</div><h2>O que vai encontrar</h2>${GUIA.map(c=>`<a class="il" href="#c-${c.id}"><span class="n">${c.n}</span><span class="t">${esc(c.t)}</span><span class="d"></span><span class="p">${pg[c.id]||''}</span></a>${c.tp.map(t=>`<div class="il2">${t.t}</div>`).join('')}`).join('')}</section>`;
+  const tpH=t=>`<div class="tp"><div class="h"><b>${t.t}</b><span>${irTxt(t.ir)}</span></div><div class="q"><b>Quando:</b> ${t.q}</div><ol>${t.p.map(s=>`<li>${s}</li>`).join('')}</ol>${t.d?`<div class="d">${t.d}</div>`:''}</div>`;
+  const caps=GUIA.map(c=>`<section class="sheet cap" id="c-${c.id}"><div class="grp"><div class="ch"><div class="n">${c.n}</div><div><div class="m">Capítulo ${c.n}</div><h2>${esc(c.t)}</h2></div></div><div class="intro">${c.intro}</div>${tpH(c.tp[0])}</div>
+    ${c.tp.slice(1).map(tpH).join('')}
+    ${c.id==='faq'?`<div class="end"><b>Sobre os resultados.</b> Os indicadores, alertas e textos são gerados pelo AuditNux a partir dos ficheiros carregados e das fichas das empresas. São apoio à decisão e não substituem o juízo profissional nem a certificação legal de contas.</div>`:''}</section>`).join('');
+  const bar=o.semBarra?'':`<div class="bar"><b>Guia completo do AuditNux</b><span style="opacity:.75">Para guardar em PDF: Imprimir › Guardar como PDF (papel A4)</span><span style="flex:1"></span><button onclick="print()">Imprimir / Guardar PDF</button></div>`;
+  return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>AuditNux — Guia completo</title><style>${css}</style></head><body>${bar}${cover}${idx}${caps}</body></html>`; }
+
+/* ---------- Estilos da vista + navegação + botão "Como fazer" ---------- */
+document.addEventListener('DOMContentLoaded',()=>{
+  document.head.insertAdjacentHTML('beforeend',`<style>
+   .gu-wrap{display:grid;grid-template-columns:240px 1fr;gap:16px;margin-top:16px;align-items:start}
+   .gu-idx{position:sticky;top:0;padding:10px}.gu-idx a{display:flex;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--tx,inherit)}.gu-idx a span{color:var(--acc,#B8892B);font-weight:800;width:22px}.gu-idx a:hover,.gu-idx a.on{background:rgba(184,137,43,.12)}
+   .gu-cap{margin-bottom:16px}.gu-ch{display:flex;gap:14px;align-items:center;margin-bottom:10px}.gu-n{font-size:30px;font-weight:800;color:#B8892B;line-height:1}
+   .gu-tp{border-top:1px solid var(--line,rgba(127,127,127,.2));padding:14px 0 6px}.gu-tp h4{margin:0 0 4px;font-size:15px}
+   .gu-tp ol{margin:10px 0 6px;padding-left:22px}.gu-tp li{margin:5px 0;line-height:1.5}
+   .gu-d{margin:6px 0 8px;padding:8px 12px;border-radius:8px;background:rgba(184,137,43,.12);font-size:13px}
+   #vTitle{display:inline-block;vertical-align:middle}#guiaTop{margin-left:10px;vertical-align:middle}
+   @media(max-width:900px){.gu-wrap{grid-template-columns:1fr}.gu-idx{position:static;display:flex;flex-wrap:wrap}}</style>`);
+  const ref=$('.nav[data-v="definicoes"]');
+  if(ref&&!$('.nav[data-v="guia"]')){ ref.insertAdjacentHTML('afterend',`<div class="nav" data-v="guia"><svg class="i"><use href="#i-book"/></svg>Guia &amp; Como fazer<span class="badge b-acc">Novo</span></div>`); $('.nav[data-v="guia"]').onclick=()=>{ S.guiaCap=''; S.guiaQ=''; go('guia'); }; }
+  if(!$('#v-guia')) $('.content').insertAdjacentHTML('beforeend','<section class="view" id="v-guia"></section>');
+  const vt=$('#vTitle'); if(vt&&!$('#guiaTop')){ vt.insertAdjacentHTML('afterend',`<button class="btn sm" id="guiaTop" title="Abrir o guia neste ecrã">${ico('book')} Como fazer</button>`);
+    $('#guiaTop').onclick=()=>{ const c=GUIA_CTX[S.view]||''; S.guiaQ=''; S.guiaCap=S.view==='guia'?'':c; go('guia'); }; }
+});
+/* O botão "Guia completo (PDF)" abre o documento premium */
+const _rGuia=RENDER.guia; RENDER.guia=function(){ _rGuia.apply(this,arguments); const b=$('#guPdf'); if(b) b.onclick=()=>guiaPdf(); };
 </script>
 </body>
 </html>
