@@ -639,7 +639,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -1852,8 +1852,15 @@ RENDER.historico=async function(){ const el=$('#v-historico');
   if(S.hisCo) return fichaEmpresa(S.hisCo);
   el.innerHTML=`<div class="card"><div class="empty">${ico('cloud')} A carregar empresas…</div></div>`;
   try{ if(!S.history.length||S.historyDirty) await cloudLoadHistory(); }catch(e){ el.innerHTML=`<div class="card"><b class="st-crit">Erro ao ler a nuvem:</b> ${esc(e.message)}</div>`; return; }
-  const G=groupCompanies(S.history); const allYm=[...new Set(S.history.map(monthOf).filter(Boolean))].sort();
-  const f=S.hisF2||(S.hisF2={q:'',ym:allYm[allYm.length-1]||today().slice(0,7),est:''}); const year=f.ym.slice(0,4);
+  const allYm=[...new Set(S.history.map(monthOf).filter(Boolean))].sort();
+  const f=S.hisF2||(S.hisF2={q:'',ym:allYm[allYm.length-1]||today().slice(0,7),est:''}); const year=f.ym.slice(0,4); if(f.set==null){ f.set=''; f.resp=''; f.ces=false; }
+  // a lista parte da base de empresas: entram também as que ainda não têm nenhuma análise
+  const E=typeof empLoad==='function'?await empLoad():{}; const X=typeof glIndex==='function'?await glIndex():{}; const G0=groupCompanies(S.history); const byN=new Map(G0.map(g=>[g.nif,g]));
+  for(const e of Object.values(E)) if(!byN.has(e.nif)){ const g={nif:e.nif,empresa:e.nome||e.nif,list:[],corr:0}; G0.push(g); byN.set(e.nif,g); }
+  for(const g of G0){ g.f=E[g.nif]||null; if(g.f&&g.f.nome&&!g.list.length) g.empresa=g.f.nome; g.ces=!!(g.f&&g.f.estado==='cessada'); g.setor=typeof empSetor==='function'?empSetor(g.f):''; g.gl=Object.values(X).filter(m=>m.nif===g.nif); }
+  const G=G0.filter(g=>(f.ces||!g.ces)&&(!f.set||(f.set==='sem'?!(g.f&&(g.f.cae||g.f.setor)):g.setor===f.set))&&(!f.resp||(g.f&&g.f.responsavel)===f.resp));
+  const resps=[...new Set(Object.values(E).map(e=>e.responsavel).filter(Boolean))].sort();
+  const glCell=g=>{ const m=g.gl.find(x=>x.ano===year); if(!m) return null; return {maxP:m.maxP||0,ok:(m.maxP||0)>=+f.ym.slice(5,7)}; };
   const yms=[...new Set([...allYm,f.ym])].sort().reverse();
   const stOf=g=>{ const c=monthCell(g,f.ym); return c?c.estado:'none'; };
   const cnt={ok:0,warn:0,crit:0,none:0}; G.forEach(g=>cnt[stOf(g)]++);
@@ -1861,22 +1868,27 @@ RENDER.historico=async function(){ const el=$('#v-historico');
    <div class="card" style="margin-top:16px"><h3>${ico('layers')} Empresas <span class="r hint">uma linha por empresa · clique para abrir a ficha com todos os meses</span></h3>
    <div class="toolbar"><input class="inp grow" id="gQ" placeholder="Pesquisar empresa ou NIF…" value="${esc(f.q)}">
     <label class="fld">Mês de controlo<select class="inp" id="gM">${yms.map(y=>`<option value="${y}" ${y===f.ym?'selected':''}>${ymLabel(y)}</option>`).join('')}</select></label>
+    ${typeof SETORES==='object'?`<label class="fld">Setor<select class="inp" id="gS"><option value="">Todos</option><option value="sem" ${f.set==='sem'?'selected':''}>Sem CAE</option>${SET_ORD.map(k=>`<option value="${k}" ${f.set===k?'selected':''}>${SETORES[k].l}</option>`).join('')}</select></label>`:''}
+    ${resps.length?`<label class="fld">Responsável<select class="inp" id="gRp"><option value="">Todos</option>${resps.map(r=>`<option ${f.resp===r?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:''}
+    <label class="fld" style="margin-top:14px"><span class="row" style="gap:6px"><input type="checkbox" id="gC" ${f.ces?'checked':''}> incluir cessadas</span></label>
     <label class="fld">Estado nesse mês<select class="inp" id="gE"><option value="">Todos</option><option value="none" ${f.est==='none'?'selected':''}>Sem análise (por fazer)</option><option value="crit" ${f.est==='crit'?'selected':''}>Bloqueado</option><option value="warn" ${f.est==='warn'?'selected':''}>Rever avisos</option><option value="ok" ${f.est==='ok'?'selected':''}>Pronto</option></select></label>
     <span class="sp"></span><button class="btn" id="gR">${ico('undo')} Atualizar</button><button class="btn" id="gCsv">${ico('down')} Excel</button></div><div id="gT"></div>
     <div class="row hint" style="margin-top:10px;gap:14px"><span class="row" style="gap:5px"><i class="ms" style="background:var(--good)"></i>Pronto</span><span class="row" style="gap:5px"><i class="ms" style="background:var(--warn)"></i>Rever avisos</span><span class="row" style="gap:5px"><i class="ms" style="background:var(--crit)"></i>Bloqueado</span><span class="row" style="gap:5px"><i class="ms" style="background:var(--bg2);border:1px dashed var(--line2)"></i>Sem análise</span></div></div>`;
   const q=norm(f.q).trim(); const rows=G.filter(g=>(!q||norm(g.empresa+' '+g.nif).includes(q))&&(!f.est||stOf(g)===f.est));
-  const cols=[{k:'empresa',l:'Empresa',html:g=>`<b>${esc(g.empresa)}</b><div class="hint mono">${esc(g.nif)}</div>`},
+  const cols=[{k:'empresa',l:'Empresa',html:g=>`<b>${esc(g.empresa)}</b>${g.ces?' <span class="badge b-info">Cessada</span>':''}<div class="hint mono">${esc(g.nif)}${g.f&&g.f.cae?' · CAE '+esc(g.f.cae):''}</div>`},
+    {k:'setor',l:'Setor',v:g=>g.setor&&SETORES[g.setor]?SETORES[g.setor].l:'',html:g=>g.f&&(g.f.cae||g.f.setor)?`<span class="hint" style="color:var(--ink)">${esc(SETORES[g.setor].l)}</span>${g.f.responsavel?`<div class="hint">${esc(g.f.responsavel)}</div>`:''}`:'<span class="badge b-warn">Sem CAE</span>'},
     {k:'mes',l:ymLabel(f.ym),v:g=>({crit:0,warn:1,none:2,ok:3})[stOf(g)],html:g=>{ const c=monthCell(g,f.ym); return c?`<span class="badge ${c.estado==='ok'?'b-ok':c.estado==='warn'?'b-warn':'b-crit'}">${c.score} · ${STATUS_TXT[c.estado].split(' —')[0]}</span>`:'<span class="badge b-info">por fazer</span>'; }},
     {k:'strip',l:'Ano '+year,v:g=>g.list.filter(h=>(h.start||'').startsWith(year)).length,html:g=>strip(g,year)},
     {k:'vendas',l:'Vendas (mês)',num:1,v:g=>{ const c=monthCell(g,f.ym); return c?c.vendas:null; },f:v=>v==null?'—':n2(v)},
     {k:'delta',l:'Δ mês ant.',num:1,v:g=>{ const c=monthCell(g,f.ym), p=monthCell(g,ymAdd(f.ym,-1)); return c&&p?pctChg(c.vendas,p.vendas):null; },html:g=>{ const c=monthCell(g,f.ym), p=monthCell(g,ymAdd(f.ym,-1)); return c&&p?deltaHtml(c.vendas,p.vendas):'<span class="muted">—</span>'; }},
     {k:'al',l:'Alertas',v:g=>{ const c=monthCell(g,f.ym); return c?c.alertas.crit*1e6+c.alertas.err*1e3+c.alertas.warn:-1; },html:g=>{ const c=monthCell(g,f.ym); return c?['crit','err','warn'].map(s=>c.alertas[s]?`<span class="badge ${SEV[s].c}">${c.alertas[s]}</span>`:'').join(' ')||'<span class="muted">0</span>':''; }},
     {k:'dp',l:'DP',html:g=>{ const c=monthCell(g,f.ym); return c?dpStatus(c):''; }},
+    {k:'gl',l:'Contab. '+year,v:g=>{ const c=glCell(g); return c?c.maxP:-1; },html:g=>{ const c=glCell(g); return c?`<span class="badge ${c.ok?'b-ok':'b-warn'}" title="SAF-T de contabilidade de ${year} com dados até ${GL_MES[c.maxP-1]||'—'}">até ${(GL_MES[c.maxP-1]||'—').slice(0,3).toLowerCase()}</span>`:'<span class="badge b-info">por carregar</span>'; }},
     {k:'n',l:'Meses',num:1,v:g=>g.list.length,f:n0},{k:'up',l:'Atualizado',v:g=>g.list.reduce((m,h)=>h.atualizadoEm>m?h.atualizadoEm:m,''),f:v=>v?new Date(v).toLocaleDateString('pt-PT'):''}];
-  S.gT=table($('#gT'),Object.assign(S.gT?{_st:S.gT._st}:{sort:'mes',dir:1},{size:100,rows,cols,onRow:g=>{ S.hisCo=g.nif; RENDER.historico(); }}));
+  S.gT=table($('#gT'),Object.assign(S.gT?{_st:S.gT._st}:{sort:'mes',dir:1},{size:100,rows,cols,onRow:g=>{ if(!g.list.length&&typeof empFicha==='function') return empFicha(g.nif,()=>RENDER.historico()); S.hisCo=g.nif; RENDER.historico(); }}));
   const rr=()=>RENDER.historico(); let tm; $('#gQ').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ f.q=e.target.value; rr(); setTimeout(()=>{ const i=$('#gQ'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); },250); };
-  $('#gM').onchange=e=>{ f.ym=e.target.value; rr(); }; $('#gE').onchange=e=>{ f.est=e.target.value; rr(); }; $('#gR').onclick=()=>{ S.historyDirty=true; rr(); };
-  $('#gCsv').onclick=()=>csvDownload(`AuditNux_empresas_${f.ym}.csv`,[{label:'Empresa',k:'empresa'},{label:'NIF',k:'nif'},{label:'Estado '+f.ym,v:g=>{ const c=monthCell(g,f.ym); return c?STATUS_TXT[c.estado]:'Sem análise'; }},{label:'Pontuação',v:g=>{ const c=monthCell(g,f.ym); return c?c.score:''; }},{label:'Vendas',v:g=>{ const c=monthCell(g,f.ym); return c?c.vendas:''; }},{label:'IVA',v:g=>{ const c=monthCell(g,f.ym); return c?c.iva:''; }},{label:'Meses analisados',v:g=>g.list.length}],rows);
+  $('#gM').onchange=e=>{ f.ym=e.target.value; rr(); }; if($('#gS')) $('#gS').onchange=e=>{ f.set=e.target.value; rr(); }; if($('#gRp')) $('#gRp').onchange=e=>{ f.resp=e.target.value; rr(); }; $('#gC').onchange=e=>{ f.ces=e.target.checked; rr(); }; $('#gE').onchange=e=>{ f.est=e.target.value; rr(); }; $('#gR').onclick=()=>{ S.historyDirty=true; rr(); };
+  $('#gCsv').onclick=()=>csvDownload(`AuditNux_empresas_${f.ym}.csv`,[{label:'Empresa',k:'empresa'},{label:'NIF',k:'nif'},{label:'CAE',v:g=>g.f&&g.f.cae||''},{label:'Setor',v:g=>g.setor&&SETORES[g.setor]?SETORES[g.setor].l:''},{label:'Responsável',v:g=>g.f&&g.f.responsavel||''},{label:'Regime IVA',v:g=>g.f&&g.f.regimeIva||''},{label:'Estado '+f.ym,v:g=>{ const c=monthCell(g,f.ym); return c?STATUS_TXT[c.estado]:'Sem análise'; }},{label:'Pontuação',v:g=>{ const c=monthCell(g,f.ym); return c?c.score:''; }},{label:'Vendas',v:g=>{ const c=monthCell(g,f.ym); return c?c.vendas:''; }},{label:'IVA',v:g=>{ const c=monthCell(g,f.ym); return c?c.iva:''; }},{label:'Meses analisados',v:g=>g.list.length},{label:'Contabilidade '+year,v:g=>{ const c=glCell(g); return c?'até '+(GL_MES[c.maxP-1]||''):'por carregar'; }}],rows);
 };
 function fichaEmpresa(nif){ const el=$('#v-historico'); const g=groupCompanies(S.history).find(x=>x.nif===nif); if(!g){ S.hisCo=null; return RENDER.historico(); }
   const years=[...new Set(g.list.map(h=>(h.start||'').slice(0,4)))].sort().reverse(); const yr=years[0];
@@ -4035,8 +4047,14 @@ async function empSave(f){ f.atualizadoEm=new Date().toISOString(); f.por=S.oper
   if(S.cloud.on){ try{ await wsCol('empresas').doc(f.nif).set(JSON.parse(JSON.stringify(f))); return true; }catch(e){ toast('Nuvem (empresas): '+esc(e.message),'err'); return false; } }
   const all=lsGet(empLsKey(),{}); all[f.nif]=f; lsSet(empLsKey(),all); return true; }
 async function empDelete(nif){ await empLoad(); delete S.EMP[nif]; if(S.cloud.on){ try{ await wsCol('empresas').doc(nif).delete(); }catch(e){} } else { const all=lsGet(empLsKey(),{}); delete all[nif]; lsSet(empLsKey(),all); } }
+const empTitle=t=>String(t||'').toLowerCase().replace(/(^|[\s-])([a-zà-ú])/g,(m,a,b)=>a+b.toUpperCase()).replace(/\b(De|Da|Do|Das|Dos|E)\b/g,w=>w.toLowerCase());
+const REG_IVA={'':'—',mensal:'Mensal',trimestral:'Trimestral',isento:'Isento (art. 9.º / 53.º)'};
+// regime de IVA deduzido dos apuramentos registados na contabilidade
+function empRegimeDe(Y){ const ap=Object.keys(Y.iva||{}).map(Number).filter(p=>p>=1&&p<=12&&Y.iva[p].ap); if(ap.length<2) return ''; return ap.some(p=>p%3!==0)?'mensal':'trimestral'; }
 // cria a ficha mínima quando chega um SAF-T de uma empresa ainda sem ficha (nome e NIF), sem tocar no resto
-async function empTouch(nif,nome){ if(!nif) return; await empLoad(); const f=S.EMP[nif]; if(f){ if(!f.nome&&nome){ f.nome=nome; await empSave(f); } return; } await empSave({nif,nome:nome||'',cae:'',setor:'',normativo:'',capital:null,ies:{},origem:'SAF-T'}); }
+async function empTouch(nif,nome,opt){ if(!nif) return false; opt=opt||{}; await empLoad(); const f=S.EMP[nif];
+  if(f){ let ch=false; if(!f.nome&&nome){ f.nome=nome; ch=true; } if(opt.regimeIva&&!f.regimeIva){ f.regimeIva=opt.regimeIva; ch=true; } if(ch) await empSave(f); return false; }
+  await empSave({nif,nome:nome||'',cae:'',setor:'',normativo:'',capital:null,ies:{},origem:'SAF-T',estado:'ativa',regimeIva:opt.regimeIva||''}); return true; }
 
 /* ---------- Leitura da IES em PDF (posição de cada valor na página) ---------- */
 const iesNum=s=>/^-?\d{1,3}(\.\d{3})*,\d{2}$/.test(s)||/^-?\d+,\d{2}$/.test(s);
@@ -4056,6 +4074,7 @@ async function iesRead(file){ const L=await pdfjsLib_(); const doc=await L.getDo
   const iN=L1.findIndex(l=>/\bNOME\b/.test(l.t)&&/IDENTIFICA/.test(l.t)); if(iN>=0&&L1[iN+1]){ r.nome=L1[iN+1].it.filter(i=>!/^\d+$/.test(i.s)).map(i=>i.s).join(' ').trim(); }
   const iC=L1.findIndex(l=>/CÓDIGO CAE|CODIGO CAE/i.test(l.t)); if(iC>=0){ for(let k=iC+1;k<Math.min(L1.length,iC+12);k++){ if(/^0?5\b|ANEXOS QUE/.test(L1[k].t)) break; const c5=L1[k].it.map(i=>i.s).filter(s=>/^\d{5}$/.test(s)&&s!==r.nif.slice(0,5)); for(const c of c5) if(!r.caes.includes(c)) r.caes.push(c); } }
   r.cae=r.caes[0]||'';
+  const iS=L1.findIndex(l=>/SERVI[ÇC]O DE FINAN/i.test(l.t)); if(iS>=0) for(let k=iS+1;k<Math.min(L1.length,iS+4);k++){ const it=L1[k].it; const cod=it.find(i=>/^\d{4}$/.test(i.s)&&i.s!==r.ano); const nm=it.filter(i=>/[A-Za-zÀ-ú]/.test(i.s)).map(i=>i.s).join(' ').trim(); if(nm&&cod){ r.sf={nome:nm,cod:cod.s}; break; } }
   for(const p of pages){ const t=p.map(i=>i.s).join(' '); if(!/NC-ME/.test(t)||!/NIC.?s/.test(t)) continue; const nic=p.find(i=>/^NIC/.test(i.s)); const xs=p.filter(i=>i.s==='X'&&nic&&Math.abs(i.y-nic.y)<14); if(!xs.length) continue;
     const X=xs.sort((a,b)=>Math.abs(a.y-nic.y)-Math.abs(b.y-nic.y))[0]; const box=p.filter(i=>/^[1-4]$/.test(i.s)&&Math.abs(i.y-nic.y)<6&&Math.abs(i.y-X.y)<9&&i.x<X.x).sort((a,b)=>b.x-a.x)[0];
     if(box) r.normativo={1:'NIC',2:'NCRF',3:'NCRF-PE',4:'NC-ME'}[box.s]; break; }
@@ -4069,7 +4088,7 @@ function iesResumo(r){ const d=r.dr||{}, b=r.bal||{}; return {vn:d.A5001||0,vp:d
   ativo:b.A5127||0,inv:b.A5113||0,cli:b.A5115||0,caixa:b.A5125||0,cp:b.A5141||0,capital:b.A5128||0,passivo:b.A5160||0,forn:b.A5148||0,fin:(b.A5143||0)+(b.A5152||0)}; }
 async function iesImport(files){ const res=[]; await empLoad();
   for(const file of files){ try{ const r=await iesRead(file); const f=S.EMP[r.nif]||{nif:r.nif,nome:'',cae:'',setor:'',normativo:'',capital:null,ies:{},origem:'IES'};
-      if(r.nome) f.nome=r.nome; const novo=!f.iesAno||+r.ano>=+f.iesAno; if(novo){ if(r.cae){ f.cae=r.cae; f.caes=r.caes; } if(r.normativo) f.normativo=r.normativo; f.iesAno=r.ano; if(r.bal&&r.bal.A5128!=null) f.capital=r.bal.A5128; }
+      if(r.nome) f.nome=r.nome; const novo=!f.iesAno||+r.ano>=+f.iesAno; if(novo){ if(r.cae){ f.cae=r.cae; f.caes=r.caes; } if(r.normativo) f.normativo=r.normativo; f.iesAno=r.ano; if(r.bal&&r.bal.A5128!=null) f.capital=r.bal.A5128; if(r.sf){ f.sf=r.sf; if(!f.concelho) f.concelho=empTitle(r.sf.nome); } }
       f.ies=f.ies||{}; f.ies[r.ano]={...iesResumo(r),drOk:r.drOk,balOk:r.balOk,cae:r.cae,normativo:r.normativo,ficheiro:r.ficheiro,lidoEm:new Date().toISOString()};
       await empSave(f); res.push({ok:true,file:file.name,r}); }
     catch(e){ res.push({ok:false,file:file.name,erro:e.message}); } }
@@ -4103,6 +4122,8 @@ RENDER.empresas=async function(){ const el=$('#v-empresas'); el.innerHTML=`<div 
     {k:'cae',l:'CAE',v:o=>o.f&&o.f.cae||'',f:v=>v?`<span class="mono">${esc(v)}</span>`:'<span class="badge b-warn">Falta</span>'},
     {k:'setor',l:'Setor',v:o=>SETORES[empSetor(o.f)].l,f:(v,o)=>esc(v)+(o.f&&o.f.setor?' <span class="hint">(manual)</span>':'')},
     {k:'norm',l:'Normativo',v:o=>o.f&&o.f.normativo||'',f:v=>esc(v||'—')},
+    {k:'iva',l:'IVA',v:o=>o.f&&o.f.regimeIva||'',f:v=>esc(v?REG_IVA[v].split(' ')[0]:'—')},
+    {k:'resp',l:'Responsável',v:o=>o.f&&o.f.responsavel||'',f:(v,o)=>esc(v||'—')+(o.f&&o.f.estado==='cessada'?' <span class="badge b-info">Cessada</span>':'')},
     {k:'ies',l:'IES',v:o=>o.f&&o.f.ies?Object.keys(o.f.ies).sort().join(' · '):'',f:v=>esc(v||'—')},
     {k:'contab',l:'Contabilidade',v:o=>o.contab.join(' · '),f:v=>esc(v||'—')},
     {k:'fat',l:'Faturação',num:1,f:v=>v?n0(v)+' análise(s)':'—'}]});
@@ -4116,26 +4137,50 @@ async function empFicha(nif,after){ await empLoad(); const rows=await empUnivers
     `<div class="grid g2"><label class="fld">CAE principal<input class="inp mono" id="efCae" value="${esc(f.cae||'')}" placeholder="ex.: 43390"></label>
        <label class="fld">Setor de atividade<select class="inp" id="efSet"><option value="">Automático pelo CAE (${esc(SETORES[auto].l)})</option>${SET_ORD.map(k=>`<option value="${k}" ${f.setor===k?'selected':''}>${SETORES[k].l} (CAE ${SETORES[k].div})</option>`).join('')}</select></label>
        <label class="fld">Normativo contabilístico<select class="inp" id="efNor">${['','NC-ME','NCRF-PE','NCRF','NIC'].map(k=>`<option ${f.normativo===k?'selected':''} value="${k}">${k||'—'}</option>`).join('')}</select></label>
-       <label class="fld">Nome<input class="inp" id="efNom" value="${esc(f.nome||o.nome||'')}"></label></div>
+       <label class="fld">Nome<input class="inp" id="efNom" value="${esc(f.nome||o.nome||'')}"></label>
+       <label class="fld">Regime de IVA<select class="inp" id="efIva">${Object.entries(REG_IVA).map(([k,l])=>`<option value="${k}" ${(f.regimeIva||'')===k?'selected':''}>${l}</option>`).join('')}</select></label>
+       <label class="fld">Concelho da sede (derrama)<input class="inp" id="efCon" value="${esc(f.concelho||'')}" placeholder="ex.: Vizela"></label>
+       <label class="fld">Estado<select class="inp" id="efEst"><option value="ativa" ${f.estado!=='cessada'?'selected':''}>Ativa</option><option value="cessada" ${f.estado==='cessada'?'selected':''}>Cessada (deixa de aparecer no controlo mensal)</option></select></label>
+       <label class="fld">Responsável no gabinete<input class="inp" id="efRes" value="${esc(f.responsavel||'')}" placeholder="ex.: Filipa" list="efResL"><datalist id="efResL">${[...new Set(Object.values(S.EMP||{}).map(x=>x.responsavel).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>
      ${(f.caes||[]).length>1?`<p class="hint">CAE secundários na IES: ${esc(f.caes.slice(1).join(', '))}</p>`:''}
      <div class="card" style="margin-top:12px;border-left:4px solid var(--acc)"><b>${esc(P.l)}</b><div class="hint" style="margin-top:4px">${esc(P.txt)}</div>
        <div class="hint" style="margin-top:4px">Inventário analisado: <b>${esc(P.inv.nome)}</b> (contas ${P.inv.pre.join(', ')})${P.atip.length?` · contas fora do normal para o setor: ${P.atip.map(a=>a.p).join(', ')}`:''}${P.marg?` · margem bruta mínima esperada: ${(P.marg.w*100).toFixed(0)}%`:''}</div></div>
-     <h3 style="margin-top:14px">Histórico das IES</h3>${anos.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th></th>${anos.map(a=>`<th class="num">${a}${I[a].drOk&&I[a].balOk?'':' ⚠'}</th>`).join('')}</tr></thead><tbody>
+     <h3 style="margin-top:14px">Histórico das IES</h3>${anos.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th></th>${anos.map(a=>`<th class="num">${a}${I[a].drOk&&I[a].balOk?'':' ⚠'} <button class="btn sm" data-dies="${a}" title="Retirar a IES de ${a} desta ficha" style="padding:0 5px;min-height:0">${ico('x')}</button></th>`).join('')}</tr></thead><tbody>
        ${tr('Volume de negócios','vn','b')}${tr('Variação da produção','vp')}${tr('CMVMC','cmv')}${tr('Fornecimentos e serviços externos','fse')}${tr('Gastos com o pessoal','pes')}${tr('EBITDA','ebitda')}${tr('Resultado líquido','rl','b')}
        ${tr('Inventários','inv')}${tr('Clientes','cli')}${tr('Caixa e depósitos','caixa')}${tr('Total do ativo','ativo','b')}${tr('Capital realizado','capital')}${tr('Capital próprio','cp','b')}${tr('Total do passivo','passivo')}</tbody></table></div>
        ${anos.some(a=>!(I[a].drOk&&I[a].balOk))?'<p class="hint st-warn">⚠ Nesse ano os totais lidos do PDF não fecham com as fórmulas do impresso: confirme os valores.</p>':'<p class="hint">Todos os totais conferem com as fórmulas oficiais do impresso (DR e balanço).</p>'}`:'<p class="hint">Ainda sem IES. Carregue a IES em PDF para preencher o CAE, o normativo e o histórico.</p>'}
      <p class="hint" style="margin-top:8px">${o.contab.length?`Contabilidade: ${o.contab.join(' · ')}`:'Sem SAF-T de contabilidade'} · ${o.fat?n0(o.fat)+' análise(s) de faturação':'sem análises de faturação'}${f.atualizadoEm?` · ficha atualizada em ${f.atualizadoEm.slice(0,10)}${f.por?' por '+esc(f.por):''}`:''}</p>`,
-    `<button class="btn" id="efIes">${ico('upload')} Carregar IES</button>${o.contab.length?`<button class="btn" id="efGl">${ico('book')} Contabilidade</button>`:''}<span class="sp"></span><button class="btn pri" id="efOk">${ico('save')} Guardar ficha</button>`);
-  $('#efOk').onclick=async()=>{ f.cae=$('#efCae').value.replace(/\D/g,'').slice(0,5); f.setor=$('#efSet').value; f.normativo=$('#efNor').value; f.nome=$('#efNom').value.trim()||f.nome; f.nif=nif; f.ies=f.ies||{};
+    `<button class="btn danger" id="efDel" title="Eliminar esta empresa">${ico('trash')} Eliminar empresa</button><button class="btn" id="efIes">${ico('upload')} Carregar IES</button>${o.contab.length?`<button class="btn" id="efGl">${ico('book')} Contabilidade</button>`:''}<span class="sp"></span><button class="btn pri" id="efOk">${ico('save')} Guardar ficha</button>`);
+  $('#efOk').onclick=async()=>{ f.cae=$('#efCae').value.replace(/\D/g,'').slice(0,5); f.setor=$('#efSet').value; f.normativo=$('#efNor').value; f.nome=$('#efNom').value.trim()||f.nome; f.regimeIva=$('#efIva').value; f.concelho=$('#efCon').value.trim(); f.estado=$('#efEst').value; f.responsavel=$('#efRes').value.trim(); f.nif=nif; f.ies=f.ies||{};
     if(await empSave(f)){ toast(`${ico('check')} Ficha de ${esc(f.nome||nif)} guardada · ${esc(SETORES[empSetor(f)].l)}`,'ok'); closeModal(); if(after) after(); else if(S.view==='empresas') RENDER.empresas(); } };
   $('#efIes').onclick=()=>iesPick(()=>empFicha(nif,after));
+  $$('[data-dies]').forEach(b=>b.onclick=async()=>{ const a=b.dataset.dies; if(!confirm(`Retirar a IES de ${a} da ficha de ${f.nome||nif}?\n\nSó apaga os valores lidos dessa IES. O PDF original não é afetado e pode voltar a carregá-lo.`)) return;
+    delete f.ies[a]; const rest=Object.keys(f.ies).sort(); if(f.iesAno===a){ f.iesAno=rest[rest.length-1]||''; if(f.iesAno&&f.ies[f.iesAno].cae&&!f.setor) f.cae=f.ies[f.iesAno].cae; }
+    await empSave(f); toast(`${ico('trash')} IES de ${a} retirada`,'ok'); empFicha(nif,after); });
+  $('#efDel').onclick=async()=>{ const nome=f.nome||o.nome||nif; const outros=o.contab.length||o.fat;
+    if(!outros){ if(!confirm(`Eliminar a empresa ${nome} (NIF ${nif})?\n\nApaga a ficha e os valores das IES lidas. Os PDF originais não são afetados.`)) return;
+      await empDelete(nif); closeModal(); toast(`${ico('trash')} ${esc(nome)} eliminada`,'ok'); if(after) after(); else RENDER.empresas(); return; }
+    if(!confirm(`${nome} tem também ${o.contab.length?'contabilidade ('+o.contab.join(', ')+')':''}${o.contab.length&&o.fat?' e ':''}${o.fat?o.fat+' análise(s) de faturação':''} no AuditNux.\n\nPara eliminar a empresa é preciso apagar TODOS os dados dela. Continuar?`)) return;
+    closeModal(); await deleteCompany(nif,nome); if(await empGone(nif)){ await empDelete(nif); toast(`${ico('trash')} ${esc(nome)} eliminada`,'ok'); } if(S.view==='empresas') RENDER.empresas(); };
   if($('#efGl')) $('#efGl').onclick=()=>{ closeModal(); S.glU.nif=nif; S.glU.ano=o.contab[o.contab.length-1]; S.glU.to=0; S.glU.tab='risco'; go('contabilidade'); }; }
 
 /* ---------- Ligações ---------- */
 document.addEventListener('DOMContentLoaded',()=>{ const ref=$('.nav[data-v="historico"]');
   if(ref&&!$('.nav[data-v="empresas"]')){ ref.insertAdjacentHTML('afterend',`<div class="nav" data-v="empresas"><svg class="i"><use href="#i-users"/></svg>Empresas<span class="badge b-acc">Novo</span></div>`); $('.nav[data-v="empresas"]').onclick=()=>go('empresas'); }
   if(!$('#v-empresas')) $('.content').insertAdjacentHTML('beforeend','<section class="view" id="v-empresas"></section>'); });
-const _glLoadedEmp=glLoaded; glLoaded=async function(R,file,batch){ const Y=await _glLoadedEmp.apply(this,arguments); try{ await empTouch(Y.nif,Y.empresa); }catch(e){} return Y; };
+const _glLoadedEmp=glLoaded; glLoaded=async function(R,file,batch){ const Y=await _glLoadedEmp.apply(this,arguments); try{ if(await empTouch(Y.nif,Y.empresa,{regimeIva:empRegimeDe(Y)})) toast(`${ico('users')} Nova empresa na base: ${esc(Y.empresa)} — complete o CAE no menu Empresas`,'ok'); }catch(e){} return Y; };
+// faturação: cada SAF-T analisado fica ligado à ficha (cria-a se for uma empresa nova)
+const _bsEmp=buildSummary; buildSummary=function(){ const sm=_bsEmp.apply(this,arguments); try{ if(sm&&sm.nif&&!(S.EMP&&S.EMP[sm.nif])) empTouch(sm.nif,sm.empresa).then(n=>{ if(n){ toast(`${ico('users')} Nova empresa na base: ${esc(sm.empresa)} — complete o CAE no menu Empresas`,'ok'); renderCtx(); } }); }catch(e){} return sm; };
+// cabeçalho: CAE e setor da empresa do ficheiro aberto
+const _rcEmp=renderCtx; renderCtx=function(){ _rcEmp.apply(this,arguments); try{ if(!S.R) return; const nif=String(S.R.header.TaxRegistrationNumber||'').trim(); const c=$('#ctx'); if(!c) return;
+    const put=()=>{ if($('#ctxEmp')) $('#ctxEmp').remove(); const f=(S.EMP||{})[nif]; const k=empSetor(f);
+      c.insertAdjacentHTML('beforeend',`<span class="chip" id="ctxEmp" style="cursor:pointer;${f&&f.cae?'':'border-color:var(--warn)'}" title="Abrir a ficha da empresa">${ico('users')} ${f&&f.cae?'CAE <b class="mono">'+esc(f.cae)+'</b> · '+esc(SETORES[k].l):'Sem CAE — completar ficha'}</span>`); $('#ctxEmp').onclick=()=>empFicha(nif,()=>renderCtx()); };
+    if(S.EMP) put(); else empLoad().then(put); }catch(e){} };
+// Multi-empresa (ficha com os meses): acesso à ficha da empresa
+const _fichaEmp=fichaEmpresa; fichaEmpresa=function(nif){ _fichaEmp.apply(this,arguments); const tb=$('#v-historico .toolbar'); if(!tb||$('#fEmp')) return; const f=(S.EMP||{})[nif];
+  tb.insertAdjacentHTML('beforeend',`<button class="btn" id="fEmp">${ico('users')} Ficha da empresa${f&&f.cae?' · CAE '+esc(f.cae):''}</button>`); $('#fEmp').onclick=()=>empFicha(nif,()=>fichaEmpresa(nif)); };
+async function empGone(nif){ const X=await glIndex(true); return !(S.history||[]).some(h=>h.nif===nif)&&!Object.values(X).some(m=>m.nif===nif); }
+const _delCoEmp=deleteCompany; deleteCompany=async function(nif,name){ const r=await _delCoEmp.apply(this,arguments); try{ if(S.EMP&&S.EMP[nif]&&await empGone(nif)) await empDelete(nif); }catch(e){} return r; };
 const _enterEmp=enterApp; enterApp=function(){ S.EMP=null; return _enterEmp.apply(this,arguments); };
 </script>
 </body>
