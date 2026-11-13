@@ -639,7 +639,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -3867,30 +3867,39 @@ function rkBal(Y,Yp,from,to,enc){ const B=glBal(Y,from,to,enc); if(!(rkNoOpen(Y)
   return B; }
 function rkSide(B,pres,sign){ let t=0; for(const id in B){ if(!pres.some(p=>id.startsWith(p))) continue; const v=B[id].sf; if(sign<0?v<0:v>0) t+=v; } return r2(t); }
 
-function rkCalc(Y,Yp,from,to,enc){ enc=Math.min(1,+enc||0); /* fluxos antes do apuramento de resultados */ const B=rkBal(Y,Yp,from,to,enc), s=glSumP(B); const n=Math.max(1,to-from+1), an=12/n;
+function rkCalc(Y,Yp,from,to,enc,P){ P=P||empPerfil(Y.nif); enc=Math.min(1,+enc||0); /* fluxos antes do apuramento de resultados */ const B=rkBal(Y,Yp,from,to,enc), s=glSumP(B); const n=Math.max(1,to-from+1), an=12/n;
   const V=r2(-(s('71').mv+s('72').mv)), Va=V*an;
   const c61=s('61').mv, c31=s('31').mv, semCmv=Math.abs(c61)<Math.max(1,0.2*Math.max(0,c31));
   const mat=r2(c61+(c31>0?c31:0)), fse=s('62').mv, pes=s('63').mv, CP=r2(mat+fse+pes);
-  const invP=['33','34','35','36']; const invF=r2(invP.reduce((a,p)=>a+s(p).sf,0)), invI=r2(invP.reduce((a,p)=>a+s(p).si,0));
+  const invP=P.inv.pre; const invF=r2(invP.reduce((a,p)=>a+s(p).sf,0)), invI=r2(invP.reduce((a,p)=>a+s(p).si,0));
+  const prod=['construcao','industria','bebidas','agricultura','geral'].includes(P.k);
   const out=[]; const add=(id,lvl,t,val,lines,why,ref)=>out.push({id,lvl,t,val,lines,why,ref});
   // R1 — custos de produção / vendas
   { const r=V>0?CP/V:null; const lim=semCmv?[2,1.3]:[1.5,1.1];
     const lvl=CP<1000&&V<=0?'na':V<=0?'crit':r>lim[0]?'crit':r>lim[1]?'warn':'ok';
-    add('R1',lvl,'Custos de produção face às vendas',r==null?(V<=0&&CP>=1000?'sem vendas':'—'):rkX(r),
-      [`Custos de produção ${eur(CP)} · vendas ${eur(V)}`,`${semCmv?'Compras (CMVMC ainda por apurar)':'CMVMC'} ${eur(mat)} · FSE ${eur(fse)} · pessoal ${eur(pes)}`],
+    add('R1',lvl,prod?'Custos de produção face às vendas':'Custos operacionais face às vendas',r==null?(V<=0&&CP>=1000?'sem vendas':'—'):rkX(r),
+      [`${prod?'Custos de produção':'Custos operacionais'} ${eur(CP)} · vendas ${eur(V)}`,`${semCmv?'Compras (CMVMC ainda por apurar)':'CMVMC'} ${eur(mat)} · FSE ${eur(fse)} · pessoal ${eur(pes)}`],
       'Uma empresa que gasta sistematicamente mais do que fatura só se mantém com dinheiro de fora ou com vendas não declaradas. É o primeiro indicador que a AT cruza.',
-      semCmv?'Sem o CMVMC apurado, as compras ainda incluem o que está em armazém ou em obra: confirme no fecho.':'Art. 87.º a 90.º da LGT (avaliação indireta).'); }
-  // R2 — obras em curso / produção em inventário
-  { const r=Va>0?invF/Va:null; const dI=r2(invF-invI); const gap=r2(CP-dI-V);
-    const lvl=invF<1000&&invI<1000?'na':r==null?'crit':r>1?'crit':r>0.5?'warn':'ok';
-    add('R2',lvl,'Obras em curso e produção em inventário',r==null?eur(invF):rkPct(r)+' das vendas',
-      [`Inventário de produção (33 a 36) ${eur(invI)} → ${eur(invF)} (${dI>=0?'+':''}${eur(dI)})`,`Vendas anualizadas ${eur(Va)}`,
-       gap>0?`Custo de produção entregue sem faturação que o cubra: ${eur(gap)} (margem 0%)${semCmv?' — antes do apuramento de fim de ano':''}`:`Vendas cobrem o custo de produção entregue (margem de ${eur(-gap)})`],
-      'Obras em curso que crescem todos os anos e valem mais do que as vendas de um ano indicam custos "parqueados" em inventário em vez de faturados.',
-      'Art. 19.º do CIRC: obras de construção pela percentagem de acabamento.'); }
+      semCmv?'Sem o CMVMC apurado, as compras ainda incluem o que está em inventário: confirme no fecho ou com inventário intermédio.':'Art. 87.º a 90.º da LGT (avaliação indireta).'); }
+  // R2 — inventário próprio do setor (obras em curso, vinho, mercadorias, …)
+  { const I=P.inv, dI=r2(invF-invI); let r=null, val='—', lvl='na'; const L=[`${I.nome} (${invP.join(', ')}): ${eur(invI)} → ${eur(invF)} (${dI>=0?'+':''}${eur(dI)})`];
+    if(I.m==='vendas'){ r=Va>0?invF/Va:null; val=r==null?eur(invF):rkPct(r)+' das vendas'; lvl=invF<1000&&invI<1000?'ok':r==null?'crit':r>I.c?'crit':r>I.w?'warn':'ok'; L.push(`Vendas anualizadas ${eur(Va)}`);
+      if(I.gap){ const gap=r2(CP-dI-V); L.push(gap>0?`Custo de produção entregue sem faturação que o cubra: ${eur(gap)} (margem 0%)${semCmv?' — antes do apuramento de fim de ano':''}`:`Vendas cobrem o custo de produção entregue (margem de ${eur(-gap)})`); } }
+    else if(I.m==='dias'){ const cmvA=(semCmv?Math.max(0,c31):c61)*an; r=cmvA>0?invF/cmvA*365:null; val=r==null?eur(invF):Math.round(r)+' dias'; lvl=invF<1000?'ok':r==null?'warn':r>I.c?'crit':r>I.w?'warn':'ok'; L.push(`Prazo médio de inventário sobre ${semCmv?'as compras':'o CMVMC'} anualizado (${eur(cmvA)})`); }
+    else if(I.m==='cmv'){ r=V>0&&!semCmv?c61/V:null; val=r==null?(semCmv?'por apurar':'—'):rkPct(r)+' das vendas'; lvl=r==null?'na':r>I.c?'crit':r>I.w?'warn':'ok'; L.push(semCmv?'O custo das matérias consumidas (61) ainda não está apurado neste período.':`CMVMC ${eur(c61)} · vendas ${eur(V)}`); }
+    else { r=Va>0?invF/Va:null; val=eur(invF); lvl=invF<1000?'ok':r==null||r>I.c?'crit':r>I.w?'warn':'ok'; L.push('Inventários pouco habituais neste setor'); }
+    add('R2',lvl,I.m==='cmv'?'Custo das matérias consumidas':I.nome,val,L,P.txt,P.ref); }
+  // R8 — margem bruta (comércio)
+  if(P.marg){ const r=V>0&&!semCmv?(V-c61)/V:null; const lvl=r==null?'na':r<P.marg.c?'crit':r<P.marg.w?'warn':'ok';
+    add('R8',lvl,'Margem bruta comercial',r==null?(semCmv?'por apurar':'—'):rkPct(r),[semCmv?'O CMVMC só fica apurado no fecho (ou com inventário intermédio).':`Vendas ${eur(V)} · CMVMC ${eur(c61)}`,`Mínimo esperado no setor: ${(P.marg.w*100).toFixed(0)}% (crítico abaixo de ${(P.marg.c*100).toFixed(0)}%)`],
+      'Uma margem anormalmente baixa com compras normais é o sinal clássico de vendas não declaradas.','Métodos indiretos (art. 87.º a 90.º da LGT).'); }
+  // R9 — contas fora do normal para o setor
+  if(P.atip.length){ const hits=P.atip.map(a=>({a,v:r2(s(a.p).sf)})).filter(x=>Math.abs(x.v)>=1000);
+    add('R9',hits.length?'warn':'ok','Contas pouco habituais para a atividade',hits.length?n0(hits.length)+' conta(s)':'nenhuma',hits.length?hits.map(x=>`${x.a.p}: ${eur(x.v)} — ${x.a.t}`):['Sem saldos em contas atípicas para o setor'],
+      'Saldos em contas que não correspondem à atividade da empresa (por exemplo, obras em curso numa adega ou num comércio) indicam classificação errada ou custos estacionados.','Ficha da empresa: setor '+P.l+'.'); }
   // R3 — fundos de sócios e outros credores
   { const f=-rkSide(B,['26','278'],-1); const r=Va>0?f/Va:null; const F1=(Y.aud||[]).find(x=>x.id==='F01'); const nReg=F1?F1.n:0; const vReg=F1?r2(F1.items.reduce((a,x)=>a+(x.v||0),0)):0;
-    let lvl=f<1000?'ok':r==null?'crit':r>0.5?'crit':r>0.2?'warn':'ok'; if(nReg&&lvl==='ok') lvl='warn'; if(Va>0&&vReg>0.1*Va) lvl='crit';
+    let lvl=f<1000?'ok':r==null?'crit':r>0.5?'crit':r>0.2?'warn':'ok'; if(nReg&&lvl==='ok') lvl='warn'; if(Va>0&&vReg>0.1*Va&&f>0.1*Va) lvl='crit'; /* conta de passagem saldada: só aviso */
     add('R3',lvl,'Fundos de sócios e outros credores',eur(f),[`${r==null?'—':rkPct(r)} das vendas anualizadas`,
       F1?(nReg?`${n0(nReg)} regularização(ões) sem entrada bancária a crédito de sócios/outros credores · ${eur(vReg)}`:'Sem regularizações sem entrada bancária neste exercício'):'Volte a carregar o SAF-T para analisar os lançamentos (regra F01).'],
       'Dinheiro que entra sem venda tem de ter origem provada (extratos do sócio, contrato de suprimento). Sem prova, a AT pode tratá-lo como rendimento não declarado.',
@@ -3903,9 +3912,10 @@ function rkCalc(Y,Yp,from,to,enc){ enc=Math.min(1,+enc||0); /* fluxos antes do a
       'Salários processados e não pagos durante meses sugerem pagamentos por fora da contabilidade. A dívida à Segurança Social pode reverter sobre o gerente.',
       'Normal: até 1 mês de Segurança Social por pagar.'); }
   // R5 — capital próprio (art. 35.º CSC)
-  { const cp=r2(-(s('5').sf+s('6').sf+s('7').sf+s('8').sf)), cap=r2(-s('51').sf);
+  { const fecho=semCmv||to<12; /* a meio do ano (sem CMVMC apurado) o capital próprio do balancete não é fiável: usa-se o do último fecho */
+    const cp=fecho&&from===1?r2(-(s('5').si+s('6').si+s('7').si+s('8').si)):r2(-(s('5').sf+s('6').sf+s('7').sf+s('8').sf)), cap=r2(-s('51').sf);
     const lvl=cap<=0&&Math.abs(cp)<1?'na':cp<0?'crit':cp<cap/2?'warn':'ok';
-    add('R5',lvl,'Capital próprio',eur(cp),[`Capital social ${eur(cap)}`,cp<cap/2?'Capital próprio inferior a metade do capital social':'Acima de metade do capital social'],
+    add('R5',lvl,'Capital próprio',eur(cp),[`Capital social ${eur(cap)}${fecho&&from===1?' · capital próprio no último fecho (abertura do exercício)':''}`,cp<cap/2?'Capital próprio inferior a metade do capital social':'Acima de metade do capital social'],
       'Com o capital próprio abaixo de metade do capital social, a gerência tem de propor ao(s) sócio(s) medidas de reforço.',
       'Art. 35.º do Código das Sociedades Comerciais.'); }
   // R6 — tesouraria
@@ -3922,16 +3932,22 @@ function rkCalc(Y,Yp,from,to,enc){ enc=Math.min(1,+enc||0); /* fluxos antes do a
 
 // evolução de todos os exercícios carregados desta empresa
 async function rkYears(Y){ const X=await glIndex(); const anos=Object.values(X).filter(m=>m.nif===Y.nif).map(m=>m.ano).sort(); const rows=[]; let prev=null;
-  for(const a of anos){ const Ya=a===Y.ano?Y:await glLoad(Y.nif+'_'+a); if(!Ya) continue; const to=Ya.maxP||12; const k=rkCalc(Ya,prev&&+prev.ano===+a-1?prev:null,1,to,1);
+  for(const a of anos){ const Ya=a===Y.ano?Y:await glLoad(Y.nif+'_'+a); if(!Ya) continue; const to=Ya.maxP||12; const k=rkCalc(Ya,prev&&+prev.ano===+a-1?prev:null,1,to,1,empPerfil(Y.nif));
     const g=id=>k.out.find(x=>x.id===id); rows.push({ano:a,to,V:k.V,CP:k.CP,inv:k.invF,fund:g('R3').val,cp:g('R5').val,r1:g('R1').val,nivel:k.nivel}); prev=Ya; }
-  return rows; }
+  // anos anteriores só com IES (ficha da empresa)
+  await empLoad(); const F=S.EMP[Y.nif]; const P=empPerfil(Y.nif);
+  if(F&&F.ies) for(const a of Object.keys(F.ies)){ if(anos.includes(a)) continue; const i=F.ies[a]; const cp_=r2(i.cmv+i.fse+i.pes);
+    rows.push({ano:a,to:12,ies:true,V:i.vn,CP:cp_,inv:i.inv,fund:'—',cp:eur(i.cp),r1:i.vn>0?rkX(cp_/i.vn):'—',nivel:'IES'}); }
+  return rows.sort((x,y)=>x.ano.localeCompare(y.ano)); }
 
-function glTabRisco(el,ctx){ const {Y,Yp,U}=ctx; const K=rkCalc(Y,Yp,U.from,U.to,U.enc); const col={Elevado:'crit',Moderado:'warn',Baixo:'good'}[K.nivel];
+async function glTabRisco(el,ctx){ const {Y,Yp,U}=ctx; await empLoad(); const F=S.EMP[Y.nif]; const P=empPerfil(Y.nif); const K=rkCalc(Y,Yp,U.from,U.to,U.enc,P); const col={Elevado:'crit',Moderado:'warn',Baixo:'good'}[K.nivel];
   el.innerHTML=`<div class="card" style="border-color:var(--${col})"><div class="row" style="gap:14px;align-items:center">
       <div style="width:54px;height:54px;border-radius:50%;background:var(--${col});box-shadow:0 0 0 6px color-mix(in srgb,var(--${col}) 22%,transparent);flex:none"></div>
-      <div style="flex:1"><div class="hint" style="text-transform:uppercase;letter-spacing:.12em">Risco fiscal · ${esc(glPerLabel(U,Y))}</div><h2 style="margin:2px 0 4px">Nível ${K.nivel.toLowerCase()}</h2>
+      <div style="flex:1"><div class="hint" style="text-transform:uppercase;letter-spacing:.12em">Risco fiscal · ${esc(glPerLabel(U,Y))}</div><h2 style="margin:2px 0 4px">Nível ${K.nivel.toLowerCase()}</h2><div class="hint" style="margin-bottom:6px">Setor: <b>${esc(P.l)}</b>${F&&F.cae?` · CAE ${esc(F.cae)}`:''} · <a href="#" id="rkFicha">ficha da empresa</a></div>
       <div class="row" style="gap:6px"><span class="badge b-crit">${K.cnt.crit} crítico(s)</span><span class="badge b-warn">${K.cnt.warn} atenção</span><span class="badge b-ok">${K.cnt.ok} OK</span></div></div>
       <button class="btn pri" id="rkPdf">${ico('pdf')} PDF de risco fiscal</button></div>
+      ${P.k==='geral'?`<div class="row" style="margin-top:10px;gap:8px;padding:10px;border:1px dashed var(--warn);border-radius:10px"><span>${ico('alert')} <b>Esta empresa ainda não tem CAE.</b> Escolha o setor para os indicadores e os textos ficarem certos para a atividade:</span>
+        <select class="inp" id="rkSet" style="max-width:280px"><option value="">Escolher setor…</option>${SET_ORD.map(k=>`<option value="${k}">${SETORES[k].l} (CAE ${SETORES[k].div})</option>`).join('')}</select><span class="hint">ou carregue a IES no menu Empresas</span></div>`:''}
       ${K.usedPrev?`<p class="hint" style="margin-top:10px">${ico('alert')} O SAF-T de ${Y.ano} não tem saldos de abertura: os saldos de balanço somam o fecho de ${Yp.ano} aos movimentos de ${Y.ano}.</p>`:K.noOpen&&+Y.ano>2000?`<p class="hint st-warn" style="margin-top:10px">${ico('alert')} O SAF-T não tem saldos de abertura e não há SAF-T de ${+Y.ano-1} carregado: os indicadores de balanço mostram só os movimentos do ano.</p>`:''}</div>
     <div class="grid g2" style="margin-top:16px">${K.out.map(x=>`<div class="card" style="border-left:4px solid var(--${RK_LV[x.lvl].v})"><div class="row" style="gap:8px"><span class="badge ${RK_LV[x.lvl].c}">${RK_LV[x.lvl].l}</span><span class="mono muted">${x.id}</span><b style="flex:1">${esc(x.t)}</b><b class="mono" style="font-size:17px">${esc(x.val)}</b></div>
       <div style="margin:8px 0 6px">${x.lines.map(l=>`<div class="hint" style="color:var(--ink)">${esc(l)}</div>`).join('')}</div><div class="hint">${esc(x.why)}</div><div class="hint" style="margin-top:4px;font-style:italic">${esc(x.ref)}</div></div>`).join('')}</div>
@@ -3939,17 +3955,19 @@ function glTabRisco(el,ctx){ const {Y,Yp,U}=ctx; const K=rkCalc(Y,Yp,U.from,U.to
     <div class="card" style="margin-top:16px"><h3>${ico('alert')} Regularizações a crédito de sócios e outros credores</h3><div id="rkF"></div></div>
     <p class="hint" style="margin-top:10px">Os indicadores são sinais de alerta para preparar a defesa das contas, não conclusões. Período: ${esc(glPerLabel(U,Y))}${U.to===12&&U.enc?' (com regularizações de fim de ano)':''}.</p>`;
   $('#rkPdf').onclick=()=>rkPdf(Y,Yp,U);
+  $('#rkFicha').onclick=e=>{ e.preventDefault(); empFicha(Y.nif,()=>glTabRisco(el,ctx)); };
+  if($('#rkSet')) $('#rkSet').onchange=async e=>{ if(!e.target.value) return; const f=S.EMP[Y.nif]||{nif:Y.nif,nome:Y.empresa,cae:'',normativo:'',capital:null,ies:{}}; f.setor=e.target.value; f.nome=f.nome||Y.empresa; await empSave(f); toast(`${ico('check')} Setor guardado: ${esc(SETORES[f.setor].l)}`,'ok'); glTabRisco(el,ctx); };
   const F1=(Y.aud||[]).find(x=>x.id==='F01'), F2=(Y.aud||[]).find(x=>x.id==='F02'); const fl=[...(F1?F1.items.map(x=>({...x,k:'Sem entrada bancária'})):[]),...(F2?F2.items.map(x=>({...x,k:'Entrada por bancos'})):[])];
   if(!F1) $('#rkF').innerHTML='<div class="hint">Esta análise usa os lançamentos: volte a carregar o SAF-T de contabilidade deste exercício.</div>';
   else if(!fl.length) $('#rkF').innerHTML=`<div class="row"><span class="badge b-ok">OK</span><span>Sem lançamentos a crédito de sócios ou outros credores acima de 2 500 €.</span></div>`;
   else table($('#rkF'),{size:15,rows:fl,cols:[{k:'d',l:'Data'},{k:'k',l:'Tipo'},{k:'m',l:'Lançamento'},{k:'v',l:'Valor',num:1,f:n2}],onRow:x=>{ if(x.x!=null&&ctx.full) glTxModal(x.x); }});
   rkYears(Y).then(rows=>{ const box=$('#rkY'); if(!box) return; if(rows.length<2){ box.innerHTML=`<div class="hint">Carregue também o SAF-T de contabilidade de outros exercícios desta empresa para ver a evolução.</div>`; if(!rows.length) return; }
-    table(box,{rows,cols:[{k:'ano',l:'Exercício',f:(v,r)=>v+(r.to<12?` (até ${GL_MES[r.to-1].slice(0,3).toLowerCase()})`:'')},{k:'V',l:'Vendas',num:1,f:n2},{k:'CP',l:'Custos de produção',num:1,f:n2},{k:'r1',l:'Custos / vendas'},{k:'inv',l:'Inventário produção',num:1,f:n2},{k:'fund',l:'Sócios e credores'},{k:'cp',l:'Capital próprio'},{k:'nivel',l:'Nível'}]}); }); }
+    table(box,{rows,cols:[{k:'ano',l:'Exercício',f:(v,r)=>v+(r.ies?' (IES)':r.to<12?` (até ${GL_MES[r.to-1].slice(0,3).toLowerCase()})`:'')},{k:'V',l:'Vendas',num:1,f:n2},{k:'CP',l:'Custos de produção',num:1,f:n2},{k:'r1',l:'Custos / vendas'},{k:'inv',l:'Inventário',num:1,f:n2},{k:'fund',l:'Sócios e credores'},{k:'cp',l:'Capital próprio'},{k:'nivel',l:'Nível'}]}); }); }
 
-async function rkPdf(Y,Yp,U){ const K=rkCalc(Y,Yp,U.from,U.to,U.enc); const doc=pdfNew('Análise de Risco Fiscal'); if(!doc) return; const sub=`${Y.empresa}  ·  NIF ${Y.nif}  ·  ${glPerLabel(U,Y)}`; let y=26;
+async function rkPdf(Y,Yp,U){ await empLoad(); const P=empPerfil(Y.nif); const F=S.EMP[Y.nif]; const K=rkCalc(Y,Yp,U.from,U.to,U.enc,P); const doc=pdfNew('Análise de Risco Fiscal'); if(!doc) return; const sub=`${Y.empresa}  ·  NIF ${Y.nif}  ·  ${glPerLabel(U,Y)}`; let y=26;
   const fx=t=>String(t||'').replace(/≥/g,'>=').replace(/−/g,'-').replace(/×/g,'x').replace(/→/g,'->');
   doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...PC.ink); doc.text(T(Y.empresa),12,y); y+=6; doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...PC.mut);
-  doc.text(T(`NIF ${Y.nif}  ·  Exercício ${Y.ano}  ·  ${glPerLabel(U,Y)}  ·  análise a partir do SAF-T de contabilidade`),12,y); y+=8;
+  doc.text(T(`NIF ${Y.nif}  ·  Exercício ${Y.ano}  ·  ${glPerLabel(U,Y)}  ·  Setor: ${P.l}${F&&F.cae?' (CAE '+F.cae+')':''}`),12,y); y+=8;
   const lc=K.nivel==='Elevado'?PC.crit:K.nivel==='Moderado'?PC.warn:PC.ok; doc.setFillColor(...lc); doc.roundedRect(12,y,186,14,2,2,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text(T(`Nível de risco fiscal: ${K.nivel.toUpperCase()}`),17,y+9); doc.setFontSize(9); doc.text(T(`${K.cnt.crit} crítico(s)  ·  ${K.cnt.warn} atenção  ·  ${K.cnt.ok} OK`),193,y+9,{align:'right'}); y+=20;
   if(K.usedPrev) y=pdfP(doc,y,`O SAF-T de ${Y.ano} não tem saldos de abertura: os saldos de balanço somam o fecho de ${Yp.ano} aos movimentos de ${Y.ano}.`,8,PC.mut);
@@ -3958,13 +3976,167 @@ async function rkPdf(Y,Yp,U){ const K=rkCalc(Y,Yp,U.from,U.to,U.enc); const doc=
     didParseCell:d=>{ if(d.section==='body'&&d.column.index===3){ const x=K.out[d.row.index]; d.cell.styles.textColor=x.lvl==='crit'?PC.crit:x.lvl==='warn'?PC.warn:x.lvl==='ok'?PC.ok:PC.mut; d.cell.styles.fontStyle='bold'; } }});
   y=pdfH(doc,y,'Porque importa e base legal'); for(const x of K.out.filter(x=>x.lvl==='crit'||x.lvl==='warn')) y=pdfP(doc,y,fx(`${x.id} ${x.t}: ${x.why} ${x.ref}`),8);
   const rows=await rkYears(Y); if(rows.length>1){ y=pdfH(doc,y,'Evolução dos exercícios carregados');
-    y=pdfTable(doc,y,['Exercício','Vendas','Custos de produção','Custos / vendas','Inventário produção','Sócios e credores','Capital próprio','Nível'],rows.map(r=>[r.ano+(r.to<12?` (ate ${GL_MES[r.to-1].slice(0,3).toLowerCase()})`:''),n2(r.V),n2(r.CP),fx(r.r1),n2(r.inv),fx(r.fund),fx(r.cp),r.nivel]),{styles:{fontSize:7.4},columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}}); }
+    y=pdfTable(doc,y,['Exercício','Vendas','Custos de produção','Custos / vendas','Inventário','Sócios e credores','Capital próprio','Nível'],rows.map(r=>[r.ano+(r.ies?' (IES)':r.to<12?` (ate ${GL_MES[r.to-1].slice(0,3).toLowerCase()})`:''),n2(r.V),n2(r.CP),fx(r.r1),n2(r.inv),fx(r.fund),fx(r.cp),r.nivel]),{styles:{fontSize:7.4},columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}}); }
   const F1=(Y.aud||[]).find(x=>x.id==='F01'); if(F1&&F1.n){ y=pdfH(doc,y,`Regularizações sem entrada bancária a crédito de sócios / outros credores (${n0(F1.n)})`);
     y=pdfTable(doc,y,['Data','Lançamento','Valor'],F1.items.slice(0,30).map(x=>[x.d||'',fx(x.m),n2(x.v)]),{columnStyles:{0:{cellWidth:20},2:{cellWidth:26,halign:'right'}}}); }
   y=pdfH(doc,y,'Documentos a pedir à gerência');
-  for(const t of ['1. Lista de obras em curso a fim do período: cliente, orçamento, percentagem executada e custos imputados.','2. Extratos bancários completos e prova da origem de cada entrada de fundos de sócios ou terceiros (contrato de suprimento).','3. Contratos, autos de medição e comprovativos de pagamento das subempreitadas.','4. Declaração de responsabilidade da gerência sobre a totalidade da faturação emitida e dos inventários.']) y=pdfP(doc,y,t,8.5);
+  const docs=[P.k==='construcao'?'1. Lista de obras em curso a fim do período: cliente, orçamento, percentagem executada e custos imputados.':P.k==='bebidas'?'1. Inventário à data: uva, vinho a granel (por lote e ano) e vinho engarrafado, com valorização ao custo.':'1. Inventário à data: contagem física e valorização.',
+    '2. Extratos bancários completos e prova da origem de cada entrada de fundos de sócios ou terceiros (contrato de suprimento).',P.k==='construcao'?'3. Contratos, autos de medição e comprovativos de pagamento das subempreitadas.':'3. Documentos de suporte dos principais fornecedores e subcontratos.','4. Declaração de responsabilidade da gerência sobre a totalidade da faturação emitida e dos inventários.'];
+  for(const t of docs) y=pdfP(doc,y,t,8.5);
   y=pdfP(doc,y,'Notas: indicadores calculados pelo AuditNux a partir do SAF-T de contabilidade. São sinais de alerta para preparar a defesa das contas, não conclusões; não substituem a análise do Contabilista Certificado nem o parecer jurídico em caso de inspeção.',7.5,PC.mut);
   pdfFrame(doc,sub); doc.save(`AuditNux_Risco_Fiscal_${glSafe(Y.empresa)}_${Y.ano}_${String(U.from).padStart(2,'0')}-${String(U.to).padStart(2,'0')}.pdf`); }
+
+/* =====================================================================
+   EMPRESAS — ficha de cada empresa (CAE, setor, normativo, histórico IES)
+   A ficha cria-se sozinha: ao carregar a IES em PDF (CAE, nome, normativo,
+   DR e balanço) ou ao carregar um SAF-T (nome e NIF). O setor sai do CAE
+   e decide os indicadores e os textos do Risco fiscal.
+   ===================================================================== */
+VIEWS.empresas=['Empresas','Ficha de cada empresa: CAE, setor de atividade, normativo e histórico das IES'];
+S.EMP=null;
+/* ---------- Perfis de setor (limiares por omissão — ajustáveis numa fase seguinte com os Quadros do Setor do Banco de Portugal) ---------- */
+const SETORES={
+  construcao:{l:'Construção',div:'41 a 43',inv:{pre:['36'],nome:'Obras em curso',m:'vendas',w:0.5,c:1,gap:true},atip:[],
+    txt:'Obras em curso que crescem todos os anos e valem mais do que as vendas de um ano indicam custos "parqueados" em inventário em vez de faturados.',ref:'Art. 19.º do CIRC: obras de construção pela percentagem de acabamento.'},
+  bebidas:{l:'Indústria das bebidas (vinhos)',div:'11',inv:{pre:['33','34'],nome:'Matérias-primas e produto (uva, vinho a granel e engarrafado)',m:'vendas',w:1,c:1.5},atip:[{p:'36',t:'Produtos e trabalhos em curso numa adega: o vinho em armazém é normalmente produto acabado ou intermédio (34).'}],
+    txt:'Numa adega é normal ter stock elevado (envelhecimento e vindima). Sem contagem a meio do ano, as compras de uva aparecem como custo: o resultado intercalar só é fiável com o inventário à data.',ref:'NCRF 18 / NC-ME: inventários ao custo; sazonalidade da vindima.'},
+  industria:{l:'Indústria transformadora',div:'10, 12 a 33',inv:{pre:['33','34','35','36'],nome:'Inventários de produção (matérias, em curso e acabados)',m:'vendas',w:0.6,c:1},atip:[],
+    txt:'Inventários de produção muito acima das vendas sugerem custos não imputados às vendas ou stock sem saída.',ref:'NCRF 18 / NC-ME: inventários.'},
+  grosso:{l:'Comércio por grosso',div:'46',inv:{pre:['32'],nome:'Mercadorias',m:'dias',w:180,c:365},marg:{w:0.08,c:0.03},atip:[{p:'34',t:'Produtos acabados num comércio'},{p:'35',t:'Subprodutos num comércio'},{p:'36',t:'Produtos e trabalhos em curso num comércio'}],
+    txt:'Num grossista o stock deve rodar; mercadorias paradas há mais de meio ano ou margem quase nula são sinais de vendas por declarar ou stock fictício.',ref:'Art. 26.º do CIRC (inventários) e métodos indiretos (art. 87.º a 90.º da LGT).'},
+  retalho:{l:'Comércio a retalho',div:'45, 47',inv:{pre:['32'],nome:'Mercadorias',m:'dias',w:120,c:240},marg:{w:0.15,c:0.05},atip:[{p:'34',t:'Produtos acabados num comércio'},{p:'35',t:'Subprodutos num comércio'},{p:'36',t:'Produtos e trabalhos em curso num comércio'}],
+    txt:'No retalho a margem bruta é o indicador mais usado pela AT: uma margem baixa com compras normais aponta para vendas a consumidor final sem fatura.',ref:'Métodos indiretos (art. 87.º a 90.º da LGT).'},
+  restauracao:{l:'Alojamento e restauração',div:'55, 56',inv:{pre:['32','33'],nome:'Mercadorias e matérias-primas',m:'cmv',w:0.45,c:0.6},atip:[{p:'36',t:'Produtos e trabalhos em curso na restauração'}],
+    txt:'Na restauração o custo das matérias consumidas anda habitualmente entre 25% e 40% das vendas. Acima disso, há vendas que não chegaram à faturação.',ref:'Métodos indiretos (art. 87.º a 90.º da LGT); controlo de caixa.'},
+  transportes:{l:'Transportes e logística',div:'49 a 53',inv:{pre:['32','33','34','35','36'],nome:'Inventários',m:'nenhum',w:0.1,c:0.3},atip:[{p:'34',t:'Produtos acabados numa transportadora'},{p:'36',t:'Produtos e trabalhos em curso numa transportadora'}],
+    txt:'Numa transportadora não se esperam inventários relevantes; os gastos com combustível, portagens e viaturas devem acompanhar as vendas.',ref:'Art. 23.º e 23.º-A do CIRC.'},
+  agricultura:{l:'Agricultura e pecuária',div:'01 a 03',inv:{pre:['33','34','35','36','37'],nome:'Inventários e ativos biológicos',m:'vendas',w:1,c:2},atip:[],
+    txt:'Os ciclos de produção agrícola justificam inventários elevados no fim do ano, mas devem ter correspondência nas vendas do ano seguinte.',ref:'NCRF 17 (agricultura) / NC-ME.'},
+  imobiliario:{l:'Atividades imobiliárias',div:'68',inv:{pre:['32','33','36'],nome:'Imóveis para venda e em construção',m:'vendas',w:3,c:6},atip:[],
+    txt:'Imóveis para venda podem valer vários anos de vendas, mas devem estar identificados imóvel a imóvel.',ref:'Art. 26.º do CIRC.'},
+  servicos:{l:'Serviços',div:'restantes',inv:{pre:['32','33','34','35','36'],nome:'Inventários',m:'nenhum',w:0.1,c:0.3},atip:[{p:'34',t:'Produtos acabados numa empresa de serviços'},{p:'36',t:'Produtos e trabalhos em curso numa empresa de serviços'}],
+    txt:'Numa empresa de serviços não se esperam inventários relevantes; o custo principal é o pessoal e os subcontratos.',ref:'Art. 23.º do CIRC.'},
+  geral:{l:'Setor por definir',div:'—',inv:{pre:['34','35','36'],nome:'Produção em inventário (34 a 36)',m:'vendas',w:0.5,c:1},atip:[],
+    txt:'Sem CAE definido, o AuditNux usa limites gerais. Carregue a IES ou indique o CAE na ficha da empresa.',ref:'Ficha da empresa (menu Empresas).'} };
+const SET_ORD=['construcao','bebidas','industria','grosso','retalho','restauracao','transportes','agricultura','imobiliario','servicos'];
+function caeSetor(cae){ const d=+String(cae||'').replace(/\D/g,'').slice(0,2); if(!d) return 'geral';
+  if(d<=3) return 'agricultura'; if(d===11) return 'bebidas'; if(d<=33) return 'industria'; if(d>=41&&d<=43) return 'construcao'; if(d===46) return 'grosso'; if(d===45||d===47) return 'retalho';
+  if(d>=49&&d<=53) return 'transportes'; if(d===55||d===56) return 'restauracao'; if(d===68) return 'imobiliario'; return 'servicos'; }
+function empSetor(f){ if(!f) return 'geral'; return f.setor&&SETORES[f.setor]?f.setor:caeSetor(f.cae); }
+function empPerfil(nif){ const f=(S.EMP||{})[nif]; const k=empSetor(f); return Object.assign({k},SETORES[k]); }
+
+/* ---------- Gravação ---------- */
+const empLsKey=()=>'auditnux_empresas_'+(S.ws||'local');
+async function empLoad(force){ if(S.EMP&&!force) return S.EMP; const E={};
+  if(S.cloud.on){ try{ const s=await wsCol('empresas').get(); for(const d of s.docs){ const x=d.data(); E[x.nif||d.id]=x; } }catch(e){ console.error(e); } }
+  else Object.assign(E,lsGet(empLsKey(),{}));
+  S.EMP=E; return E; }
+async function empSave(f){ f.atualizadoEm=new Date().toISOString(); f.por=S.oper||''; await empLoad(); S.EMP[f.nif]=f;
+  if(S.cloud.on){ try{ await wsCol('empresas').doc(f.nif).set(JSON.parse(JSON.stringify(f))); return true; }catch(e){ toast('Nuvem (empresas): '+esc(e.message),'err'); return false; } }
+  const all=lsGet(empLsKey(),{}); all[f.nif]=f; lsSet(empLsKey(),all); return true; }
+async function empDelete(nif){ await empLoad(); delete S.EMP[nif]; if(S.cloud.on){ try{ await wsCol('empresas').doc(nif).delete(); }catch(e){} } else { const all=lsGet(empLsKey(),{}); delete all[nif]; lsSet(empLsKey(),all); } }
+// cria a ficha mínima quando chega um SAF-T de uma empresa ainda sem ficha (nome e NIF), sem tocar no resto
+async function empTouch(nif,nome){ if(!nif) return; await empLoad(); const f=S.EMP[nif]; if(f){ if(!f.nome&&nome){ f.nome=nome; await empSave(f); } return; } await empSave({nif,nome:nome||'',cae:'',setor:'',normativo:'',capital:null,ies:{},origem:'SAF-T'}); }
+
+/* ---------- Leitura da IES em PDF (posição de cada valor na página) ---------- */
+const iesNum=s=>/^-?\d{1,3}(\.\d{3})*,\d{2}$/.test(s)||/^-?\d+,\d{2}$/.test(s);
+const iesVal=s=>parseFloat(s.replace(/\./g,'').replace(',','.'));
+function iesLines(items){ const rows=[]; for(const it of [...items].sort((a,b)=>b.y-a.y||a.x-b.x)){ let r=rows.find(r=>Math.abs(r.y-it.y)<2.5); if(!r){ r={y:it.y,it:[]}; rows.push(r); } r.it.push(it); }
+  for(const r of rows) r.it.sort((a,b)=>a.x-b.x); return rows.map(r=>({y:r.y,it:r.it,t:r.it.map(i=>i.s).join(' | ')})); }
+function iesCodes(items,re){ const out={}; const codes=items.filter(i=>i.x<140&&re.test(i.s)); const nums=items.filter(i=>iesNum(i.s));
+  for(const c of codes){ const code=c.s.match(re)[1]; const cand=nums.filter(n=>n.x>c.x+150&&n.y-c.y<=4&&n.y-c.y>=-13).map(n=>({n,d:Math.abs(n.y-c.y)}));
+    if(!cand.length) continue; const best=Math.min(...cand.map(x=>x.d)); const near=cand.filter(x=>x.d<=best+2).sort((a,b)=>a.n.x-b.n.x); out[code]=iesVal(near[0].n.s); }
+  return out; }
+async function iesRead(file){ const L=await pdfjsLib_(); const doc=await L.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise; const pages=[];
+  for(let i=1;i<=doc.numPages;i++){ const pg=await doc.getPage(i); const c=await pg.getTextContent(); pages.push(c.items.filter(it=>it.str&&it.str.trim()).map(it=>({s:it.str.trim(),x:it.transform[4],y:it.transform[5]}))); }
+  const all=pages.map(p=>p.map(i=>i.s).join(' ')).join('\n'); const m=all.match(/IES-DA:\s*(\d{9})\s*\/\s*(\d{4})/);
+  if(!m) throw new Error('não parece um comprovativo da IES (falta "Comprovativo IES-DA")');
+  const r={nif:m[1],ano:m[2],nome:'',cae:'',caes:[],normativo:'',dr:{},bal:{},ficheiro:file.name};
+  const L1=iesLines(pages[0]);
+  const iN=L1.findIndex(l=>/\bNOME\b/.test(l.t)&&/IDENTIFICA/.test(l.t)); if(iN>=0&&L1[iN+1]){ r.nome=L1[iN+1].it.filter(i=>!/^\d+$/.test(i.s)).map(i=>i.s).join(' ').trim(); }
+  const iC=L1.findIndex(l=>/CÓDIGO CAE|CODIGO CAE/i.test(l.t)); if(iC>=0){ for(let k=iC+1;k<Math.min(L1.length,iC+12);k++){ if(/^0?5\b|ANEXOS QUE/.test(L1[k].t)) break; const c5=L1[k].it.map(i=>i.s).filter(s=>/^\d{5}$/.test(s)&&s!==r.nif.slice(0,5)); for(const c of c5) if(!r.caes.includes(c)) r.caes.push(c); } }
+  r.cae=r.caes[0]||'';
+  for(const p of pages){ const t=p.map(i=>i.s).join(' '); if(!/NC-ME/.test(t)||!/NIC.?s/.test(t)) continue; const nic=p.find(i=>/^NIC/.test(i.s)); const xs=p.filter(i=>i.s==='X'&&nic&&Math.abs(i.y-nic.y)<14); if(!xs.length) continue;
+    const X=xs.sort((a,b)=>Math.abs(a.y-nic.y)-Math.abs(b.y-nic.y))[0]; const box=p.filter(i=>/^[1-4]$/.test(i.s)&&Math.abs(i.y-nic.y)<6&&Math.abs(i.y-X.y)<9&&i.x<X.x).sort((a,b)=>b.x-a.x)[0];
+    if(box) r.normativo={1:'NIC',2:'NCRF',3:'NCRF-PE',4:'NC-ME'}[box.s]; break; }
+  for(const p of pages){ const t=p.map(i=>i.s).join(' '); if(/A5001/.test(t)&&/A5025/.test(t)) r.dr=iesCodes(p,/^(A50[0-2]\d)\b/); if(/A5127/.test(t)&&/A5161/.test(t)) r.bal=iesCodes(p,/^(A51[0-6]\d)\b/); }
+  const d=r.dr, b=r.bal, g=(o,k)=>o[k]||0; const ok=(a,c)=>Math.abs(a-c)<0.05;
+  const e17=g(d,'A5001')+g(d,'A5002')+g(d,'A5003')+g(d,'A5004')+g(d,'A5005')-g(d,'A5006')-g(d,'A5007')-g(d,'A5008')-g(d,'A5009')-g(d,'A5010')-g(d,'A5011')-g(d,'A5012')-g(d,'A5013')+g(d,'A5014')+g(d,'A5015')-g(d,'A5016');
+  r.drOk=d.A5017!=null&&ok(e17,d.A5017)&&ok(g(d,'A5017')-g(d,'A5018')-g(d,'A5019'),g(d,'A5020'))&&ok(g(d,'A5020')+g(d,'A5021')-g(d,'A5022'),g(d,'A5023'))&&ok(g(d,'A5023')-g(d,'A5024'),g(d,'A5025'));
+  r.balOk=b.A5127!=null&&ok(g(b,'A5112')+g(b,'A5126'),g(b,'A5127'))&&ok(g(b,'A5141')+g(b,'A5160'),g(b,'A5161'))&&ok(g(b,'A5127'),g(b,'A5161'))&&ok(g(b,'A5147')+g(b,'A5159'),g(b,'A5160'));
+  return r; }
+function iesResumo(r){ const d=r.dr||{}, b=r.bal||{}; return {vn:d.A5001||0,vp:d.A5004||0,cmv:d.A5006||0,fse:d.A5007||0,pes:d.A5008||0,ebitda:d.A5017||0,rai:d.A5023||0,rl:d.A5025||0,
+  ativo:b.A5127||0,inv:b.A5113||0,cli:b.A5115||0,caixa:b.A5125||0,cp:b.A5141||0,capital:b.A5128||0,passivo:b.A5160||0,forn:b.A5148||0,fin:(b.A5143||0)+(b.A5152||0)}; }
+async function iesImport(files){ const res=[]; await empLoad();
+  for(const file of files){ try{ const r=await iesRead(file); const f=S.EMP[r.nif]||{nif:r.nif,nome:'',cae:'',setor:'',normativo:'',capital:null,ies:{},origem:'IES'};
+      if(r.nome) f.nome=r.nome; const novo=!f.iesAno||+r.ano>=+f.iesAno; if(novo){ if(r.cae){ f.cae=r.cae; f.caes=r.caes; } if(r.normativo) f.normativo=r.normativo; f.iesAno=r.ano; if(r.bal&&r.bal.A5128!=null) f.capital=r.bal.A5128; }
+      f.ies=f.ies||{}; f.ies[r.ano]={...iesResumo(r),drOk:r.drOk,balOk:r.balOk,cae:r.cae,normativo:r.normativo,ficheiro:r.ficheiro,lidoEm:new Date().toISOString()};
+      await empSave(f); res.push({ok:true,file:file.name,r}); }
+    catch(e){ res.push({ok:false,file:file.name,erro:e.message}); } }
+  return res; }
+
+/* ---------- Vista Empresas ---------- */
+async function empUniverse(){ const E=await empLoad(); const X=await glIndex(); const m=new Map();
+  const put=(nif,nome)=>{ if(!nif) return null; let o=m.get(nif); if(!o){ o={nif,nome:nome||'',contab:[],fat:0,f:E[nif]||null}; m.set(nif,o); } if(!o.nome&&nome) o.nome=nome; return o; };
+  for(const f of Object.values(E)) put(f.nif,f.nome);
+  for(const x of Object.values(X)){ const o=put(x.nif,x.empresa); if(o&&!o.contab.includes(x.ano)) o.contab.push(x.ano); }
+  if(S.cloud.on&&(S.historyDirty||!S.history.length)){ try{ await cloudLoadHistory(); }catch(e){} }
+  for(const h of S.history||[]){ const o=put(h.nif,h.empresa); if(o) o.fat++; }
+  return [...m.values()].map(o=>{ o.f=E[o.nif]||null; o.contab.sort(); return o; }).sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')); }
+function iesPick(after){ const fi=document.createElement('input'); fi.type='file'; fi.accept='.pdf,application/pdf'; fi.multiple=true;
+  fi.onchange=async()=>{ if(!fi.files.length) return; toast(`${ico('file')} A ler ${fi.files.length} IES…`); const res=await iesImport([...fi.files]);
+    const ok=res.filter(x=>x.ok), ko=res.filter(x=>!x.ok); const av=ok.filter(x=>!x.r.drOk||!x.r.balOk);
+    toast(`${ico('check')} ${ok.length} IES lida(s)${ko.length?` · ${ko.length} com erro: ${esc(ko.map(x=>x.file+' ('+x.erro+')').join('; '))}`:''}${av.length?` · ${av.length} com totais por confirmar`:''}`,ko.length?'err':'ok'); if(after) after(res); };
+  fi.click(); }
+RENDER.empresas=async function(){ const el=$('#v-empresas'); el.innerHTML=`<div class="card"><div class="empty">${ico('layers')} A preparar as empresas…</div></div>`;
+  const U=S.empU||(S.empU={q:'',f:''}); const rows=await empUniverse();
+  const semCae=rows.filter(o=>!o.f||!(o.f.cae||o.f.setor)).length;
+  el.innerHTML=`<div class="card pbar"><div class="row" style="gap:12px;align-items:center"><div style="flex:1"><div class="pb-lab">Fichas das empresas</div>
+      <div class="hint">O CAE define o setor e o setor define as verificações e os textos do Risco fiscal. A forma mais rápida de preencher tudo: carregar as IES em PDF (pode escolher várias de uma vez).</div></div>
+      <button class="btn pri" id="emIes">${ico('upload')} Carregar IES (PDF)</button></div>
+    <div class="row" style="margin-top:10px;gap:6px"><span class="chip"><b>${rows.length}</b> empresas</span><span class="chip" style="${semCae?'border-color:var(--warn)':'border-color:var(--good)'}">${semCae?`${ico('alert')} <b>${semCae}</b> sem CAE`:`${ico('check')} Todas com CAE`}</span>
+      <span class="sp"></span><input class="inp" id="emQ" placeholder="Procurar empresa ou NIF" value="${esc(U.q)}" style="max-width:260px"><select class="inp" id="emF" style="max-width:200px"><option value="">Todas</option><option value="sem" ${U.f==='sem'?'selected':''}>Sem CAE</option>${SET_ORD.map(k=>`<option value="${k}" ${U.f===k?'selected':''}>${SETORES[k].l}</option>`).join('')}</select></div></div>
+    <div class="card" style="margin-top:16px"><div id="emT"></div></div>`;
+  const q=U.q.toLowerCase(); const list=rows.filter(o=>(!q||(o.nome||'').toLowerCase().includes(q)||o.nif.includes(q))&&(!U.f||(U.f==='sem'?!(o.f&&(o.f.cae||o.f.setor)):empSetor(o.f)===U.f)));
+  table($('#emT'),{size:50,rows:list,empty:'Ainda não há empresas: carregue um SAF-T ou uma IES.',onRow:o=>empFicha(o.nif),cols:[
+    {k:'nome',l:'Empresa',f:(v,o)=>`<b>${esc(v||'(sem nome)')}</b><div class="hint mono">${o.nif}</div>`},
+    {k:'cae',l:'CAE',v:o=>o.f&&o.f.cae||'',f:v=>v?`<span class="mono">${esc(v)}</span>`:'<span class="badge b-warn">Falta</span>'},
+    {k:'setor',l:'Setor',v:o=>SETORES[empSetor(o.f)].l,f:(v,o)=>esc(v)+(o.f&&o.f.setor?' <span class="hint">(manual)</span>':'')},
+    {k:'norm',l:'Normativo',v:o=>o.f&&o.f.normativo||'',f:v=>esc(v||'—')},
+    {k:'ies',l:'IES',v:o=>o.f&&o.f.ies?Object.keys(o.f.ies).sort().join(' · '):'',f:v=>esc(v||'—')},
+    {k:'contab',l:'Contabilidade',v:o=>o.contab.join(' · '),f:v=>esc(v||'—')},
+    {k:'fat',l:'Faturação',num:1,f:v=>v?n0(v)+' análise(s)':'—'}]});
+  $('#emIes').onclick=()=>iesPick(()=>RENDER.empresas());
+  $('#emQ').onchange=e=>{ U.q=e.target.value; RENDER.empresas(); }; $('#emF').onchange=e=>{ U.f=e.target.value; RENDER.empresas(); }; };
+async function empFicha(nif,after){ await empLoad(); const rows=await empUniverse(); const o=rows.find(x=>x.nif===nif)||{nif,nome:'',contab:[],fat:0};
+  const f=S.EMP[nif]||{nif,nome:o.nome,cae:'',setor:'',normativo:'',capital:null,ies:{}}; const auto=caeSetor(f.cae); const P=SETORES[empSetor(f)];
+  const anos=Object.keys(f.ies||{}).sort().reverse(); const I=f.ies||{};
+  const tr=(l,k,cls)=>`<tr class="${cls||''}"><td>${l}</td>${anos.map(a=>`<td class="num">${n2(I[a][k]||0)}</td>`).join('')}</tr>`;
+  modal(`${ico('book')} ${esc(f.nome||o.nome||nif)} <span class="hint mono">${nif}</span>`,
+    `<div class="grid g2"><label class="fld">CAE principal<input class="inp mono" id="efCae" value="${esc(f.cae||'')}" placeholder="ex.: 43390"></label>
+       <label class="fld">Setor de atividade<select class="inp" id="efSet"><option value="">Automático pelo CAE (${esc(SETORES[auto].l)})</option>${SET_ORD.map(k=>`<option value="${k}" ${f.setor===k?'selected':''}>${SETORES[k].l} (CAE ${SETORES[k].div})</option>`).join('')}</select></label>
+       <label class="fld">Normativo contabilístico<select class="inp" id="efNor">${['','NC-ME','NCRF-PE','NCRF','NIC'].map(k=>`<option ${f.normativo===k?'selected':''} value="${k}">${k||'—'}</option>`).join('')}</select></label>
+       <label class="fld">Nome<input class="inp" id="efNom" value="${esc(f.nome||o.nome||'')}"></label></div>
+     ${(f.caes||[]).length>1?`<p class="hint">CAE secundários na IES: ${esc(f.caes.slice(1).join(', '))}</p>`:''}
+     <div class="card" style="margin-top:12px;border-left:4px solid var(--acc)"><b>${esc(P.l)}</b><div class="hint" style="margin-top:4px">${esc(P.txt)}</div>
+       <div class="hint" style="margin-top:4px">Inventário analisado: <b>${esc(P.inv.nome)}</b> (contas ${P.inv.pre.join(', ')})${P.atip.length?` · contas fora do normal para o setor: ${P.atip.map(a=>a.p).join(', ')}`:''}${P.marg?` · margem bruta mínima esperada: ${(P.marg.w*100).toFixed(0)}%`:''}</div></div>
+     <h3 style="margin-top:14px">Histórico das IES</h3>${anos.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th></th>${anos.map(a=>`<th class="num">${a}${I[a].drOk&&I[a].balOk?'':' ⚠'}</th>`).join('')}</tr></thead><tbody>
+       ${tr('Volume de negócios','vn','b')}${tr('Variação da produção','vp')}${tr('CMVMC','cmv')}${tr('Fornecimentos e serviços externos','fse')}${tr('Gastos com o pessoal','pes')}${tr('EBITDA','ebitda')}${tr('Resultado líquido','rl','b')}
+       ${tr('Inventários','inv')}${tr('Clientes','cli')}${tr('Caixa e depósitos','caixa')}${tr('Total do ativo','ativo','b')}${tr('Capital realizado','capital')}${tr('Capital próprio','cp','b')}${tr('Total do passivo','passivo')}</tbody></table></div>
+       ${anos.some(a=>!(I[a].drOk&&I[a].balOk))?'<p class="hint st-warn">⚠ Nesse ano os totais lidos do PDF não fecham com as fórmulas do impresso: confirme os valores.</p>':'<p class="hint">Todos os totais conferem com as fórmulas oficiais do impresso (DR e balanço).</p>'}`:'<p class="hint">Ainda sem IES. Carregue a IES em PDF para preencher o CAE, o normativo e o histórico.</p>'}
+     <p class="hint" style="margin-top:8px">${o.contab.length?`Contabilidade: ${o.contab.join(' · ')}`:'Sem SAF-T de contabilidade'} · ${o.fat?n0(o.fat)+' análise(s) de faturação':'sem análises de faturação'}${f.atualizadoEm?` · ficha atualizada em ${f.atualizadoEm.slice(0,10)}${f.por?' por '+esc(f.por):''}`:''}</p>`,
+    `<button class="btn" id="efIes">${ico('upload')} Carregar IES</button>${o.contab.length?`<button class="btn" id="efGl">${ico('book')} Contabilidade</button>`:''}<span class="sp"></span><button class="btn pri" id="efOk">${ico('save')} Guardar ficha</button>`);
+  $('#efOk').onclick=async()=>{ f.cae=$('#efCae').value.replace(/\D/g,'').slice(0,5); f.setor=$('#efSet').value; f.normativo=$('#efNor').value; f.nome=$('#efNom').value.trim()||f.nome; f.nif=nif; f.ies=f.ies||{};
+    if(await empSave(f)){ toast(`${ico('check')} Ficha de ${esc(f.nome||nif)} guardada · ${esc(SETORES[empSetor(f)].l)}`,'ok'); closeModal(); if(after) after(); else if(S.view==='empresas') RENDER.empresas(); } };
+  $('#efIes').onclick=()=>iesPick(()=>empFicha(nif,after));
+  if($('#efGl')) $('#efGl').onclick=()=>{ closeModal(); S.glU.nif=nif; S.glU.ano=o.contab[o.contab.length-1]; S.glU.to=0; S.glU.tab='risco'; go('contabilidade'); }; }
+
+/* ---------- Ligações ---------- */
+document.addEventListener('DOMContentLoaded',()=>{ const ref=$('.nav[data-v="historico"]');
+  if(ref&&!$('.nav[data-v="empresas"]')){ ref.insertAdjacentHTML('afterend',`<div class="nav" data-v="empresas"><svg class="i"><use href="#i-users"/></svg>Empresas<span class="badge b-acc">Novo</span></div>`); $('.nav[data-v="empresas"]').onclick=()=>go('empresas'); }
+  if(!$('#v-empresas')) $('.content').insertAdjacentHTML('beforeend','<section class="view" id="v-empresas"></section>'); });
+const _glLoadedEmp=glLoaded; glLoaded=async function(R,file,batch){ const Y=await _glLoadedEmp.apply(this,arguments); try{ await empTouch(Y.nif,Y.empresa); }catch(e){} return Y; };
+const _enterEmp=enterApp; enterApp=function(){ S.EMP=null; return _enterEmp.apply(this,arguments); };
 </script>
 </body>
 </html>
