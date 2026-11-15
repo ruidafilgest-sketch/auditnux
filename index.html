@@ -645,7 +645,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.16.1';
+const APP_VERSION = '1.17.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -5195,6 +5195,62 @@ function pacoteTrimestral(Y,Yp,to){ to=Math.min(to||Y.maxP,Y.maxP); const qf=Mat
   const i=GUIA.find(x=>x.id==='irc'); if(i) i.tp.push({t:'Pagamentos por conta e limitação do 3.º',q:'Julho, setembro e dezembro: quanto pagar e se o 3.º pagamento pode ser limitado.',p:['Faça o apuramento do ano em <b>Demonstrações & IRC</b> (a partir do SAF-T de contabilidade até ao mês mais recente).','Vá ao passo <b>6 · Imposto</b> e desça até <b>Pagamentos por conta</b>.','Confirme a coleta, as retenções, o volume de negócios e o lucro tributável do ano anterior (vêm do apuramento guardado do ano anterior ou da IES).','Veja as três prestações com os prazos e o IRC estimado do ano (anualizado, se a contabilidade não estiver no fim do ano).','Se os dois primeiros pagamentos já cobrirem o imposto estimado, o programa indica que o 3.º pode ser limitado ou não efetuado.'],d:'Guarde a análise de IRC de cada ano: no ano seguinte a coleta vem preenchida automaticamente.',ir:['apuramento','irc']});
   if(typeof GUIA_CTX!=='undefined') GUIA_CTX.gabinete='gabinete'; if(typeof GUIA_NOME!=='undefined') GUIA_NOME.gabinete='Painel do gabinete';
   GUIA.forEach((c,i)=>c.n=String(i+1).padStart(2,'0')); })();
+
+/* =========================================================================
+   1.17 — MENU AGRUPADO POR ÁREA DE ANÁLISE · TODOS OS MENUS ATIVOS
+   Cada grupo diz de onde vêm os dados; os ecrãs sem dados mostram o que
+   fazem e o que é preciso carregar, em vez de ficarem a cinzento.
+   ========================================================================= */
+const MENU_G=[
+ {id:'cmd',l:'Gabinete',h:'visão geral e importação',c:'#22D3EE',v:['painel','gabinete','importar']},
+ {id:'emp',l:'Empresas',h:'fichas, IES e carteira',c:'#A78BFA',v:['empresas','historico']},
+ {id:'fat',l:'Faturação',h:'SAF-T de faturação',c:'#34D399',v:['validacao','iva','correcoes','documentos','artigos','clientes','analises','evolucao','financeiro']},
+ {id:'ctb',l:'Contabilidade',h:'SAF-T de contabilidade',c:'#F5B544',v:['contabilidade','apuramento']},
+ {id:'out',l:'Saídas e sistema',h:'relatórios, definições e ajuda',c:'#94A3B8',v:['relatorios','definicoes','guia','contas']}];
+const MENU_TXT={painel:'Painel do ficheiro',historico:'Multi-empresa',iva:'Mapa IVA & DP',contabilidade:'Contabilidade',apuramento:'Demonstrações & IRC',evolucao:'Evolução & Comparativos',relatorios:'Relatórios & Exportações',guia:'Guia & Como fazer',empresas:'Empresas',gabinete:'Painel do gabinete'};
+VIEWS.painel[0]='Painel do ficheiro';
+const menuGrupo=v=>MENU_G.find(g=>g.v.includes(v));
+const MENU_VAZIO={
+ validacao:['shield','Validação do SAF-T de faturação','Mais de 30 regras automáticas: numeração, datas, NIF, taxas e isenções de IVA, totais, documentos anulados e de conferência. Dá a pontuação do ficheiro e lista cada erro com os documentos envolvidos.'],
+ correcoes:['wrench','Correções','Corrige taxas de IVA inválidas e incoerências, guarda o registo de tudo o que foi alterado e exporta um SAF-T corrigido (o original nunca é alterado).'],
+ documentos:['file','Documentos','Explorador de todas as faturas, notas de crédito, recibos e guias do ficheiro, com filtros e exportação para Excel (documentos e linhas).']};
+let menuAberto={}; try{ menuAberto=JSON.parse(localStorage.getItem('auditnux_menu')||'{}')||{}; }catch(e){ menuAberto={}; }
+const menuGuardar=()=>{ try{ localStorage.setItem('auditnux_menu',JSON.stringify(menuAberto)); }catch(e){} };
+
+function menuMontar(){ const nav=$('#nav'); if(!nav||nav.dataset.grp) return; nav.dataset.grp='1';
+  const items={}; $$('.nav',nav).forEach(n=>{ items[n.dataset.v]=n; n.classList.remove('need','dis'); const b=n.querySelector('.badge.b-acc'); if(b&&/novo/i.test(b.textContent)) b.remove(); });
+  $$('.navsec',nav).forEach(s=>s.remove());
+  const usados=new Set();
+  for(const g of MENU_G){ const sec=document.createElement('div'); sec.className='ngrp'+(menuAberto[g.id]===false?' fech':''); sec.dataset.g=g.id; sec.style.setProperty('--gc',g.c);
+    sec.innerHTML=`<button class="ngh" type="button" title="${esc(g.h)}"><span class="ngd"></span><span class="ngt"><b>${g.l}</b><small>${g.h}</small></span><svg class="i ngc" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="ngb"></div>`;
+    const body=sec.querySelector('.ngb'); for(const v of g.v){ const n=items[v]; if(!n) continue; usados.add(v); if(MENU_TXT[v]){ const t=[...n.childNodes].find(x=>x.nodeType===3&&x.textContent.trim()); if(t) t.textContent=MENU_TXT[v]; } body.appendChild(n); }
+    sec.querySelector('.ngh').onclick=()=>{ sec.classList.toggle('fech'); menuAberto[g.id]=!sec.classList.contains('fech'); menuGuardar(); };
+    nav.appendChild(sec); }
+  const resto=Object.keys(items).filter(v=>!usados.has(v)); if(resto.length){ const last=nav.querySelector('.ngrp[data-g="out"] .ngb'); resto.forEach(v=>last.appendChild(items[v])); } }
+
+/* Todos os menus ativos: os ecrãs que precisam do ficheiro aberto explicam o que fazem */
+for(const v of Object.keys(MENU_VAZIO)){ const f=RENDER[v]; RENDER[v]=function(){ if(S.R) return f.apply(this,arguments); const [ic,t,d]=MENU_VAZIO[v]; const el=$('#v-'+v);
+  el.innerHTML=`<div class="card hero-empty" style="min-height:46vh"><div>${ico(ic)}<h2>${t}</h2><p>${d}</p><p class="hint" style="margin-top:6px">Este ecrã trabalha sobre o <b>SAF-T de faturação aberto</b>. Importe o ficheiro ou abra uma análise já guardada.</p>
+    <div class="row" style="justify-content:center;gap:10px;margin-top:14px"><button class="btn pri" onclick="go('importar')">${ico('upload')} Importar SAF-T</button><button class="btn" onclick="go('historico')">${ico('layers')} Abrir do Multi-empresa</button><button class="btn" onclick="guiaAbrir('${v==='documentos'?'exploracao':v}')">${ico('book')} Como fazer</button></div></div></div>`; }; }
+const _goMenu=go; go=function(v){ $$('.nav.need').forEach(n=>n.classList.remove('need')); _goMenu.apply(this,arguments);
+  const g=menuGrupo(S.view); const sec=g&&$(`.ngrp[data-g="${g.id}"]`); if(sec&&sec.classList.contains('fech')) sec.classList.remove('fech');
+  const c=$('#vGrp'); if(c){ c.textContent=g?g.l:''; c.style.setProperty('--gc',g?g.c:'#94A3B8'); c.style.display=g?'':'none'; } const n=$(`.nav[data-v="${S.view}"]`); if(n&&n.offsetParent) n.scrollIntoView({block:'nearest'}); };
+const _rnbMenu=renderNavBadges; renderNavBadges=function(){ _rnbMenu.apply(this,arguments); $$('.nav.dis').forEach(n=>n.classList.remove('dis')); };
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.head.insertAdjacentHTML('beforeend',`<style>
+   .ngrp{margin:2px 0 6px;border-radius:12px}.ngh{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:9px;width:100%;padding:10px 8px 6px;cursor:pointer;border-radius:10px}
+   .ngh:hover{background:rgba(130,170,255,.05)}.ngd{width:8px;height:8px;border-radius:50%;background:var(--gc);box-shadow:0 0 10px var(--gc);flex:none}
+   .ngt{display:flex;flex-direction:column;line-height:1.15;flex:1;min-width:0}.ngt b{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}.ngt small{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+   .ngc{width:14px;height:14px;color:var(--muted);transition:transform .15s}.ngrp.fech .ngc{transform:rotate(-90deg)}.ngrp.fech .ngb{display:none}
+   .ngb{border-left:2px solid color-mix(in srgb,var(--gc) 45%,transparent);margin-left:11px;padding-left:4px}
+   .ngb .nav.on::before{background:var(--gc);box-shadow:0 0 12px var(--gc)}.ngb .nav.on svg{color:var(--gc)}.ngb .nav.on{background:linear-gradient(90deg,color-mix(in srgb,var(--gc) 18%,transparent),transparent)}
+   .nav.dis{opacity:1;pointer-events:auto}
+   #vGrp{display:inline-block;vertical-align:middle;margin-right:10px;font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--gc);border:1px solid color-mix(in srgb,var(--gc) 50%,transparent);background:color-mix(in srgb,var(--gc) 12%,transparent);padding:3px 8px;border-radius:999px}
+   @media (max-height:860px){.ngh{padding:7px 8px 4px}}</style>`);
+  menuMontar(); const vt=$('#vTitle'); if(vt&&!$('#vGrp')) vt.insertAdjacentHTML('beforebegin','<span id="vGrp" style="display:none"></span>');
+  if(typeof GUIA!=='undefined'){ const c=GUIA.find(x=>x.id==='inicio'); const t=c&&c.tp.find(x=>/organizado o menu/.test(x.t)); if(t) t.p=['O menu está dividido em cinco áreas, cada uma com a sua cor; o nome da área aparece também ao lado do título de cada ecrã.','<b>Gabinete</b> — Painel do ficheiro, Painel do gabinete (todas as empresas e o calendário) e Importar SAF-T.','<b>Empresas</b> — fichas de cada empresa (CAE, IES, derrama) e Multi-empresa (a carteira).','<b>Faturação</b> — tudo o que vem do SAF-T de faturação: Validação, Mapa IVA & DP, Correções, Documentos, Artigos, Clientes, Análises de gestão, Evolução e Financeiro.','<b>Contabilidade</b> — tudo o que vem do SAF-T de contabilidade: Contabilidade (balancete, razão, antiguidade, fluxos de caixa, risco fiscal) e Demonstrações & IRC.','<b>Saídas e sistema</b> — Relatórios & Exportações, Definições e este Guia.','Clique no nome de uma área para a fechar ou abrir. Todos os menus estão ativos: se ainda não houver dados, o ecrã explica o que faz e o que é preciso carregar.']; }
+});
 </script>
 </body>
 </html>
