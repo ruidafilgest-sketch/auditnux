@@ -645,7 +645,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.17.1';
+const APP_VERSION = '1.17.2';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -2842,7 +2842,9 @@ function glPick(){ const fi=$('#fileIn'); fi.multiple=true; fi.value=''; fi.onch
 RENDER.contabilidade=async function(){ const el=$('#v-contabilidade'); const U=S.glU;
   el.innerHTML=`<div class="card"><div class="empty">${ico('layers')} A preparar a contabilidade…</div></div>`;
   const X=await glIndex(); const metas=Object.values(X);
-  if(!metas.length){ el.innerHTML=`<div class="card hero-empty" style="min-height:44vh"><div>${ico('book')}<h2>Contabilidade a partir do SAF-T</h2><p>Carregue o SAF-T de contabilidade (exportado do CentralGest: ficheiro anual ou do ano até à data). O AuditNux gera o balancete de qualquer período, o razão, os saldos de clientes e fornecedores, o controlo do IVA, o cruzamento com a faturação e a auditoria da contabilidade.</p><p class="hint">Daqui saem também o Balanço, a DR, o IRC e a leitura para a banca (menu Demonstrações &amp; IRC). O ficheiro SAF-T não é guardado; só o resumo por conta e por mês.</p><div class="row" style="justify-content:center;margin-top:12px"><button class="btn pri" onclick="glPick()">${ico('upload')} Carregar SAF-T de contabilidade</button></div><div id="glProg" style="margin-top:14px"></div></div></div>`; return; }
+  const UNI=await empUniverse(); S._uni=UNI; const naBase=n=>UNI.some(o=>o.nif===n);
+  if(U.nif&&naBase(U.nif)&&!metas.some(m=>m.nif===U.nif)) return glSemDados(el,U.nif,metas);
+  if(!metas.length){ if(UNI.length) return glSemDados(el,'',metas); el.innerHTML=`<div class="card hero-empty" style="min-height:44vh"><div>${ico('book')}<h2>Contabilidade a partir do SAF-T</h2><p>Carregue o SAF-T de contabilidade (exportado do CentralGest: ficheiro anual ou do ano até à data). O AuditNux gera o balancete de qualquer período, o razão, os saldos de clientes e fornecedores, o controlo do IVA, o cruzamento com a faturação e a auditoria da contabilidade.</p><p class="hint">Daqui saem também o Balanço, a DR, o IRC e a leitura para a banca (menu Demonstrações &amp; IRC). O ficheiro SAF-T não é guardado; só o resumo por conta e por mês.</p><div class="row" style="justify-content:center;margin-top:12px"><button class="btn pri" onclick="glPick()">${ico('upload')} Carregar SAF-T de contabilidade</button></div><div id="glProg" style="margin-top:14px"></div></div></div>`; return; }
   const cos=new Map(); for(const m of metas){ const c=cos.get(m.nif)||{nif:m.nif,empresa:m.empresa,anos:[]}; c.anos.push(m.ano); if(m.carregadoEm>(c.last||'')){ c.last=m.carregadoEm; c.empresa=m.empresa; } cos.set(m.nif,c); }
   if(!cos.has(U.nif)) { U.nif=(S.GL&&S.GL.Y.nif)||[...cos.values()].sort((a,b)=>(b.last||'').localeCompare(a.last||''))[0].nif; U.ano=''; }
   const co=cos.get(U.nif); co.anos.sort(); if(!co.anos.includes(U.ano)){ U.ano=co.anos[co.anos.length-1]; U.from=1; U.to=0; }
@@ -2852,7 +2854,7 @@ RENDER.contabilidade=async function(){ const el=$('#v-contabilidade'); const U=S
   const full=!!(S.GL&&S.GL.Y.id===Y.id);
   const cnt=Y.counts||{}; const nAl=(cnt.crit||0)+(cnt.err||0);
   el.innerHTML=`<div class="card pbar"><div class="toolbar" style="margin:0">
-    <label class="fld">Empresa<select class="inp" id="glN">${[...cos.values()].sort((a,b)=>a.empresa.localeCompare(b.empresa)).map(c=>`<option value="${c.nif}" ${c.nif===U.nif?'selected':''}>${esc(c.empresa)} · ${c.nif}</option>`).join('')}</select></label>
+    <label class="fld">Empresa<select class="inp" id="glN">${empOpcoes(U.nif,new Set(cos.keys()),'contabilidade')}</select></label>
     <label class="fld">Exercício<select class="inp" id="glA">${co.anos.map(a=>`<option ${a===U.ano?'selected':''}>${a}</option>`).join('')}</select></label>
     <label class="fld">De<select class="inp" id="glF">${GL_MES.map((m,i)=>`<option value="${i+1}" ${i+1===U.from?'selected':''}>${m}</option>`).join('')}</select></label>
     <label class="fld">Até<select class="inp" id="glT">${GL_MES.map((m,i)=>`<option value="${i+1}" ${i+1===U.to?'selected':''}>${m}${i+1>Y.maxP?' ·':''}</option>`).join('')}</select></label>
@@ -3555,7 +3557,7 @@ async function apFromSaft(nif,ano,to,enc,keep){ const Y=await glLoad(nif+'_'+ano
 async function apReadSheet(file){ const X=await xlsxLib(); const wb=X.read(new Uint8Array(await file.arrayBuffer()),{type:'array'}); return {wb,X}; }
 async function apFromExcel(file,sheet){ try{ const {wb,X}=await apReadSheet(file); const nm=sheet&&wb.SheetNames.includes(sheet)?sheet:wb.SheetNames[0];
     const rows=X.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:true,defval:''}); const res=apProcessar(rows); if(res.erro||!res.contas.length) throw new Error(res.erro||'Não foram encontradas contas neste ficheiro.');
-    const ap=apNew(); ap.empresa=S.ap.src?'':S.ap.empresa; ap.accounts=res.contas.map(a=>({...a,debito:a.saldo>0?a.saldo:0,credito:a.saldo<0?-a.saldo:0}));
+    const ap=apNew(); ap.empresa=S.ap.src&&!S.ap.fixo?'':S.ap.empresa; if(S.ap.fixo){ ap.nif=S.ap.nif; ap.fixo=1; } ap.accounts=res.contas.map(a=>({...a,debito:a.saldo>0?a.saldo:0,credito:a.saldo<0?-a.saldo:0}));
     const hi=apHeaderIdx(rows), hd=rows[hi].map(h=>String(h).trim());
     ap.mapa={headers:hd,hi,conta:apGuess(hd,['conta','código','codigo']),desc:apGuess(hd,['descri','designa']),saldo:apGuess(hd,['saldo'],['mês','mes','período','periodo']),deb:-1,cred:-1,sheets:wb.SheetNames,sheet:nm};
     if(ap.mapa.saldo<0){ ap.mapa.deb=apGuess(hd,['devedor','débito','debito'],['mês','mes','período','periodo']); ap.mapa.cred=apGuess(hd,['credor','crédito','credito'],['mês','mes','período','periodo']); }
@@ -3663,12 +3665,12 @@ async function apTabBal(el){ const ap=S.ap; const X=await glIndex(); const metas
   const meta=co&&co.anos.find(m=>m.ano===sel.ano); if(meta&&(!sel.to||sel.to>12)) sel.to=meta.maxP||12;
   const F=has=>has?apFlags(ap.accounts):null; const fl=F(ap.accounts.length);
   el.innerHTML=`<div class="grid g2"><div class="card"><h3>${ico('book')} A partir do SAF-T de contabilidade <span class="r"><span class="badge b-ok">Recomendado</span></span></h3>
-     ${cos.size?`<div class="toolbar"><label class="fld" style="flex:1">Empresa<select class="inp" id="abN">${[...cos.values()].sort((a,b)=>a.empresa.localeCompare(b.empresa)).map(c=>`<option value="${c.nif}" ${c.nif===sel.nif?'selected':''}>${esc(c.empresa)} · ${c.nif}</option>`).join('')}</select></label>
-       <label class="fld">Exercício<select class="inp" id="abA">${co.anos.map(m=>`<option ${m.ano===sel.ano?'selected':''}>${m.ano}</option>`).join('')}</select></label>
+     ${(await empUniverse()).length||cos.size?`<div class="toolbar"><label class="fld" style="flex:1">Empresa<select class="inp" id="abN">${!sel.nif?'<option value="">Escolher empresa…</option>':''}${empOpcoes(sel.nif,new Set(cos.keys()),'contabilidade')}</select></label>
+       ${co?`<label class="fld">Exercício<select class="inp" id="abA">${co.anos.map(m=>`<option ${m.ano===sel.ano?'selected':''}>${m.ano}</option>`).join('')}</select></label>
        <label class="fld">Até<select class="inp" id="abT">${GL_MES.map((m,i)=>`<option value="${i+1}" ${i+1===+sel.to?'selected':''}>${m}</option>`).join('')}</select></label>
        ${meta&&(meta.closed||meta.has13)&&+sel.to===12?`<label class="fld">Encerramento<select class="inp" id="abE">${GL_ENC.filter(([k])=>k!=='2'||meta.closed).map(([k,l])=>`<option value="${k}" ${String(sel.enc)===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>
        <p class="hint">Balancete acumulado de janeiro até ao mês escolhido, já validado pela auditoria da contabilidade. ${co.anos.some(m=>+m.ano===+sel.ano-1)?`O comparativo usa automaticamente o SAF-T de ${+sel.ano-1}, no mesmo período.`:`Carregue o SAF-T de ${+sel.ano-1} em Contabilidade para ter o comparativo automático.`}</p>
-       <button class="btn pri" id="abGo">${ico('check')} Carregar este balancete</button>`:`<p class="hint">Ainda não há SAF-T de contabilidade carregados. Carregue-os em <b>Importar SAF-T</b> (o programa reconhece o tipo sozinho).</p><button class="btn" onclick="go('importar')">${ico('upload')} Importar SAF-T</button>`}</div>
+       <button class="btn pri" id="abGo">${ico('check')} Carregar este balancete</button>`:`</div>${sel.nif?`<p class="hint" style="margin-top:8px">${ico('alert')} <b>${esc(empNomeDe(sel.nif))}</b> ainda não tem SAF-T de contabilidade carregado. Pode carregá-lo agora ou usar o balancete em Excel (ao lado): a análise fica associada a esta empresa.</p><button class="btn" onclick="empSaftPick('${sel.nif}')">${ico('upload')} Carregar o SAF-T de contabilidade desta empresa</button>`:'<p class="hint" style="margin-top:8px">Escolha a empresa.</p>'}`}`:`<p class="hint">Ainda não há SAF-T de contabilidade carregados. Carregue-os em <b>Importar SAF-T</b> (o programa reconhece o tipo sozinho).</p><button class="btn" onclick="go('importar')">${ico('upload')} Importar SAF-T</button>`}</div>
    <div class="card"><h3>${ico('file')} Balancete em Excel</h3><p class="hint">Para empresas sem SAF-T de contabilidade: o Excel exportado do programa de contabilidade, com código de conta, descrição e saldos (devedor/credor ou débito/crédito). As colunas são detetadas sozinhas.</p>
      <div class="drop" id="abX" style="padding:22px"><div class="big">${ico('upload')}</div><h4>Arraste o Excel do balancete para aqui</h4><div class="hint">ou clique para escolher · .xlsx / .xls / .csv</div></div></div></div>
    <div id="abMap"></div>
@@ -3680,9 +3682,10 @@ async function apTabBal(el){ const ap=S.ap; const X=await glIndex(); const metas
      ${[[fl.cevcAp,'CMVMC/CEVC já apurado (611/612)','CMVMC por apurar (611/612 vazias) — indique a existência final no passo 2'],[fl.varAp,'Variação da produção já apurada (73)','Variação da produção por apurar (73 vazia)'],[fl.amAp,'Amortizações já lançadas (64)','Sem amortizações lançadas (64 vazia) — indique-as no passo 2']].map(([ok,a,b])=>`<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)">${ok?'<span class="badge b-ok">Apurado</span>':'<span class="badge b-warn">Por apurar</span>'}<span>${ok?a:b}</span></div>`).join('')}
      <div class="row" style="padding:7px 0">${Math.abs(ap.accounts.reduce((s,a)=>s+a.saldo,0))<0.01?'<span class="badge b-ok">OK</span><span>Soma dos saldos = 0 (débito = crédito)</span>':`<span class="badge b-warn">Atenção</span><span>Soma dos saldos = ${n2(ap.accounts.reduce((s,a)=>s+a.saldo,0))} (o balancete não está equilibrado)</span>`}</div></div></div>
      <div class="card" style="margin-top:16px"><h3>${ico('file')} Balancete classificado <span class="r"><span class="chip">${n0(ap.accounts.length)} contas</span></span></h3><div id="abT2"></div></div>${apNext('exist')}`:''}`;
+  if(!el.isConnected) return; // outra renderização entretanto substituiu este ecrã
   apBind(el,()=>{ if(ap.comp.resumo2) RENDER.apuramento(); });
-  if($('#abN')){ $('#abN').onchange=e=>{ sel.nif=e.target.value; sel.ano=''; sel.to=0; apTabBal(el); }; $('#abA').onchange=e=>{ sel.ano=e.target.value; sel.to=0; apTabBal(el); }; $('#abT').onchange=e=>{ sel.to=+e.target.value; apTabBal(el); }; if($('#abE')) $('#abE').onchange=e=>{ sel.enc=+e.target.value; };
-    $('#abGo').onclick=async()=>{ if(+sel.enc===2&&+sel.to===12&&!confirm('Com o apuramento de resultados incluído, as classes 6 e 7 ficam saldadas e o resultado não pode ser calculado. Continuar mesmo assim?')) return; await apFromSaft(sel.nif,sel.ano,sel.to,+sel.to===12?sel.enc:0,true); toast(`${ico('check')} Balancete de ${esc(S.ap.empresa)} carregado`,'ok'); RENDER.apuramento(); }; }
+  if($('#abN')){ $('#abN').onchange=e=>apTrocaEmpresa(e.target.value); if($('#abA')) $('#abA').onchange=e=>{ sel.ano=e.target.value; sel.to=0; apTabBal(el); }; if($('#abT')) $('#abT').onchange=e=>{ sel.to=+e.target.value; apTabBal(el); }; if($('#abE')) $('#abE').onchange=e=>{ sel.enc=+e.target.value; };
+    if($('#abGo')) $('#abGo').onclick=async()=>{ if(+sel.enc===2&&+sel.to===12&&!confirm('Com o apuramento de resultados incluído, as classes 6 e 7 ficam saldadas e o resultado não pode ser calculado. Continuar mesmo assim?')) return; await apFromSaft(sel.nif,sel.ano,sel.to,+sel.to===12?sel.enc:0,true); toast(`${ico('check')} Balancete de ${esc(S.ap.empresa)} carregado`,'ok'); RENDER.apuramento(); }; }
   const z=$('#abX'); z.onclick=()=>apPickFile('.xlsx,.xls,.csv',async f=>{ if(await apFromExcel(f)) RENDER.apuramento(); });
   z.ondragover=e=>{ e.preventDefault(); z.classList.add('over'); }; z.ondragleave=()=>z.classList.remove('over'); z.ondrop=async e=>{ e.preventDefault(); z.classList.remove('over'); if(e.dataTransfer.files.length&&await apFromExcel(e.dataTransfer.files[0])) RENDER.apuramento(); };
   $('#abC').onclick=()=>apPickFile('.xlsx,.xls,.csv,.pdf',apCompFile); if($('#abCx')) $('#abCx').onclick=()=>{ ap.comp={fonte:'',modo:ap.comp.modo,accounts2:[],resumo2:null,label:''}; RENDER.apuramento(); };
@@ -5284,6 +5287,51 @@ document.addEventListener('DOMContentLoaded',()=>{
   menuMontar(); const vt=$('#vTitle'); if(vt&&!$('#vGrp')) vt.insertAdjacentHTML('beforebegin','<span id="vGrp" style="display:none"></span>');
   if(typeof GUIA!=='undefined'){ const c=GUIA.find(x=>x.id==='inicio'); const t=c&&c.tp.find(x=>/organizado o menu/.test(x.t)); if(t) t.p=['O menu está dividido em cinco áreas, cada uma com a sua cor; o nome da área aparece também ao lado do título de cada ecrã.','<b>Gabinete</b> — Painel do ficheiro, Painel do gabinete (todas as empresas e o calendário) e Importar SAF-T.','<b>Empresas</b> — fichas de cada empresa (CAE, IES, derrama) e Multi-empresa (a carteira).','<b>Faturação</b> — tudo o que vem do SAF-T de faturação: Validação, Mapa IVA & DP, Correções, Documentos, Artigos, Clientes, Análises de gestão, Evolução e Financeiro.','<b>Contabilidade</b> — tudo o que vem do SAF-T de contabilidade: Contabilidade (balancete, razão, antiguidade, fluxos de caixa, risco fiscal) e Demonstrações & IRC.','<b>Saídas e sistema</b> — Relatórios & Exportações, Definições e este Guia.','Clique no nome de uma área para a fechar ou abrir. Todos os menus estão ativos: se ainda não houver dados, o ecrã explica o que faz e o que é preciso carregar.']; }
 });
+
+/* =========================================================================
+   1.17.2 — QUALQUER EMPRESA DA BASE EM QUALQUER QUADRO DE SELEÇÃO
+   Contabilidade e Demonstrações & IRC listam todas as empresas (com e sem
+   dados). A empresa escolhida fica escolhida; se ainda não tiver dados,
+   o ecrã diz o que fazer para começar.
+   ========================================================================= */
+const _empUniSel=empUniverse; empUniverse=async function(){ const r=await _empUniSel.apply(this,arguments); S._uni=r; return r; };
+function empNomeDe(nif){ const o=(S._uni||[]).find(x=>x.nif===nif); const f=(S.EMP||{})[nif]; return (o&&o.nome)||(f&&f.nome)||nif; }
+function empOpcoes(sel,comDados,area){ const U=(S._uni||[]).slice(); for(const n of comDados) if(!U.some(o=>o.nif===n)) U.push({nif:n,nome:n});
+  const nome=o=>o.nome||(o.f&&o.f.nome)||o.nif; U.sort((a,b)=>nome(a).localeCompare(nome(b)));
+  const op=o=>`<option value="${o.nif}" ${o.nif===sel?'selected':''}>${esc(nome(o))} · ${o.nif}</option>`;
+  const a=U.filter(o=>comDados.has(o.nif)), b=U.filter(o=>!comDados.has(o.nif));
+  return (a.length?`<optgroup label="Com SAF-T de ${area}">${a.map(op).join('')}</optgroup>`:'')+(b.length?`<optgroup label="Sem SAF-T de ${area} (só na base de empresas)">${b.map(op).join('')}</optgroup>`:''); }
+
+/* Contabilidade: empresa sem SAF-T de contabilidade */
+function glSemDados(el,nif,metas){ const com=new Set(metas.map(m=>m.nif)); const nome=nif?empNomeDe(nif):'';
+  el.innerHTML=`<div class="card pbar"><div class="toolbar" style="margin:0"><label class="fld" style="min-width:340px">Empresa<select class="inp" id="glN">${nif?'':'<option value="">Escolher empresa…</option>'}${empOpcoes(nif,com,'contabilidade')}</select></label><span class="sp"></span>${nif?`<span class="chip">NIF <b class="mono">${nif}</b></span>`:''}</div></div>
+   ${nif?`<div class="card hero-empty" style="min-height:44vh;margin-top:16px"><div>${ico('book')}<h2>${esc(nome)}</h2><p>Esta empresa ainda não tem SAF-T de contabilidade carregado. Escolha como quer começar:</p>
+     <div class="grid g3" style="margin-top:16px;text-align:left">
+      <div class="card"><h3>${ico('upload')} Tenho o SAF-T de contabilidade</h3><p class="hint">Exporte do CentralGest o SAF-T de contabilidade do ano (desde janeiro) e carregue-o: o balancete, o razão, a antiguidade, os fluxos e o risco ficam disponíveis aqui.</p><button class="btn pri" id="gsSaft">${ico('upload')} Carregar SAF-T desta empresa</button></div>
+      <div class="card"><h3>${ico('scale')} Só tenho o balancete</h3><p class="hint">Faça as contas em Demonstrações &amp; IRC a partir do balancete em Excel: existências, depreciações, correções fiscais, IRC, rácios e parecer — já associado a esta empresa.</p><button class="btn" id="gsAp">${ico('scale')} Fazer as contas desta empresa</button></div>
+      <div class="card"><h3>${ico('users')} Ficha da empresa</h3><p class="hint">CAE, setor, concelho (derrama), regime de IVA e IES. Quanto mais completa a ficha, mais certos ficam os alertas e o IRC.</p><button class="btn" id="gsF">${ico('users')} Abrir ficha</button></div></div></div></div>`
+   :`<div class="card empty" style="margin-top:16px">${ico('users')} Escolha a empresa na lista acima — aparecem todas as empresas da base, com ou sem contabilidade carregada.</div>`}`;
+  $('#vSub').textContent=VIEWS.contabilidade[1].split(' — ')[0]+(nif?' · '+nome:'');
+  $('#glN').onchange=e=>{ S.glU.nif=e.target.value; S.glU.ano=''; S.glU.acc=''; S.glU.to=0; RENDER.contabilidade(); };
+  if(nif){ $('#gsSaft').onclick=()=>empSaftPick(nif); $('#gsAp').onclick=()=>apParaEmpresa(nif); $('#gsF').onclick=()=>empFicha(nif,()=>RENDER.contabilidade()); } }
+
+/* Demonstrações & IRC: trocar de empresa carrega logo a empresa escolhida */
+async function apTrocaEmpresa(nif){ if(!nif) return; const ap=S.ap; const nome=empNomeDe(nif);
+  if(ap&&ap.accounts.length&&ap.nif!==nif&&!confirm(`Passar para ${nome}?\n\nA análise que está aberta (${ap.empresa||ap.nif}) perde as alterações que não tenham sido guardadas.`)){ RENDER.apuramento(); return; }
+  S.apAuto=true; const ms=Object.values(await glIndex()).filter(m=>m.nif===nif).sort((a,b)=>a.ano.localeCompare(b.ano));
+  if(ms.length){ const m=ms[ms.length-1]; const to=m.maxP||12; await apFromSaft(nif,m.ano,to,to===12?1:0); S.apSel={nif,ano:m.ano,to,enc:1}; toast(`${ico('check')} ${esc(nome)}: balancete de ${m.ano} até ${GL_MES[to-1].toLowerCase()} carregado.`,'ok'); }
+  else { S.ap=apNew(); S.ap.nif=nif; S.ap.empresa=nome; S.ap.ano=String(new Date().getFullYear()-1); S.ap.fixo=1; S.apSel={nif,ano:'',to:0,enc:1}; toast(`${esc(nome)}: sem SAF-T de contabilidade — carregue-o ou use o balancete em Excel.`,'ok'); }
+  S.apTab='bal'; RENDER.apuramento(); }
+async function apParaEmpresa(nif){ S.apAuto=true; closeModal&&closeModal(); go('apuramento'); await apTrocaEmpresa(nif); }
+
+/* Ficha da empresa: atalhos para Contabilidade e Demonstrações & IRC (sempre) */
+const _empFichaSel=empFicha; empFicha=async function(nif,after){ await _empFichaSel.apply(this,arguments); try{ const ies=$('#efIes'); if(!ies||$('#efAp')) return;
+  if(!$('#efGl')){ ies.insertAdjacentHTML('afterend',`<button class="btn" id="efGl">${ico('book')} Contabilidade</button>`); $('#efGl').onclick=()=>{ closeModal(); S.glU.nif=nif; S.glU.ano=''; S.glU.to=0; S.glU.tab='resumo'; go('contabilidade'); }; }
+  $('#efGl').insertAdjacentHTML('afterend',`<button class="btn" id="efAp">${ico('scale')} Demonstrações &amp; IRC</button>`); $('#efAp').onclick=()=>apParaEmpresa(nif); }catch(e){ console.error(e); } };
+
+/* Guia */
+(function(){ if(typeof GUIA==='undefined') return; const c=GUIA.find(x=>x.id==='irc'); if(!c) return;
+  c.tp.unshift({t:'Começar as contas de qualquer empresa',q:'Fecho de contas de uma empresa da base, tenha ou não SAF-T de contabilidade carregado.',p:['Clique em <b>Demonstrações & IRC</b> (área Contabilidade).','No passo <b>1 · Balancete</b>, abra a lista <b>Empresa</b>: aparecem todas as empresas da base, separadas em «Com SAF-T de contabilidade» e «Sem SAF-T de contabilidade».','Escolha a empresa. Se tiver SAF-T, o balancete do último ano é carregado logo. Se não tiver, carregue o SAF-T (botão no cartão) ou arraste o balancete em Excel para o cartão ao lado.','Siga os passos: 2 · Existências (existência final e depreciações), 3 · Parâmetros fiscais, 4 · Correções, 5 a 8.','Clique em <b>Guardar</b>.'],d:'Também pode começar pela ficha da empresa (menu Empresas): botão <b>Demonstrações & IRC</b>.',ir:['apuramento','bal']}); })();
 </script>
 </body>
 </html>
