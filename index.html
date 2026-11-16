@@ -645,7 +645,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.17.1';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -4887,49 +4887,82 @@ function agRelatorio(Y,C,F,P,BD,U){ const hoje=new Date().toLocaleDateString('pt
    ${sec(C,'01',P.pmr,BD.pmr)}<div class="nb"></div>${sec(F,'02',P.pmp,BD.pmp)}${imp}${nota}<div class="ft"><span>${resp}${resp?' · ':''}${tit}</span><span>Documento confidencial · ${hoje}</span></div></div></body></html>`;
   return agWin(html); }
 
-/* ---------- Cartas de circularização ---------- */
-function agCartasModal(Y,X){ const T=X.T; const c=X.rows.filter(r=>Math.abs(r.s)>=0.01);
-  modal(`${ico('file')} Cartas de circularização — ${T.l.toLowerCase()}`,`<p class="hint">Uma carta por ${T.l1}, em nome de ${esc(Y.empresa)}, a pedir a confirmação do saldo em ${X.ref.split('-').reverse().join('/')}, com talão de resposta.</p>
-    <div class="grid g2" style="margin-top:10px"><label class="fld">Saldo mínimo (€)<input class="inp mono" id="acMin" type="number" value="1000"></label><label class="fld">Máximo de cartas<input class="inp mono" id="acMax" type="number" value="50"></label></div>
-    <label class="fld" style="margin-top:10px">Responder para (nome, morada, email)<input class="inp" id="acResp" value="${esc([CFG.gabinete,CFG.responsavel].filter(Boolean).join(' — '))}"></label>
+/* ---------- Cartas de circularização (modelo de pedido de confirmação de saldo, tipo ROC) ---------- */
+const AC_MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const acDataExt=iso=>{ const [y,m,d]=iso.split('-'); return `${+d} de ${AC_MES[+m-1]} de ${y}`; };
+function acCfg(){ const c=CFG.circ||{}; return {email:c.email||'circulacoes.dafilgest@gmail.com',ac:c.ac||'Departamento de Contabilidade',prazo:c.prazo||10,local:c.local||''}; }
+function agCartasModal(Y,X){ const T=X.T; const c=X.rows.filter(r=>Math.abs(r.s)>=0.01); const K=acCfg(); const f=(S.EMP||{})[Y.nif]||{};
+  modal(`${ico('file')} Cartas de circularização — ${T.l.toLowerCase()}`,`<p class="hint">Uma carta por ${T.l1}, em nome de ${esc(Y.empresa)}, a pedir a confirmação do saldo em ${X.ref.split('-').reverse().join('/')} e o extrato de conta corrente, com resposta direta para o gabinete.</p>
+    <div class="grid g2" style="margin-top:10px"><label class="fld">Saldo mínimo (€)<input class="inp mono" id="acMin" type="number" value="1000"></label><label class="fld">Máximo de cartas<input class="inp mono" id="acMax" type="number" value="50"></label>
+     <label class="fld">Email para a resposta<input class="inp" id="acMail" value="${esc(K.email)}"></label><label class="fld">Ao cuidado de (destinatário)<input class="inp" id="acAc" value="${esc(K.ac)}"></label>
+     <label class="fld">Prazo de resposta (dias úteis)<input class="inp mono" id="acPz" type="number" value="${K.prazo}"></label><label class="fld">Local da carta<input class="inp" id="acLoc" value="${esc(K.local||f.concelho||'')}" placeholder="ex.: Vizela"></label></div>
     <label class="chk" style="margin-top:10px"><input type="checkbox" id="acCon" checked> Incluir saldos de natureza contrária e adiantamentos</label>
-    <p class="hint" style="margin-top:8px" id="acN"></p>`,`<button class="btn pri" id="acGo">${ico('file')} Gerar cartas</button>`);
+    <p class="hint" style="margin-top:8px" id="acN"></p>`,`<button class="btn" id="acDoc">${ico('down')} Word (.docx)</button><button class="btn pri" id="acGo">${ico('pdf')} PDF / imprimir</button>`);
   const sel=()=>{ const mn=+$('#acMin').value||0, mx=+$('#acMax').value||50, con=$('#acCon').checked; return c.filter(r=>Math.abs(r.s)>=mn&&(con||(!r.contra&&!r.ad))).sort((a,b)=>Math.abs(b.s)-Math.abs(a.s)).slice(0,mx); };
-  const upd=()=>{ const s=sel(); $('#acN').textContent=`${s.length} carta(s) · ${s.filter(r=>!r.I||!r.I.ad).length} sem morada no SAF-T (fica espaço para escrever).`; };
+  const upd=()=>{ const s=sel(); $('#acN').textContent=`${s.length} carta(s) · ${s.filter(r=>!r.I||!r.I.ad).length} sem morada no SAF-T (fica espaço para escrever; no Word pode completar).`; };
   ['acMin','acMax','acCon'].forEach(id=>$('#'+id).oninput=upd); upd();
-  $('#acGo').onclick=()=>{ const s=sel(); if(!s.length) return toast('Nenhum saldo cumpre os critérios.','err'); agCartas(Y,X,s,$('#acResp').value); closeModal(); }; }
-function agCartas(Y,X,rows,resp){ const T=X.T, cli=T.nat>0; const refL=X.ref.split('-').reverse().join('/'); const hoje=new Date().toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'});
-  const css=`@page{size:A4;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1F2937;font-size:9.4pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-   .pg{width:210mm;height:297mm;position:relative;padding:18mm 22mm 0;page-break-after:always;overflow:hidden;background:#fff}.band{position:absolute;left:0;right:0;top:0;height:3mm;background:#0B1F3A}.band i{position:absolute;left:0;top:3mm;width:40mm;height:1.2mm;background:#B8892B}
-   .em{font-size:12.5pt;font-weight:800;color:#0B1F3A}.em small{display:block;font-size:8.5pt;font-weight:400;color:#6B7280}.to{margin:9mm 0 0 95mm;min-height:24mm}.to .l{border-bottom:.25mm dotted #9CA3AF;height:6mm}
-   .dt{margin-top:5mm;color:#6B7280}.as{margin:4mm 0 3mm;font-weight:800;color:#0B1F3A}p{margin-bottom:2.4mm;text-align:justify}.sal{margin:3mm 0;padding:3.5mm 5mm;border-radius:2mm;background:#F5F7FA;border-left:1.2mm solid #B8892B;font-size:11pt}.sal b{color:#0B1F3A}
-   .sg{margin-top:4mm}.sg .l{width:70mm;border-bottom:.3mm solid #374151;height:11mm}.cut{position:absolute;left:0;right:0;top:214mm;border-top:.4mm dashed #9CA3AF;text-align:center;font-size:7pt;color:#9CA3AF}.cut span{background:#fff;padding:0 3mm;position:relative;top:-2.2mm}
-   .rs{position:absolute;left:22mm;right:22mm;top:220mm;font-size:9pt}.rs h4{font-size:9.5pt;color:#0B1F3A;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2mm}.rs .bx{display:inline-block;width:3.6mm;height:3.6mm;border:.35mm solid #374151;margin-right:2mm;vertical-align:-.6mm}.rs .ln{border-bottom:.25mm dotted #9CA3AF;display:inline-block;min-width:60mm;height:5mm}.rs .g{display:grid;grid-template-columns:1fr 1fr;gap:3mm 8mm;margin-top:3mm}
-   .tbar{position:sticky;top:0;background:#0B1F3A;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:5}.tbar button{background:#B8892B;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer}
+  const opts=async()=>{ const o={email:$('#acMail').value.trim(),ac:$('#acAc').value.trim(),prazo:+$('#acPz').value||10,local:$('#acLoc').value.trim()}; CFG.circ={email:o.email,ac:o.ac,prazo:o.prazo,local:CFG.circ&&CFG.circ.local||''}; try{ await cloudSaveConfig(); }catch(e){} return o; };
+  $('#acGo').onclick=async()=>{ const s=sel(); if(!s.length) return toast('Nenhum saldo cumpre os critérios.','err'); const o=await opts(); agCartas(Y,X,s,o); closeModal(); };
+  $('#acDoc').onclick=async()=>{ const s=sel(); if(!s.length) return toast('Nenhum saldo cumpre os critérios.','err'); const o=await opts(); await agCartasDocx(Y,X,s,o); }; }
+function acTexto(Y,X,r,o){ const refE=acDataExt(X.ref); const I=r.I||{};
+  return {ref:X.ref.split('-').reverse().join('/'),refE,dest:[r.n||'',r.nif?'NIF '+r.nif:'',I.ad||'',[I.cp,I.ci].filter(Boolean).join(' '),I.pa&&I.pa!=='PT'?I.pa:''].filter(Boolean),semMorada:!I.ad,
+    data:(o.local?o.local+', ':'')+acDataExt(new Date().toISOString().slice(0,10)),
+    assunto:`Pedido de confirmação de saldo e de extrato de conta corrente em ${X.ref.split('-').reverse().join('/')}`,
+    p1:`No âmbito dos trabalhos de verificação das nossas contas, solicitamos a V. Ex.as que nos confirmem o saldo da nossa conta corrente nos vossos registos, com referência a ${refE}.`,
+    p2:`De acordo com os nossos registos, o saldo naquela data é de:`, valor:n2(Math.abs(r.s))+' €',
+    p3:`Agradecemos que nos enviem, em qualquer caso, o extrato de conta corrente com referência àquela data, com o detalhe dos documentos que compõem o saldo (número, data e valor). Se o saldo dos vossos registos for diferente, agradecemos que indiquem o saldo e as diferenças que o justificam.`,
+    p4:`A resposta, acompanhada do extrato de conta corrente, deve ser enviada diretamente para o endereço de correio eletrónico ${o.email}, no prazo de ${o.prazo} dias úteis.`,
+    p5:`Este pedido destina-se exclusivamente à verificação de saldos e não constitui pedido de pagamento. Caso o saldo já tenha sido regularizado, agradecemos igualmente o envio do extrato.`,
+    p6:`Gratos pela vossa colaboração, apresentamos os nossos melhores cumprimentos.`, conta:r.a}; }
+function agCartas(Y,X,rows,o){ const css=`@page{size:A4;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Calibri,Inter,Segoe UI,Arial,sans-serif;color:#111827;font-size:10.2pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+   .pg{width:210mm;height:297mm;position:relative;padding:20mm 24mm 0;page-break-after:always;overflow:hidden;background:#fff}
+   .em{font-size:13pt;font-weight:700;color:#0B1F3A;border-bottom:.4mm solid #0B1F3A;padding-bottom:2mm}.em small{display:block;font-size:9pt;font-weight:400;color:#4B5563}
+   .to{margin:11mm 0 0 92mm;min-height:26mm;font-size:10.2pt}.to .ac{margin-top:2mm;font-style:italic}.to .l{border-bottom:.25mm dotted #9CA3AF;height:6mm}
+   .dt{margin-top:7mm;text-align:right}.as{margin:6mm 0 5mm;font-weight:700}p{margin-bottom:3mm;text-align:justify}
+   .val{margin:2mm 0 5mm;text-align:center}.val span{display:inline-block;border:.35mm solid #0B1F3A;padding:2.5mm 10mm;font-size:13pt;font-weight:700;letter-spacing:.02em}
+   .sg{margin-top:8mm;width:75mm;text-align:center}.sg .l{border-bottom:.3mm solid #111827;height:13mm;margin-bottom:1.5mm}
+   .rf{position:absolute;left:24mm;right:24mm;bottom:12mm;border-top:.25mm solid #E5E7EB;padding-top:2mm;font-size:7.5pt;color:#6B7280;display:flex;justify-content:space-between}
+   .tbar{position:sticky;top:0;background:#0B1F3A;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:5;font-family:Arial}.tbar button{background:#B8892B;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer}
    @media screen{body{background:#e9edf3}.pg{margin:10px auto;box-shadow:0 2px 12px rgba(0,0,0,.12)}}@media print{.tbar{display:none!important}}`;
-  const fav=r=>{ const devedor=cli?r.s>0:r.s<0; return devedor?`a nosso favor (V. Ex.as devem-nos)`:`a vosso favor (devemos a V. Ex.as)`; };
-  const pg=r=>{ const I=r.I||{}; const ad=[I.ad,[I.cp,I.ci].filter(Boolean).join(' '),I.pa&&I.pa!=='PT'?I.pa:''].filter(Boolean);
-    return `<section class="pg"><div class="band"><i></i></div><div class="em">${esc(Y.empresa)}<small>NIF ${Y.nif}</small></div>
-     <div class="to"><b>${esc(r.n||'')}</b>${r.nif?`<br>NIF ${esc(r.nif)}`:''}${ad.length?ad.map(x=>'<br>'+esc(x)).join(''):'<div class="l"></div><div class="l"></div>'}</div>
-     <div class="dt">${hoje}</div><div class="as">Assunto: Pedido de confirmação de saldo em ${refL}</div>
-     <p>Exmos. Senhores,</p><p>No âmbito da verificação das nossas contas, solicitamos que confirmem o saldo da vossa conta${r.a?` (a nossa conta n.º ${esc(r.a)})`:''} nos nossos registos, em ${refL}:</p>
-     <div class="sal">Saldo em ${refL}: <b>${n2(Math.abs(r.s))} €</b> ${fav(r)}</div>
-     <p>Caso o saldo esteja correto, agradecemos que assinem e devolvam o talão abaixo. Se não estiver de acordo, indiquem o saldo nos vossos registos e enviem o extrato de conta corrente com o detalhe dos documentos em aberto, para podermos conciliar as diferenças.</p>
-     <p>A resposta deve ser enviada diretamente para: <b>${esc(resp||'_______________________________')}</b>.</p><p>Este pedido não constitui pedido de pagamento. Gratos pela colaboração.</p>
-     <p style="margin-top:5mm">Com os melhores cumprimentos,</p><div class="sg"><div class="l"></div>A Gerência — ${esc(Y.empresa)}</div>
-     <div class="cut"><span>✂ destaque e devolva</span></div>
-     <div class="rs"><h4>Confirmação de saldo — ${esc(Y.empresa)} · ${refL}</h4>De: <b>${esc(r.n||'')}</b>${r.nif?` · NIF ${esc(r.nif)}`:''} · conta ${esc(r.a)}<br>
-      <div style="margin-top:2.5mm"><span class="bx"></span>Confirmamos o saldo de <b>${n2(Math.abs(r.s))} €</b> ${fav(r)}.</div>
-      <div style="margin-top:1.5mm"><span class="bx"></span>Não confirmamos. Saldo nos nossos registos: <span class="ln"></span> € (juntamos extrato).</div>
-      <div class="g"><div>Data: <span class="ln" style="min-width:40mm"></span></div><div>Assinatura e carimbo: <span class="ln" style="min-width:45mm"></span></div></div></div></section>`; };
-  const html=`<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Cartas de circularização — ${esc(Y.empresa)}</title><style>${css}</style></head><body><div class="tbar"><b>${rows.length} carta(s) de circularização</b><span style="opacity:.75">Imprimir › papel A4, sem margens</span><span style="flex:1"></span><button onclick="print()">Imprimir / Guardar PDF</button></div>${rows.map(pg).join('')}</body></html>`;
+  const pg=r=>{ const t=acTexto(Y,X,r,o); return `<section class="pg"><div class="em">${esc(Y.empresa)}<small>NIF ${Y.nif}</small></div>
+    <div class="to">${t.dest.map((x,i)=>i?esc(x):'<b>'+esc(x)+'</b>').join('<br>')}${t.semMorada?'<div class="l"></div><div class="l"></div>':''}${o.ac?`<div class="ac">Ao cuidado do ${esc(o.ac)}</div>`.replace('do Departamento','do Departamento'):''}</div>
+    <div class="dt">${esc(t.data)}</div><div class="as">Assunto: ${esc(t.assunto)}</div><p>Exmos. Senhores,</p><p>${esc(t.p1)}</p><p>${esc(t.p2)}</p><div class="val"><span>${t.valor}</span></div>
+    <p>${esc(t.p3)}</p><p>${esc(t.p4).replace(esc(o.email),'<b>'+esc(o.email)+'</b>')}</p><p>${esc(t.p5)}</p><p>${esc(t.p6)}</p>
+    <div class="sg"><div class="l"></div>A Gerência<br><b>${esc(Y.empresa)}</b></div><div class="rf"><span>Ref.ª interna: conta ${esc(t.conta)}</span><span>Pedido de confirmação de saldo · ${t.ref}</span></div></section>`; };
+  const html=`<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Cartas de circularização — ${esc(Y.empresa)}</title><style>${css}</style></head><body><div class="tbar"><b>${rows.length} carta(s) de circularização</b><span style="opacity:.75">Imprimir › papel A4, sem margens · ou Guardar como PDF</span><span style="flex:1"></span><button onclick="print()">Imprimir / Guardar PDF</button></div>${rows.map(pg).join('')}</body></html>`;
   return agWin(html); }
+/* Word (.docx) — gerado no navegador, editável */
+function acDocxXml(Y,X,rows,o){ const xe=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const run=(t,r)=>{ r=r||{}; return `<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>${r.b?'<w:b/>':''}${r.i?'<w:i/>':''}${r.c?`<w:color w:val="${r.c}"/>`:''}<w:sz w:val="${r.sz||21}"/></w:rPr><w:t xml:space="preserve">${xe(t)}</w:t></w:r>`; };
+  const par=(runs,p)=>{ p=p||{}; return `<w:p><w:pPr>${p.bdr?'<w:pBdr><w:top w:val="single" w:sz="8" w:space="4" w:color="0B1F3A"/><w:left w:val="single" w:sz="8" w:space="4" w:color="0B1F3A"/><w:bottom w:val="single" w:sz="8" w:space="4" w:color="0B1F3A"/><w:right w:val="single" w:sz="8" w:space="4" w:color="0B1F3A"/></w:pBdr>':''}${p.bb?'<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="0B1F3A"/></w:pBdr>':''}<w:spacing w:before="${p.before||0}" w:after="${p.after==null?120:p.after}" w:line="${p.line||276}" w:lineRule="auto"/>${p.ind?`<w:ind w:left="${p.ind}"${p.indR?` w:right="${p.indR}"`:''}/>`:''}<w:jc w:val="${p.jc||'both'}"/></w:pPr>${[].concat(runs).join('')}</w:p>`; };
+  const brk='<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+  const body=rows.map((r,i)=>{ const t=acTexto(Y,X,r,o); return [
+    par([run(Y.empresa,{b:1,sz:26,c:'0B1F3A'})],{after:0,jc:'left'}),par([run('NIF '+Y.nif,{sz:18,c:'4B5563'})],{after:240,jc:'left',bb:1}),
+    par([run('')],{after:480}),
+    ...t.dest.map((x,k)=>par([run(x,{b:k===0})],{ind:5200,after:0,jc:'left'})),
+    ...(t.semMorada?[par([run('_______________________________')],{ind:5200,after:0,jc:'left'}),par([run('_______________________________')],{ind:5200,after:0,jc:'left'})]:[]),
+    ...(o.ac?[par([run('Ao cuidado do '+o.ac,{i:1})],{ind:5200,before:60,after:0,jc:'left'})]:[]),
+    par([run(t.data)],{before:600,after:360,jc:'right'}),
+    par([run('Assunto: '+t.assunto,{b:1})],{after:240,jc:'left'}),
+    par([run('Exmos. Senhores,')]),par([run(t.p1)]),par([run(t.p2)]),
+    par([run(t.valor,{b:1,sz:26})],{bdr:1,ind:3000,indR:3000,jc:'center',before:120,after:240}),
+    par([run(t.p3)]),par([run(t.p4.split(o.email)[0]),run(o.email,{b:1}),run(t.p4.split(o.email).slice(1).join(o.email))]),par([run(t.p5)]),par([run(t.p6)]),
+    par([run('')],{after:720}),par([run('______________________________')],{after:0,jc:'left'}),par([run('A Gerência')],{after:0,jc:'left'}),par([run(Y.empresa,{b:1})],{after:240,jc:'left'}),
+    par([run(`Ref.ª interna: conta ${t.conta} · Pedido de confirmação de saldo · ${t.ref}`,{sz:15,c:'6B7280'})],{before:240,jc:'left'}),
+    i<rows.length-1?brk:''].join(''); }).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1361" w:right="1361" w:bottom="1134" w:left="1361" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`; }
+async function agCartasDocx(Y,X,rows,o){ try{ const XL=await xlsxLib(); const C=XL.CFB; const z=C.utils.cfb_new(); const enc=s=>new TextEncoder().encode(s);
+  C.utils.cfb_add(z,'/[Content_Types].xml',enc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'));
+  C.utils.cfb_add(z,'/_rels/.rels',enc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'));
+  C.utils.cfb_add(z,'/word/document.xml',enc(acDocxXml(Y,X,rows,o)));
+  const out=C.write(z,{fileType:'zip',type:'array'}); download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),`Cartas_circularizacao_${glSafe(Y.empresa)}_${X.ref}.docx`);
+  toast(`${ico('check')} ${rows.length} carta(s) em Word: abra, complete o que faltar e imprima.`,'ok'); }catch(e){ toast('Não foi possível gerar o Word: '+esc(e.message),'err'); } }
 
 /* ---------- Guia: tarefas novas ---------- */
 (function(){ if(typeof GUIA==='undefined') return; const c=GUIA.find(x=>x.id==='contab'); if(!c) return;
   c.tp.push({t:'Antiguidade de saldos de clientes e fornecedores',q:'Controlo de cobranças e pagamentos, fecho de contas, banca ou preparação de uma inspeção.',p:['Importe o SAF-T de contabilidade do ano (e, se tiver, o do ano anterior: serve para saber a origem dos saldos de abertura).','Clique em <b>Contabilidade</b>, escolha a empresa, o ano e o mês <b>Até</b> (data de referência).','Clique no separador <b>Antiguidade de saldos</b>.','Escolha <b>Clientes</b> ou <b>Fornecedores</b>.','Leia os escalões (0–30 dias até mais de 1 ano), a idade média, o prazo médio comparado com o setor e os pontos de atenção.','Clique num terceiro para abrir o razão dessa conta.'],d:'Os recebimentos e pagamentos abatem primeiro as faturas mais antigas. O SAF-T não tem a data de vencimento: a antiguidade conta a partir da data do documento.',ir:['contabilidade','antig']},
    {t:'Imparidades de clientes (art. 28.º-B do CIRC)',q:'Fecho de contas: saber quanto se pode registar de imparidade e o que não é aceite fiscalmente.',p:['No separador <b>Antiguidade de saldos</b>, com <b>Clientes</b> escolhido, indique o <b>Prazo de vencimento</b> habitual (dias).','Veja o cartão <b>Imparidades de clientes</b>: máximo fiscalmente aceite, imparidade registada (219) e gasto do período (6511).','Exclua com <b>⊘</b> os créditos que a lei não aceita (sócios, empresas participadas, créditos com garantia ou seguro). As entidades públicas (NIF começado por 6) são excluídas automaticamente.','Se houver excesso, clique em <b>Levar para o IRC (passo 4)</b>: o acréscimo fica no apuramento.'],ir:['contabilidade','antig']},
-   {t:'Relatório, Excel e cartas de circularização',q:'Entregar ao cliente, à banca ou confirmar saldos com terceiros.',p:['No separador <b>Antiguidade de saldos</b> clique em <b>Relatório</b> (clientes, fornecedores e imparidades) e depois em <b>Imprimir / Guardar PDF</b>.','<b>Excel</b> exporta todos os terceiros com os escalões.','<b>Cartas de circularização</b>: escolha o saldo mínimo, o número máximo de cartas e para onde devem responder; clique em <b>Gerar cartas</b>.','Imprima: uma carta por página, em nome da empresa, com talão de resposta destacável.'],d:'Se o SAF-T não tiver a morada do terceiro, a carta fica com espaço para a escrever à mão.',ir:['contabilidade','antig']});
+   {t:'Relatório, Excel e cartas de circularização',q:'Entregar ao cliente, à banca ou confirmar saldos com terceiros.',p:['No separador <b>Antiguidade de saldos</b> clique em <b>Relatório</b> (clientes, fornecedores e imparidades) e depois em <b>Imprimir / Guardar PDF</b>.','<b>Excel</b> exporta todos os terceiros com os escalões.','<b>Cartas de circularização</b>: escolha o saldo mínimo, o número máximo de cartas, o email para a resposta (por omissão circulacoes.dafilgest@gmail.com), o «ao cuidado de» e o prazo.','Clique em <b>PDF / imprimir</b> para imprimir, ou em <b>Word (.docx)</b> para editar antes de enviar.','Cada carta pede a confirmação do saldo e o extrato de conta corrente, com resposta direta por email para o gabinete.'],d:'Se o SAF-T não tiver a morada do terceiro, a carta fica com linhas para a escrever (no Word pode completar).',ir:['contabilidade','antig']});
 })();
 
 /* =========================================================================
