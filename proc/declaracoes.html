@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<script src="procdb.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dafilgest — Declarações Fiscais</title>
+<style>
+:root {
+  --azul: #1a3a5c;
+  --azul2: #2255a4;
+  --ouro: #c8a84b;
+  --ouro2: #e8c96a;
+  --verde: #1a7a3c;
+  --verde2: #27ae60;
+  --vermelho: #c0392b;
+  --laranja: #e67e22;
+  --cinza: #6c757d;
+  --fundo: #f0f4f8;
+  --branco: #ffffff;
+  --borda: #d0d8e4;
+  --texto: #1a2535;
+  --texto2: #4a5568;
+  --sombra: 0 2px 12px rgba(26,58,92,0.10);
+  --sombra2: 0 4px 24px rgba(26,58,92,0.16);
+  --radius: 10px;
+  --radius2: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--fundo); color: var(--texto); font-size: 14px; }
+
+/* LOGIN */
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #1a3a5c 0%, #2255a4 60%, #1a3a5c 100%);
+}
+.login-card {
+  background: var(--branco); border-radius: 16px; padding: 48px 40px 40px;
+  width: 100%; max-width: 380px; box-shadow: var(--sombra2);
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+}
+.login-logo { font-size: 2.2rem; font-weight: 800; color: var(--azul); letter-spacing: -1px; }
+.login-logo span { color: var(--ouro); }
+.login-sub { font-size: 0.82rem; color: var(--cinza); margin-top: 4px; text-align: center; margin-bottom: 28px; }
+.login-card input {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--borda); border-radius: var(--radius2);
+  font-size: 15px; margin-bottom: 12px; outline: none; transition: border 0.2s;
+}
+.login-card input:focus { border-color: var(--azul2); }
+.btn-login {
+  width: 100%; padding: 12px; background: var(--azul); color: #fff; border: none;
+  border-radius: var(--radius2); font-size: 15px; font-weight: 700; cursor: pointer;
+  margin-top: 4px; transition: background 0.2s;
+}
+.btn-login:hover { background: var(--azul2); }
+.login-error { color: var(--vermelho); font-size: 0.82rem; margin-top: 6px; display: none; }
+
+/* HEADER */
+#app { display: none; }
+header {
+  background: var(--azul); color: #fff; padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 56px; position: sticky; top: 0; z-index: 100; box-shadow: var(--sombra2);
+}
+.header-logo { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px; }
+.header-logo span { color: var(--ouro2); }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.header-ano {
+  background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.25);
+  color: #fff; border-radius: var(--radius2); padding: 5px 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.header-user { font-size: 0.8rem; color: rgba(255,255,255,0.7); }
+.btn-sair {
+  background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.25);
+  color: #fff; border-radius: var(--radius2); padding: 5px 12px; font-size: 13px; cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-sair:hover { background: rgba(255,255,255,0.22); }
+
+/* TABS */
+.tabs {
+  background: var(--branco); border-bottom: 2px solid var(--borda);
+  display: flex; padding: 0 24px; gap: 4px;
+}
+.tab {
+  padding: 14px 20px; cursor: pointer; font-weight: 600; color: var(--cinza);
+  border-bottom: 3px solid transparent; margin-bottom: -2px; font-size: 13.5px;
+  transition: color 0.2s, border-color 0.2s; white-space: nowrap;
+}
+.tab:hover { color: var(--azul2); }
+.tab.active { color: var(--azul); border-bottom-color: var(--ouro); }
+
+/* MAIN */
+main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+/* DASHBOARD */
+.dash-prazo {
+  background: var(--azul); color: #fff; border-radius: var(--radius); padding: 16px 24px;
+  margin-bottom: 20px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+}
+.dash-prazo-item { display: flex; flex-direction: column; }
+.dash-prazo-item .label { font-size: 0.72rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+.dash-prazo-item .val { font-size: 1.1rem; font-weight: 700; }
+.dash-prazo-item .val.alerta { color: var(--ouro2); }
+.dash-prazo-sep { width: 1px; background: rgba(255,255,255,0.2); height: 36px; }
+
+.cards-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px; margin-bottom: 24px;
+}
+.card {
+  background: var(--branco); border-radius: var(--radius); padding: 20px 22px;
+  box-shadow: var(--sombra); border-left: 4px solid var(--borda);
+}
+.card.verde { border-left-color: var(--verde2); }
+.card.azul { border-left-color: var(--azul2); }
+.card.laranja { border-left-color: var(--laranja); }
+.card.vermelho { border-left-color: var(--vermelho); }
+.card.cinza { border-left-color: var(--cinza); }
+.card .card-label { font-size: 0.75rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.card .card-val { font-size: 2rem; font-weight: 800; color: var(--azul); }
+.card .card-sub { font-size: 0.75rem; color: var(--cinza); margin-top: 2px; }
+
+.alertas-box {
+  background: #fff8e1; border: 1.5px solid #f59e0b; border-radius: var(--radius);
+  padding: 16px 20px; margin-bottom: 20px;
+}
+.alertas-box h3 { color: #b45309; font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.alerta-item { font-size: 0.82rem; color: var(--texto); padding: 4px 0; border-bottom: 1px solid #fde68a; }
+.alerta-item:last-child { border-bottom: none; }
+
+/* TABELA */
+.toolbar {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.toolbar input[type=text] {
+  padding: 8px 14px; border: 1.5px solid var(--borda); border-radius: var(--radius2);
+  font-size: 13.5px; min-width: 220px; outline: none; transition: border 0.2s;
+}
+.toolbar input[type=text]:focus { border-color: var(--azul2); }
+.toolbar select {
+  padding: 8px 12px; border: 1.5px solid var(--borda); border-radius: var(--radius2);
+  font-size: 13.5px; background: #fff; cursor: pointer; outline: none;
+}
+.btn {
+  padding: 8px 16px; border: none; border-radius: var(--radius2); font-size: 13.5px;
+  font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--azul); color: #fff; }
+.btn-primary:hover { background: var(--azul2); }
+.btn-success { background: var(--verde2); color: #fff; }
+.btn-success:hover { background: #219a52; }
+.btn-warn { background: var(--laranja); color: #fff; }
+.btn-warn:hover { background: #cf6d17; }
+.btn-danger { background: var(--vermelho); color: #fff; }
+.btn-danger:hover { background: #a93226; }
+.btn-ghost { background: transparent; border: 1.5px solid var(--borda); color: var(--texto2); }
+.btn-ghost:hover { background: var(--fundo); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-ouro { background: var(--ouro); color: #1a2535; }
+.btn-ouro:hover { background: var(--ouro2); }
+
+.table-wrap { overflow-x: auto; background: var(--branco); border-radius: var(--radius); box-shadow: var(--sombra); }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  background: var(--azul); color: #fff; padding: 11px 14px;
+  text-align: left; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+thead th:first-child { border-radius: var(--radius) 0 0 0; }
+thead th:last-child { border-radius: 0 var(--radius) 0 0; }
+tbody tr { border-bottom: 1px solid var(--borda); transition: background 0.15s; }
+tbody tr:hover { background: #f0f6ff; }
+tbody td { padding: 10px 14px; font-size: 13px; vertical-align: middle; }
+tbody td.nome { font-weight: 600; max-width: 260px; }
+tbody td.nome small { display: block; color: var(--cinza); font-weight: 400; font-size: 11px; }
+tfoot td { background: var(--fundo); padding: 10px 14px; font-weight: 700; font-size: 13px; border-top: 2px solid var(--borda); }
+
+/* BADGE FASE */
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.badge-pendente { background: #e2e8f0; color: #4a5568; }
+.badge-processo { background: #dbeafe; color: #1e40af; }
+.badge-pronto { background: #fef3c7; color: #92400e; }
+.badge-enviado { background: #d1fae5; color: #065f46; }
+.badge-validado { background: #d1fae5; color: #065f46; border: 1.5px solid #34d399; }
+.badge-erro { background: #fee2e2; color: #991b1b; }
+.badge-isento { background: #f3f4f6; color: #6b7280; font-style: italic; }
+.badge-yes { background: #d1fae5; color: #065f46; }
+.badge-no { background: #fee2e2; color: #991b1b; }
+.badge-pend-ies { background: #fef3c7; color: #92400e; }
+
+/* SENHA */
+.senha-cell { font-family: monospace; font-size: 12px; color: var(--cinza); letter-spacing: 1px; cursor: pointer; }
+.senha-cell:hover { color: var(--azul2); }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000;
+  display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px;
+  overflow-y: auto;
+}
+.modal {
+  background: var(--branco); border-radius: 14px; width: 100%; max-width: 640px;
+  box-shadow: var(--sombra2); animation: fadeIn 0.18s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px; border-bottom: 1.5px solid var(--borda);
+}
+.modal-header h2 { font-size: 1.05rem; color: var(--azul); font-weight: 800; }
+.modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--cinza); padding: 4px; line-height: 1; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1.5px solid var(--borda); display: flex; gap: 10px; justify-content: flex-end; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid.full { grid-template-columns: 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.span2 { grid-column: 1 / -1; }
+.form-group label { font-size: 0.78rem; font-weight: 700; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.4px; }
+.form-group input, .form-group select, .form-group textarea {
+  padding: 9px 12px; border: 1.5px solid var(--borda); border-radius: var(--radius2);
+  font-size: 13.5px; outline: none; transition: border 0.2s; background: #fff;
+  font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--azul2); }
+.form-group textarea { resize: vertical; min-height: 60px; }
+.form-section { font-size: 0.78rem; font-weight: 800; color: var(--azul); text-transform: uppercase;
+  letter-spacing: 0.8px; padding: 10px 0 6px; grid-column: 1 / -1; border-bottom: 1.5px solid var(--borda); margin-bottom: 4px; }
+
+/* SEMAFORO */
+.semaforo { display: flex; align-items: center; gap: 6px; }
+.sem-dot { width: 10px; height: 10px; border-radius: 50%; }
+.sem-verde { background: var(--verde2); }
+.sem-amarelo { background: #f59e0b; }
+.sem-vermelho { background: var(--vermelho); }
+.sem-cinza { background: var(--cinza); }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; background: var(--azul); color: #fff;
+  padding: 12px 22px; border-radius: var(--radius); font-weight: 600; font-size: 14px;
+  box-shadow: var(--sombra2); z-index: 9999; animation: slideIn 0.25s ease;
+  display: none;
+}
+.toast.success { background: var(--verde2); }
+.toast.error { background: var(--vermelho); }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* EMPRESAS */
+.empresa-card {
+  background: var(--branco); border-radius: var(--radius); padding: 16px 20px;
+  box-shadow: var(--sombra); margin-bottom: 10px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.empresa-card.arquivado { opacity: 0.5; }
+.empresa-nif { font-family: monospace; font-size: 12px; color: var(--cinza); }
+.empresa-senha { font-family: monospace; font-size: 12px; background: var(--fundo); padding: 2px 8px; border-radius: 4px; cursor: pointer; }
+.empresa-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* EMPTY */
+.empty { text-align: center; padding: 48px 20px; color: var(--cinza); }
+.empty .icon { font-size: 3rem; margin-bottom: 12px; }
+
+/* RESPONSIVE */
+@media (max-width: 700px) {
+  main { padding: 12px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-group.span2 { grid-column: 1; }
+  header { padding: 0 12px; }
+  .tabs { padding: 0 8px; }
+  .tab { padding: 12px 10px; font-size: 12px; }
+}
+
+.ano-badge {
+  display: inline-block; background: var(--ouro); color: #1a2535;
+  border-radius: 6px; padding: 2px 10px; font-weight: 800; font-size: 15px; margin-left: 8px;
+}
+.resultado-positivo { color: var(--verde2); font-weight: 700; }
+.resultado-negativo { color: var(--vermelho); font-weight: 700; }
+.resultado-neutro { color: var(--cinza); }
+.valor-pos { color: var(--vermelho); font-weight: 600; } /* A pagar */
+.valor-neg { color: var(--verde2); font-weight: 600; } /* A receber */
+.sem-senha { color: #f59e0b; font-size: 11px; font-weight: 700; }
+
+.progress-bar-outer { background: #e2e8f0; border-radius: 20px; height: 8px; flex: 1; }
+.progress-bar-inner { height: 100%; border-radius: 20px; background: var(--verde2); transition: width 0.4s; }
+.progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.progress-label { width: 90px; font-size: 12px; color: var(--cinza); }
+.progress-count { font-size: 12px; font-weight: 700; color: var(--azul); min-width: 40px; text-align: right; }
+</style>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Dafil<span>gest</span></div>
+    <div class="login-sub">Gestão de Declarações Fiscais<br>NIF 505403447 · Vizela</div>
+    <input type="password" id="login-senha" placeholder="Palavra-passe" autocomplete="current-password">
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="login-error">Palavra-passe incorrecta.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="header-logo">Dafil<span>gest</span> <span style="font-weight:400;opacity:0.7;font-size:0.85rem">· Declarações Fiscais</span></div>
+    <div class="header-right">
+      <select class="header-ano" id="ano-select" onchange="mudarAno()"></select>
+      <span class="header-user" id="header-user"></span>
+      <button class="btn-sair" onclick="logout()">Sair</button>
+    </div>
+  </header>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+    <div class="tab" onclick="showTab('mod22')">📋 Mod. 22 IRC</div>
+    <div class="tab" onclick="showTab('ies')">📑 IES</div>
+    <div class="tab" onclick="showTab('irc2025')">🧮 IRC 2025</div>
+    <div class="tab" onclick="showTab('empresas')" id="tab-empresas">🏢 Empresas</div>
+  </div>
+  <main id="main-content"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" style="display:none" onclick="closeModalClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<script type="module">
+// ===================== FIREBASE =====================
+import { initializeApp } from './procdb-rtdb.js';
+import { getDatabase, ref, set, get, update, onValue, remove } from './procdb-rtdb.js';
+
+const firebaseConfig = {
+  apiKey: "",
+  authDomain: "dafilgest-declaracoes.firebaseapp.com",
+  databaseURL: "https://dafilgest-declaracoes-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "dafilgest-declaracoes",
+  storageBucket: "dafilgest-declaracoes.appspot.com",
+  messagingSenderId: "626852328164",
+  appId: "1:626852328164:web:fb1848042e65300ee732f1"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ===================== AUTH =====================
+const SENHAS = {
+  admin: null,
+  leitura: null
+};
+let userRole = null;
+let anoActivo = String(new Date().getFullYear() - 1); // default: ano anterior
+let empresasCache = {};
+let mod22Cache = {};
+let iesCache = {};
+
+window.doLogin = function() {
+  if (window.PROCDB && PROCDB.ligado()) { userRole = PROCDB.role() === 'admin' ? 'admin' : 'leitura'; iniciarApp(); return; }
+  const s = document.getElementById('login-senha').value;
+  if (s === SENHAS.admin) { userRole = 'admin'; iniciarApp(); }
+  else if (s === SENHAS.leitura) { userRole = 'leitura'; iniciarApp(); }
+  else { document.getElementById('login-error').style.display = 'block'; }
+};
+document.getElementById('login-senha').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin(); });
+
+window.logout = function() {
+  userRole = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-senha').value = '';
+};
+
+// ===================== INICIAR =====================
+function iniciarApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('header-user').textContent = userRole === 'admin' ? '👤 Admin' : '👁 Leitura';
+  if (userRole !== 'admin') document.getElementById('tab-empresas').style.display = 'none';
+  popularAnos();
+  carregarDados();
+}
+
+function popularAnos() {
+  const sel = document.getElementById('ano-select');
+  sel.innerHTML = '';
+  const anos = ['2023','2024','2025','2026'];
+  anos.forEach(a => {
+    const op = document.createElement('option');
+    op.value = a; op.textContent = a;
+    if (a === anoActivo) op.selected = true;
+    sel.appendChild(op);
+  });
+}
+
+window.mudarAno = function() {
+  anoActivo = document.getElementById('ano-select').value;
+  carregarDados();
+};
+
+// ===================== DADOS =====================
+function carregarDados() {
+  // Empresas (globais, sem ano)
+  onValue(ref(db, 'empresas'), snap => {
+    empresasCache = snap.val() || {};
+    // Se ainda não há empresas, importar do seed
+    if (Object.keys(empresasCache).length === 0 && userRole === 'admin') {
+      importarEmpresas();
+    }
+    // Carregar mod22, ies e irc2025 do ano activo
+    onValue(ref(db, `anos/${anoActivo}/mod22`), s2 => {
+      mod22Cache = s2.val() || {};
+      onValue(ref(db, `anos/${anoActivo}/ies`), s3 => {
+        iesCache = s3.val() || {};
+        onValue(ref(db, `anos/${anoActivo}/irc2025`), s4 => {
+          irc2025Cache = s4.val() || {};
+          renderTab(tabActiva());
+        }, { onlyOnce: true });
+      }, { onlyOnce: true });
+    }, { onlyOnce: true });
+  }, { onlyOnce: true });
+}
+
+function tabActiva() {
+  const tabs = document.querySelectorAll('.tab');
+  const labels = ['dashboard','mod22','ies','irc2025','empresas'];
+  for (let i=0; i<tabs.length; i++) {
+    if (tabs[i].classList.contains('active')) return labels[i];
+  }
+  return 'dashboard';
+}
+
+// ===================== SEED EMPRESAS =====================
+async function importarEmpresas() {
+  const seed = EMPRESAS_SEED;
+  const updates = {};
+  seed.forEach(e => {
+    updates[`empresas/${e.nif}`] = {
+      id: e.id, nome: e.nome, nif: e.nif, senhaAT: e.senhaAT, arquivado: false, criadoEm: Date.now()
+    };
+  });
+  await update(ref(db), updates);
+  toast('68 empresas importadas com sucesso!', 'success');
+  carregarDados();
+}
+
+// ===================== TABS =====================
+window.showTab = function(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['dashboard','mod22','ies','irc2025','empresas'][i] === tab);
+  });
+  renderTab(tab);
+};
+
+function renderTab(tab) {
+  const main = document.getElementById('main-content');
+  if (tab === 'dashboard') main.innerHTML = renderDashboard();
+  else if (tab === 'mod22') main.innerHTML = renderMod22();
+  else if (tab === 'ies') main.innerHTML = renderIES();
+  else if (tab === 'irc2025') main.innerHTML = renderIRC2025();
+  else if (tab === 'empresas') main.innerHTML = renderEmpresas();
+  afterRender(tab);
+}
+
+// ===================== DASHBOARD =====================
+function renderDashboard() {
+  const empresas = Object.values(empresasCache).filter(e => !e.arquivado);
+  const total = empresas.length;
+
+  // MOD 22 stats
+  const m22 = Object.values(mod22Cache);
+  const m22pend = empresas.filter(e => !mod22Cache[e.nif] || mod22Cache[e.nif].fase === 'pendente').length;
+  const m22proc = empresas.filter(e => mod22Cache[e.nif]?.fase === 'processo').length;
+  const m22pronto = empresas.filter(e => mod22Cache[e.nif]?.fase === 'pronto').length;
+  const m22env = empresas.filter(e => mod22Cache[e.nif]?.fase === 'enviado').length;
+  const m22valid = empresas.filter(e => mod22Cache[e.nif]?.fase === 'validado').length;
+  const m22erro = empresas.filter(e => mod22Cache[e.nif]?.fase === 'erro').length;
+  const m22total = m22env + m22valid;
+
+  // IES stats
+  const iesPend = empresas.filter(e => !iesCache[e.nif] || iesCache[e.nif].fase === 'pendente').length;
+  const iesEnv = empresas.filter(e => iesCache[e.nif]?.fase === 'enviado').length;
+  const iesValid = empresas.filter(e => iesCache[e.nif]?.fase === 'validado').length;
+  const iesTotal = iesEnv + iesValid;
+
+  // Alertas: mod22 entregue mas IES pendente
+  const alertas = empresas.filter(e => {
+    const m = mod22Cache[e.nif];
+    const i = iesCache[e.nif];
+    return (m?.fase === 'validado' || m?.fase === 'enviado') && (!i || i.fase === 'pendente');
+  });
+
+  // Financeiro
+  const totalPagar = empresas.reduce((s, e) => {
+    const m = mod22Cache[e.nif];
+    if (m?.resultado === 'pagar' && m?.valor) return s + parseFloat(m.valor);
+    return s;
+  }, 0);
+  const totalReceber = empresas.reduce((s, e) => {
+    const m = mod22Cache[e.nif];
+    if (m?.resultado === 'receber' && m?.valor) return s + parseFloat(m.valor);
+    return s;
+  }, 0);
+
+  // Prazos
+  const hoje = new Date();
+  const prazoMod22 = new Date(anoActivo === '2025' ? '2026-05-31' : `${parseInt(anoActivo)+1}-05-31`);
+  const prazoIES = new Date(anoActivo === '2025' ? '2026-07-15' : `${parseInt(anoActivo)+1}-07-15`);
+  const diasMod22 = Math.ceil((prazoMod22 - hoje) / 86400000);
+  const diasIES = Math.ceil((prazoIES - hoje) / 86400000);
+  const corMod22 = diasMod22 < 0 ? 'sem-vermelho' : diasMod22 < 15 ? 'sem-amarelo' : 'sem-verde';
+  const corIES = diasIES < 0 ? 'sem-vermelho' : diasIES < 30 ? 'sem-amarelo' : 'sem-verde';
+
+  const pctM22 = total ? Math.round(m22total/total*100) : 0;
+  const pctIES = total ? Math.round(iesTotal/total*100) : 0;
+  const pdfMod22Count = empresas.filter(e => mod22Cache[e.nif]?.pdfMod22).length;
+  const pdfIESCount = empresas.filter(e => iesCache[e.nif]?.pdfIES).length;
+  const xlsIRCCount = empresas.filter(e => irc2025Cache[e.nif]?.xlsPrevisa).length;
+
+  return `
+<div class="dash-prazo">
+  <div class="dash-prazo-item">
+    <span class="label">Campanha</span>
+    <span class="val">${anoActivo}</span>
+  </div>
+  <div class="dash-prazo-sep"></div>
+  <div class="dash-prazo-item">
+    <span class="label">Prazo Mod. 22</span>
+    <span class="val">31/05/${parseInt(anoActivo)+1}</span>
+  </div>
+  <div class="dash-prazo-item">
+    <span class="label">Dias restantes</span>
+    <span class="val alerta">${diasMod22 < 0 ? 'EXPIRADO' : diasMod22 + ' dias'}</span>
+  </div>
+  <div class="dash-prazo-sep"></div>
+  <div class="dash-prazo-item">
+    <span class="label">Prazo IES</span>
+    <span class="val">15/07/${parseInt(anoActivo)+1}</span>
+  </div>
+  <div class="dash-prazo-item">
+    <span class="label">Dias restantes</span>
+    <span class="val alerta">${diasIES < 0 ? 'EXPIRADO' : diasIES + ' dias'}</span>
+  </div>
+  <div class="dash-prazo-sep"></div>
+  <div class="dash-prazo-item">
+    <span class="label">Empresas activas</span>
+    <span class="val">${total}</span>
+  </div>
+</div>
+
+${alertas.length > 0 ? `
+<div class="alertas-box">
+  <h3>⚠️ Atenção — Mod.22 entregue mas IES pendente (${alertas.length})</h3>
+  ${alertas.map(e => `<div class="alerta-item">· ${e.nome} <span style="color:var(--cinza)">(${e.nif})</span></div>`).join('')}
+</div>` : ''}
+
+<div class="cards-grid">
+  <div class="card azul">
+    <div class="card-label">Mod. 22 · Entregues</div>
+    <div class="card-val">${m22total}/${total}</div>
+    <div class="card-sub">${pctM22}% concluído</div>
+  </div>
+  <div class="card verde">
+    <div class="card-label">Mod. 22 · Validados AT</div>
+    <div class="card-val">${m22valid}</div>
+    <div class="card-sub">+ ${m22env} enviados aguardam</div>
+  </div>
+  <div class="card laranja">
+    <div class="card-label">Mod. 22 · Pendentes</div>
+    <div class="card-val">${m22pend}</div>
+    <div class="card-sub">${m22proc} em processo · ${m22pronto} prontos</div>
+  </div>
+  ${m22erro > 0 ? `<div class="card vermelho"><div class="card-label">Mod. 22 · Erros AT</div><div class="card-val">${m22erro}</div><div class="card-sub">Requerem atenção</div></div>` : ''}
+  <div class="card azul">
+    <div class="card-label">IES · Entregues</div>
+    <div class="card-val">${iesTotal}/${total}</div>
+    <div class="card-sub">${pctIES}% concluído</div>
+  </div>
+  <div class="card laranja">
+    <div class="card-label">IES · Pendentes</div>
+    <div class="card-val">${iesPend}</div>
+    <div class="card-sub">${iesValid} validadas AT</div>
+  </div>
+  <div class="card vermelho">
+    <div class="card-label">Total a Pagar (IRC)</div>
+    <div class="card-val" style="font-size:1.4rem">${totalPagar.toLocaleString('pt-PT',{style:'currency',currency:'EUR'})}</div>
+    <div class="card-sub">Apurado</div>
+  </div>
+  <div class="card verde">
+    <div class="card-label">Total a Receber (IRC)</div>
+    <div class="card-val" style="font-size:1.4rem">${totalReceber.toLocaleString('pt-PT',{style:'currency',currency:'EUR'})}</div>
+    <div class="card-sub">Reembolso</div>
+  </div>
+</div>
+
+<div style="background:var(--branco);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--sombra);margin-bottom:20px;">
+  <h3 style="font-size:0.85rem;color:var(--azul);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">Progresso da Campanha ${anoActivo}</h3>
+  <div class="progress-row">
+    <span class="progress-label">Mod. 22</span>
+    <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${pctM22}%"></div></div>
+    <span class="progress-count">${m22total}/${total} <small style="color:var(--cinza)">(${pctM22}%)</small></span>
+  </div>
+  <div class="progress-row">
+    <span class="progress-label">IES</span>
+    <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${pctIES}%;background:var(--azul2)"></div></div>
+    <span class="progress-count">${iesTotal}/${total} <small style="color:var(--cinza)">(${pctIES}%)</small></span>
+  </div>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--borda);display:flex;gap:24px;font-size:12px;color:var(--cinza)">
+    <span>📄 PDFs Mod.22 arquivados: <strong style="color:${pdfMod22Count>0?'var(--verde)':'var(--cinza)'}">${pdfMod22Count}/${total}</strong></span>
+    <span>📄 PDFs IES arquivados: <strong style="color:${pdfIESCount>0?'var(--verde)':'var(--cinza)'}">${pdfIESCount}/${total}</strong></span>
+    <span>🧮 XLS Previsa IRC 2025: <strong style="color:${xlsIRCCount>0?'var(--verde)':'var(--cinza)'}">${xlsIRCCount}/${total}</strong></span>
+  </div>
+</div>
+`;
+}
+
+// ===================== MOD 22 =====================
+function renderMod22() {
+  const empresas = Object.values(empresasCache).filter(e => !e.arquivado).sort((a,b) => a.nome.localeCompare(b.nome));
+  const fases = ['pendente','processo','pronto','enviado','validado','erro','isento'];
+
+  return `
+<div class="toolbar">
+  <input type="text" id="search-mod22" placeholder="🔍 Pesquisar empresa..." oninput="filtrarMod22()">
+  <select id="filtro-fase-mod22" onchange="filtrarMod22()">
+    <option value="">Todas as fases</option>
+    <option value="pendente">Pendente</option>
+    <option value="processo">Em Processo</option>
+    <option value="pronto">Pronto</option>
+    <option value="enviado">Enviado AT</option>
+    <option value="validado">Validado AT</option>
+    <option value="erro">Erro AT</option>
+    <option value="isento">Isento</option>
+  </select>
+  <select id="filtro-resultado-mod22" onchange="filtrarMod22()">
+    <option value="">Todos os resultados</option>
+    <option value="pagar">A Pagar</option>
+    <option value="receber">A Receber</option>
+    <option value="zero">Zero</option>
+  </select>
+  ${userRole==='admin' ? `<button class="btn btn-ouro" onclick="exportarExcelMod22()">⬇ Excel</button>` : ''}
+</div>
+<div class="table-wrap">
+<table id="table-mod22">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Empresa</th>
+  <th>NIF</th>
+  <th>Fase</th>
+  <th>Data Envio</th>
+  <th>Data Valid.</th>
+  <th>Resultado</th>
+  <th>Valor (€)</th>
+  <th>Método Pag.</th>
+  <th>Data Pag.</th>
+  <th>IES</th>
+  <th>PDF</th>
+  ${userRole==='admin' ? '<th>Acções</th>' : ''}
+</tr>
+</thead>
+<tbody id="tbody-mod22">
+${empresas.map((e,i) => renderRowMod22(e, i+1)).join('')}
+</tbody>
+<tfoot>
+<tr>
+  <td colspan="7">Total</td>
+  <td id="total-mod22-pagar"></td>
+  <td colspan="${userRole==='admin' ? 4 : 3}"></td>
+</tr>
+</tfoot>
+</table>
+</div>`;
+}
+
+function renderRowMod22(e, i) {
+  const m = mod22Cache[e.nif] || {};
+  const ies = iesCache[e.nif] || {};
+  const fase = m.fase || 'pendente';
+  const iesFase = ies.fase || 'pendente';
+
+  // Alerta: mod22 validado/enviado mas IES pendente
+  const alertaIES = (fase === 'validado' || fase === 'enviado') && iesFase === 'pendente';
+
+  return `<tr data-nif="${e.nif}" data-nome="${e.nome.toLowerCase()}" data-fase="${fase}" data-resultado="${m.resultado||''}">
+  <td>${i}</td>
+  <td class="nome">${e.nome}<small>${e.nif}</small></td>
+  <td style="font-family:monospace;font-size:12px">${e.nif}</td>
+  <td><span class="badge badge-${fase}">${faseLbl(fase)}</span></td>
+  <td>${m.dataEnvio || '—'}</td>
+  <td>${m.dataValidacao || '—'}</td>
+  <td>${m.resultado ? resultadoLbl(m.resultado) : '—'}</td>
+  <td>${m.valor ? formatEur(m.valor, m.resultado) : '—'}</td>
+  <td>${m.metodoPag || '—'}</td>
+  <td>${m.dataPag || '—'}</td>
+  <td>${alertaIES ? '<span class="badge badge-pend-ies">⚠ Pendente</span>' : '<span class="badge badge-' + (iesFase==='validado'||iesFase==='enviado' ? 'yes' : 'pendente') + '">' + faseLbl(iesFase) + '</span>'}</td>
+  <td>${m.pdfMod22 ? `<button class="btn btn-ghost btn-sm" onclick="verPDF('mod22','${e.nif}')" title="${m.pdfMod22Nome||'PDF'}">📄</button>` : '—'}</td>
+  ${userRole==='admin' ? `<td><button class="btn btn-primary btn-sm" onclick="editarMod22('${e.nif}')">✏ Editar</button></td>` : ''}
+</tr>`;
+}
+
+function afterRender(tab) {
+  if (tab === 'mod22') calcTotalMod22();
+  if (tab === 'dashboard') {} // já calculado inline
+}
+
+function calcTotalMod22() {
+  const empresas = Object.values(empresasCache).filter(e => !e.arquivado);
+  const totalPagar = empresas.reduce((s,e) => {
+    const m = mod22Cache[e.nif];
+    return m?.resultado === 'pagar' && m?.valor ? s + parseFloat(m.valor) : s;
+  }, 0);
+  const el = document.getElementById('total-mod22-pagar');
+  if (el) el.textContent = totalPagar > 0 ? totalPagar.toLocaleString('pt-PT',{style:'currency',currency:'EUR'}) : '—';
+}
+
+window.filtrarMod22 = function() {
+  const q = document.getElementById('search-mod22')?.value.toLowerCase() || '';
+  const fase = document.getElementById('filtro-fase-mod22')?.value || '';
+  const res = document.getElementById('filtro-resultado-mod22')?.value || '';
+  document.querySelectorAll('#tbody-mod22 tr').forEach(tr => {
+    const nome = tr.dataset.nome || '';
+    const nif = tr.dataset.nif || '';
+    const trFase = tr.dataset.fase || '';
+    const trRes = tr.dataset.resultado || '';
+    const ok = (!q || nome.includes(q) || nif.includes(q))
+      && (!fase || trFase === fase)
+      && (!res || trRes === res);
+    tr.style.display = ok ? '' : 'none';
+  });
+};
+
+window.editarMod22 = function(nif) {
+  const e = empresasCache[nif];
+  const m = mod22Cache[nif] || {};
+  document.getElementById('modal-title').textContent = `Mod. 22 IRC ${anoActivo} · ${e.nome}`;
+  document.getElementById('modal-body').innerHTML = `
+<div class="form-grid">
+  <div class="form-group span2"><div class="form-section">Identificação</div></div>
+  <div class="form-group"><label>NIF</label><input type="text" value="${e.nif}" disabled></div>
+  <div class="form-group"><label>Senha AT</label><input type="text" value="${e.senhaAT || ''}" disabled></div>
+  <div class="form-group span2"><div class="form-section">Controlo Mod. 22</div></div>
+  <div class="form-group">
+    <label>Fase</label>
+    <select id="m22-fase">
+      ${['pendente','processo','pronto','enviado','validado','erro','isento'].map(f => `<option value="${f}" ${m.fase===f?'selected':''}>${faseLbl(f)}</option>`).join('')}
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Resultado</label>
+    <select id="m22-resultado">
+      <option value="" ${!m.resultado?'selected':''}>—</option>
+      <option value="pagar" ${m.resultado==='pagar'?'selected':''}>A Pagar</option>
+      <option value="receber" ${m.resultado==='receber'?'selected':''}>A Receber</option>
+      <option value="zero" ${m.resultado==='zero'?'selected':''}>Zero</option>
+    </select>
+  </div>
+  <div class="form-group"><label>Valor (€)</label><input type="number" id="m22-valor" step="0.01" value="${m.valor||''}" placeholder="0.00"></div>
+  <div class="form-group">
+    <label>Método Pagamento</label>
+    <select id="m22-metodo">
+      <option value="" ${!m.metodoPag?'selected':''}>—</option>
+      <option value="Débito Directo" ${m.metodoPag==='Débito Directo'?'selected':''}>Débito Directo</option>
+      <option value="Multibanco" ${m.metodoPag==='Multibanco'?'selected':''}>Multibanco</option>
+      <option value="Transferência" ${m.metodoPag==='Transferência'?'selected':''}>Transferência</option>
+      <option value="Cheque" ${m.metodoPag==='Cheque'?'selected':''}>Cheque</option>
+      <option value="MBWay" ${m.metodoPag==='MBWay'?'selected':''}>MBWay</option>
+    </select>
+  </div>
+  <div class="form-group"><label>Data Envio AT</label><input type="date" id="m22-dataenvio" value="${m.dataEnvio||''}"></div>
+  <div class="form-group"><label>Data Validação AT</label><input type="date" id="m22-datavalid" value="${m.dataValidacao||''}"></div>
+  <div class="form-group"><label>Data Pagamento</label><input type="date" id="m22-datapag" value="${m.dataPag||''}"></div>
+  <div class="form-group span2"><div class="form-section">Arquivo PDF — Mod.22 Validada</div></div>
+  <div class="form-group span2">
+    <label>PDF da Declaração Validada pelo AT</label>
+    ${m.pdfMod22
+      ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+           <span style="color:var(--verde);font-size:13px">✅ PDF arquivado</span>
+           <button type="button" class="btn btn-ghost btn-sm" onclick="verPDF('mod22','${nif}')">👁 Ver</button>
+           <button type="button" class="btn btn-sm btn-warn" onclick="apagarPDF('mod22','${nif}')">🗑 Remover</button>
+         </div>`
+      : ''}
+    <input type="file" id="m22-pdf" accept="application/pdf" style="font-size:12px;color:var(--texto)">
+    <small style="color:var(--cinza);font-size:11px">Máx. 1MB · Apenas PDF · Substitui o anterior se já existir</small>
+  </div>
+  <div class="form-group span2"><div class="form-section">IES (associada)</div></div>
+  <div class="form-group">
+    <label>IES entregue?</label>
+    <select id="m22-ies-flag">
+      <option value="nao" ${!m.iesAssoc||m.iesAssoc==='nao'?'selected':''}>Não</option>
+      <option value="sim" ${m.iesAssoc==='sim'?'selected':''}>Sim</option>
+    </select>
+  </div>
+  <div class="form-group span2"><label>Observações</label><textarea id="m22-obs" rows="2">${m.obs||''}</textarea></div>
+</div>`;
+  document.getElementById('modal-footer').innerHTML = `
+<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+<button class="btn btn-primary" onclick="guardarMod22('${nif}')">💾 Guardar</button>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+};
+
+window.guardarMod22 = async function(nif) {
+  const dados = {
+    fase: document.getElementById('m22-fase').value,
+    resultado: document.getElementById('m22-resultado').value,
+    valor: document.getElementById('m22-valor').value,
+    metodoPag: document.getElementById('m22-metodo').value,
+    dataEnvio: document.getElementById('m22-dataenvio').value,
+    dataValidacao: document.getElementById('m22-datavalid').value,
+    dataPag: document.getElementById('m22-datapag').value,
+    iesAssoc: document.getElementById('m22-ies-flag').value,
+    obs: document.getElementById('m22-obs').value,
+    actualizadoEm: Date.now()
+  };
+  // Manter PDF existente
+  if (mod22Cache[nif]?.pdfMod22) dados.pdfMod22 = mod22Cache[nif].pdfMod22;
+  // Novo PDF
+  const fileInput = document.getElementById('m22-pdf');
+  if (fileInput && fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    if (file.size > 1.5 * 1024 * 1024) { toast('PDF demasiado grande (máx. 1.5MB)!', 'error'); return; }
+    dados.pdfMod22 = await lerFicheiroBase64(file);
+    dados.pdfMod22Nome = file.name;
+    dados.pdfMod22Data = new Date().toLocaleDateString('pt-PT');
+  }
+  await set(ref(db, `anos/${anoActivo}/mod22/${nif}`), dados);
+  mod22Cache[nif] = dados;
+  closeModal();
+  showTab('mod22');
+  toast('Mod. 22 guardado!' + (fileInput?.files.length > 0 ? ' PDF arquivado ✅' : ''), 'success');
+};
+
+// ===================== IES =====================
+function renderIES() {
+  const empresas = Object.values(empresasCache).filter(e => !e.arquivado).sort((a,b) => a.nome.localeCompare(b.nome));
+  return `
+<div class="toolbar">
+  <input type="text" id="search-ies" placeholder="🔍 Pesquisar empresa..." oninput="filtrarIES()">
+  <select id="filtro-fase-ies" onchange="filtrarIES()">
+    <option value="">Todas as fases</option>
+    <option value="pendente">Pendente</option>
+    <option value="processo">Em Processo</option>
+    <option value="enviado">Enviado AT</option>
+    <option value="validado">Validado AT</option>
+    <option value="erro">Erro AT</option>
+    <option value="isento">Isento</option>
+  </select>
+  ${userRole==='admin' ? `<button class="btn btn-ouro" onclick="exportarExcelIES()">⬇ Excel</button>` : ''}
+</div>
+<div class="table-wrap">
+<table id="table-ies">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Empresa</th>
+  <th>NIF</th>
+  <th>Fase</th>
+  <th>Data Envio</th>
+  <th>Data Valid.</th>
+  <th>Mod.22 Assoc.</th>
+  <th>Contab. Anex.</th>
+  <th>Despacho</th>
+  <th>PDF</th>
+  ${userRole==='admin' ? '<th>Acções</th>' : ''}
+</tr>
+</thead>
+<tbody id="tbody-ies">
+${empresas.map((e,i) => renderRowIES(e, i+1)).join('')}
+</tbody>
+</table>
+</div>`;
+}
+
+function renderRowIES(e, i) {
+  const d = iesCache[e.nif] || {};
+  const fase = d.fase || 'pendente';
+  return `<tr data-nif="${e.nif}" data-nome="${e.nome.toLowerCase()}" data-fase="${fase}">
+  <td>${i}</td>
+  <td class="nome">${e.nome}<small>${e.nif}</small></td>
+  <td style="font-family:monospace;font-size:12px">${e.nif}</td>
+  <td><span class="badge badge-${fase}">${faseLbl(fase)}</span></td>
+  <td>${d.dataEnvio || '—'}</td>
+  <td>${d.dataValidacao || '—'}</td>
+  <td><span class="badge badge-${d.mod22Assoc==='sim'?'yes':'no'}">${d.mod22Assoc==='sim'?'Sim':'Não'}</span></td>
+  <td><span class="badge badge-${d.contabAnex==='sim'?'yes':'no'}">${d.contabAnex==='sim'?'Sim':'Não'}</span></td>
+  <td>${d.despacho || '—'}</td>
+  <td>${d.pdfIES ? `<button class="btn btn-ghost btn-sm" onclick="verPDF('ies','${e.nif}')" title="${d.pdfIESNome||'PDF'}">📄</button>` : '—'}</td>
+  ${userRole==='admin' ? `<td><button class="btn btn-primary btn-sm" onclick="editarIES('${e.nif}')">✏ Editar</button></td>` : ''}
+</tr>`;
+}
+
+window.filtrarIES = function() {
+  const q = document.getElementById('search-ies')?.value.toLowerCase() || '';
+  const fase = document.getElementById('filtro-fase-ies')?.value || '';
+  document.querySelectorAll('#tbody-ies tr').forEach(tr => {
+    const nome = tr.dataset.nome || '';
+    const nif = tr.dataset.nif || '';
+    const trFase = tr.dataset.fase || '';
+    const ok = (!q || nome.includes(q) || nif.includes(q)) && (!fase || trFase === fase);
+    tr.style.display = ok ? '' : 'none';
+  });
+};
+
+window.editarIES = function(nif) {
+  const e = empresasCache[nif];
+  const d = iesCache[nif] || {};
+  document.getElementById('modal-title').textContent = `IES ${anoActivo} · ${e.nome}`;
+  document.getElementById('modal-body').innerHTML = `
+<div class="form-grid">
+  <div class="form-group span2"><div class="form-section">Identificação</div></div>
+  <div class="form-group"><label>NIF</label><input type="text" value="${e.nif}" disabled></div>
+  <div class="form-group"><label>Senha AT</label><input type="text" value="${e.senhaAT || ''}" disabled></div>
+  <div class="form-group span2"><div class="form-section">Controlo IES</div></div>
+  <div class="form-group">
+    <label>Fase</label>
+    <select id="ies-fase">
+      ${['pendente','processo','enviado','validado','erro','isento'].map(f => `<option value="${f}" ${d.fase===f?'selected':''}>${faseLbl(f)}</option>`).join('')}
+    </select>
+  </div>
+  <div class="form-group"><label>Data Envio AT</label><input type="date" id="ies-dataenvio" value="${d.dataEnvio||''}"></div>
+  <div class="form-group"><label>Data Validação AT</label><input type="date" id="ies-datavalid" value="${d.dataValidacao||''}"></div>
+  <div class="form-group">
+    <label>Mod. 22 Associada?</label>
+    <select id="ies-mod22">
+      <option value="sim" ${d.mod22Assoc==='sim'?'selected':''}>Sim</option>
+      <option value="nao" ${!d.mod22Assoc||d.mod22Assoc==='nao'?'selected':''}>Não</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Contabilidade Anexa?</label>
+    <select id="ies-contab">
+      <option value="sim" ${d.contabAnex==='sim'?'selected':''}>Sim</option>
+      <option value="nao" ${!d.contabAnex||d.contabAnex==='nao'?'selected':''}>Não</option>
+    </select>
+  </div>
+  <div class="form-group"><label>Despacho / Referência</label><input type="text" id="ies-despacho" value="${d.despacho||''}" placeholder="Nº despacho AT"></div>
+  <div class="form-group span2"><label>Observações</label><textarea id="ies-obs" rows="2">${d.obs||''}</textarea></div>
+  <div class="form-group span2"><div class="form-section">Arquivo PDF — IES Validada</div></div>
+  <div class="form-group span2">
+    <label>PDF da IES Validada pelo AT</label>
+    ${d.pdfIES
+      ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+           <span style="color:var(--verde);font-size:13px">✅ PDF arquivado</span>
+           <button type="button" class="btn btn-ghost btn-sm" onclick="verPDF('ies','${nif}')">👁 Ver</button>
+           <button type="button" class="btn btn-sm btn-warn" onclick="apagarPDF('ies','${nif}')">🗑 Remover</button>
+         </div>`
+      : ''}
+    <input type="file" id="ies-pdf" accept="application/pdf" style="font-size:12px;color:var(--texto)">
+    <small style="color:var(--cinza);font-size:11px">Máx. 2MB · Apenas PDF · Substitui o anterior se já existir</small>
+  </div>
+</div>`;
+  document.getElementById('modal-footer').innerHTML = `
+<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+<button class="btn btn-primary" onclick="guardarIES('${nif}')">💾 Guardar</button>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+};
+
+window.guardarIES = async function(nif) {
+  const dados = {
+    fase: document.getElementById('ies-fase').value,
+    dataEnvio: document.getElementById('ies-dataenvio').value,
+    dataValidacao: document.getElementById('ies-datavalid').value,
+    mod22Assoc: document.getElementById('ies-mod22').value,
+    contabAnex: document.getElementById('ies-contab').value,
+    despacho: document.getElementById('ies-despacho').value,
+    obs: document.getElementById('ies-obs').value,
+    actualizadoEm: Date.now()
+  };
+  // Manter PDF existente
+  if (iesCache[nif]?.pdfIES) dados.pdfIES = iesCache[nif].pdfIES;
+  // Novo PDF
+  const fileInput = document.getElementById('ies-pdf');
+  if (fileInput && fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    if (file.size > 2.5 * 1024 * 1024) { toast('PDF demasiado grande (máx. 2.5MB)!', 'error'); return; }
+    dados.pdfIES = await lerFicheiroBase64(file);
+    dados.pdfIESNome = file.name;
+    dados.pdfIESData = new Date().toLocaleDateString('pt-PT');
+  }
+  await set(ref(db, `anos/${anoActivo}/ies/${nif}`), dados);
+  iesCache[nif] = dados;
+  closeModal();
+  showTab('ies');
+  toast('IES guardada!' + (fileInput?.files.length > 0 ? ' PDF arquivado ✅' : ''), 'success');
+};
+
+// ===================== IRC 2025 =====================
+let irc2025Cache = {};
+
+function renderIRC2025() {
+  const empresas = Object.values(empresasCache)
+    .filter(e => !e.arquivado)
+    .sort((a,b) => a.nome.localeCompare(b.nome));
+  const xlsCount = empresas.filter(e => irc2025Cache[e.nif]?.xlsPrevisa).length;
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="font-size:1.1rem;color:var(--azul);margin:0">🧮 IRC 2025 — Arquivo Previsa</h2>
+        <p style="font-size:0.78rem;color:var(--cinza);margin:4px 0 0">Arquivo do ficheiro XLS do Previsa por empresa · ${xlsCount} de ${empresas.length} arquivados</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Empresa</th><th>NIF</th>
+          <th>Previsa XLS</th>
+          <th>Data arquivo</th>
+          <th>Total IRC</th>
+          <th>Ações</th>
+        </tr></thead>
+        <tbody>
+          ${empresas.map(e => {
+            const d = irc2025Cache[e.nif] || {};
+            return `<tr>
+              <td><strong>${e.nome}</strong></td>
+              <td style="font-family:monospace">${e.nif}</td>
+              <td style="text-align:center">${d.xlsPrevisa
+                ? `<button class="btn btn-ghost btn-sm" onclick="verXLS('${e.nif}')" title="${d.xlsPrevisaNome||'XLS'}">📊</button>`
+                : '—'}</td>
+              <td style="font-size:0.78rem;color:var(--cinza)">${d.xlsPrevisaData||'—'}</td>
+              <td style="font-size:0.82rem;font-weight:700;${d.xlsValores?.total_pagar > 0 ? 'color:#c0392b' : d.xlsValores?.total_pagar < 0 ? 'color:var(--verde)' : ''}">
+                ${d.xlsValores != null
+                  ? (d.xlsValores.total_pagar >= 0
+                    ? '▲ '+parseFloat(d.xlsValores.total_pagar).toLocaleString('pt-PT',{minimumFractionDigits:2})+'€'
+                    : '▼ '+parseFloat(Math.abs(d.xlsValores.total_pagar)).toLocaleString('pt-PT',{minimumFractionDigits:2})+'€')
+                  : '—'}
+              </td>
+              <td><button class="btn btn-sm" onclick="editarIRC2025('${e.nif}')">✏️ Consultar</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+window.editarIRC2025 = function(nif) {
+  const e = empresasCache[nif];
+  const d = irc2025Cache[nif] || {};
+  const valoresHtml = d.xlsValores ? renderValoresPrevisa(d.xlsValores) : '';
+  document.getElementById('modal-title').textContent = `IRC 2025 · ${e.nome}`;
+  document.getElementById('modal-body').innerHTML = `
+    ${valoresHtml}
+    <div class="form-group span2">
+      <div class="form-section">Arquivo XLS — Simulação Previsa IRC 2025</div>
+    </div>
+    <div class="form-group span2">
+      ${d.xlsPrevisa
+        ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="color:var(--verde);font-size:13px">✅ ${d.xlsPrevisaNome||'XLS arquivado'}</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="verXLS('${nif}')">⬇️ Download</button>
+            <button type="button" class="btn btn-sm btn-warn" onclick="apagarXLS('${nif}')">🗑 Remover</button>
+           </div>`
+        : ''}
+      <label>Novo ficheiro XLS do Previsa</label>
+      <input type="file" id="irc-xls" accept=".xls,.xlsx" style="margin-top:6px" onchange="previewXLS(this,'${nif}')">
+      <small style="color:var(--cinza);font-size:11px">Máx. 2MB · XLS/XLSX · Lê automaticamente os valores chave do Previsa</small>
+    </div>
+    <div id="irc-preview" style="margin-top:4px"></div>`;
+  document.getElementById('modal-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    <button class="btn" onclick="guardarIRC2025('${nif}')">💾 Guardar</button>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+};
+
+function renderValoresPrevisa(v) {
+  if (!v) return '';
+  const fmt = n => n != null ? parseFloat(n).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '—';
+  const cls = n => n > 0 ? 'color:var(--azul);font-weight:700' : n < 0 ? 'color:var(--vermelho,#c0392b);font-weight:700' : '';
+  return `
+    <div style="background:#f0f7ff;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #c8dff7">
+      <div style="font-size:0.72rem;font-weight:800;color:var(--azul);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+        📊 Valores Previsa arquivados
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+        <tr style="border-bottom:1px solid #c8dff7">
+          <td style="padding:4px 6px;color:#555">Resultado Antes de Impostos (RAI)</td>
+          <td style="padding:4px 6px;text-align:right;${cls(v.rai)}">${fmt(v.rai)}</td>
+          <td style="padding:4px 6px;color:#555">Matéria Coletável (C311)</td>
+          <td style="padding:4px 6px;text-align:right;${cls(v.mc)}">${fmt(v.mc)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #c8dff7">
+          <td style="padding:4px 6px;color:#555">Lucro Tributável (C778)</td>
+          <td style="padding:4px 6px;text-align:right;${cls(v.lt)}">${fmt(v.lt)}</td>
+          <td style="padding:4px 6px;color:#555">Coleta IRC (C351)</td>
+          <td style="padding:4px 6px;text-align:right;${cls(v.coleta)}">${fmt(v.coleta)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #c8dff7">
+          <td style="padding:4px 6px;color:#555">Prejuízos deduzidos (C309)</td>
+          <td style="padding:4px 6px;text-align:right">${fmt(v.pj_ded)}</td>
+          <td style="padding:4px 6px;color:#555">Derrama municipal (C364)</td>
+          <td style="padding:4px 6px;text-align:right">${fmt(v.derrama)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #c8dff7">
+          <td style="padding:4px 6px;color:#555">Pagamentos por conta (C360)</td>
+          <td style="padding:4px 6px;text-align:right">${fmt(v.pc)}</td>
+          <td style="padding:4px 6px;color:#555">Retenções na fonte (C359)</td>
+          <td style="padding:4px 6px;text-align:right">${fmt(v.ret)}</td>
+        </tr>
+        <tr style="background:#e8f4fd">
+          <td style="padding:6px;font-weight:700;color:var(--azul)" colspan="2">
+            ${v.total_pagar >= 0 ? '▲ IRC A PAGAR (C367)' : '▼ IRC A RECUPERAR (C368)'}
+          </td>
+          <td style="padding:6px;text-align:right;font-size:1.05rem;font-weight:800;${v.total_pagar >= 0 ? 'color:#c0392b' : 'color:var(--verde)'}" colspan="2">
+            ${fmt(Math.abs(v.total_pagar))}
+          </td>
+        </tr>
+      </table>
+    </div>`;
+}
+
+window.previewXLS = async function(input, nif) {
+  const file = input.files[0];
+  if (!file) return;
+  const prev = document.getElementById('irc-preview');
+  prev.innerHTML = '<div style="color:var(--cinza);font-size:0.8rem;padding:6px">A ler ficheiro...</div>';
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, {type:'array'});
+    const vals = lerValoresPrevisa(wb);
+    if (vals) {
+      prev.innerHTML = renderValoresPrevisa(vals);
+      // Guardar valores lidos para usar no guardar
+      window._xlsValoresLidos = vals;
+    } else {
+      prev.innerHTML = '<div style="color:orange;font-size:0.8rem;padding:6px">⚠️ Não foi possível ler os valores — o ficheiro será arquivado na mesma.</div>';
+      window._xlsValoresLidos = null;
+    }
+  } catch(err) {
+    prev.innerHTML = '<div style="color:red;font-size:0.8rem;padding:6px">Erro ao ler o ficheiro: '+err.message+'</div>';
+    window._xlsValoresLidos = null;
+  }
+};
+
+function lerValoresPrevisa(wb) {
+  try {
+    // Folha "Q7 e Q9" — RAI, LT, Prejuízos, MC
+    const q7 = wb.Sheets['Q7 e Q9'];
+    // Folha " Res Q10" — Coleta, Derrama, PC, Retenções, Total
+    const q10 = wb.Sheets[' Res Q10'] || wb.Sheets['Res Q10'];
+    if (!q7 || !q10) return null;
+
+    // Converter para array de arrays
+    const q7d = XLSX.utils.sheet_to_json(q7, {header:1, defval:null});
+    const q10d = XLSX.utils.sheet_to_json(q10, {header:1, defval:null});
+
+    // RAI — linha 3, coluna D (índice 3) na Q7 e Q9
+    const rai = q7d[2]?.[3] || null;
+    // LT — linha 108, coluna D
+    const lt = q7d[107]?.[3] || null;
+    // Prejuízos deduzidos — linha 125, coluna D
+    const pj_ded = q7d[124]?.[3] || null;
+    // MC — linha 128, coluna D
+    const mc = q7d[127]?.[3] || null;
+
+    // Coleta IRC — linha 71, coluna C (índice 2) na Res Q10
+    const coleta = q10d[70]?.[2] || null;
+    // Derrama — linha 102, coluna C
+    const derrama = q10d[101]?.[2] || null;
+    // PC — linha 94, coluna C
+    const pc = q10d[93]?.[2] || null;
+    // Retenções — linha 93, coluna C
+    const ret = q10d[92]?.[2] || null;
+    // Total a pagar — linha 123, coluna C (positivo=pagar, negativo=recuperar)
+    const total_r = q10d[122]?.[2] || null;
+    const total_rc = q10d[123]?.[2] || null;
+    // Total: se recuperar é negativo no Previsa
+    const total_pagar = total_r != null && total_r !== 0 ? total_r :
+                        total_rc != null ? -Math.abs(total_rc) : 0;
+
+    return { rai, lt, pj_ded, mc, coleta, derrama, pc, ret, total_pagar };
+  } catch(e) {
+    console.error('lerValoresPrevisa:', e);
+    return null;
+  }
+}
+
+window.guardarIRC2025 = async function(nif) {
+  const dados = { actualizadoEm: Date.now() };
+  // Manter dados existentes
+  if (irc2025Cache[nif]?.xlsPrevisa) dados.xlsPrevisa = irc2025Cache[nif].xlsPrevisa;
+  if (irc2025Cache[nif]?.xlsPrevisaNome) dados.xlsPrevisaNome = irc2025Cache[nif].xlsPrevisaNome;
+  if (irc2025Cache[nif]?.xlsPrevisaData) dados.xlsPrevisaData = irc2025Cache[nif].xlsPrevisaData;
+  if (irc2025Cache[nif]?.xlsValores) dados.xlsValores = irc2025Cache[nif].xlsValores;
+  // Novo XLS
+  const fileInput = document.getElementById('irc-xls');
+  if (fileInput && fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    if (file.size > 2.5 * 1024 * 1024) { toast('Ficheiro demasiado grande (máx. 2.5MB)!', 'error'); return; }
+    dados.xlsPrevisa = await lerFicheiroBase64(file);
+    dados.xlsPrevisaNome = file.name;
+    dados.xlsPrevisaData = new Date().toLocaleDateString('pt-PT');
+    // Guardar valores lidos automaticamente
+    if (window._xlsValoresLidos) {
+      dados.xlsValores = window._xlsValoresLidos;
+      window._xlsValoresLidos = null;
+    }
+  }
+  await set(ref(db, `anos/${anoActivo}/irc2025/${nif}`), dados);
+  irc2025Cache[nif] = dados;
+  closeModal();
+  showTab('irc2025');
+  toast('IRC 2025 guardado!' + (fileInput?.files.length > 0 ? ' XLS arquivado ✅' : ''), 'success');
+};
+
+window.verXLS = function(nif) {
+  const d = irc2025Cache[nif];
+  if (!d?.xlsPrevisa) return;
+  // Converter base64 para blob e abrir
+  const base64 = d.xlsPrevisa.split(',')[1] || d.xlsPrevisa;
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+  const blob = new Blob([arr], {type:'application/vnd.ms-excel'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = d.xlsPrevisaNome||'previsa_irc2025.xls';
+  a.click(); URL.revokeObjectURL(url);
+};
+
+window.apagarXLS = async function(nif) {
+  if (!confirm('Remover o XLS arquivado desta empresa?')) return;
+  const dados = {...irc2025Cache[nif]};
+  delete dados.xlsPrevisa; delete dados.xlsPrevisaNome; delete dados.xlsPrevisaData;
+  await set(ref(db, `anos/${anoActivo}/irc2025/${nif}`), dados);
+  irc2025Cache[nif] = dados;
+  closeModal();
+  showTab('irc2025');
+  toast('XLS removido.', 'success');
+};
+
+// ===================== EMPRESAS =====================
+function renderEmpresas() {
+  const empresas = Object.values(empresasCache).sort((a,b) => a.nome.localeCompare(b.nome));
+  const activas = empresas.filter(e => !e.arquivado);
+  const arquivadas = empresas.filter(e => e.arquivado);
+  return `
+<div class="toolbar">
+  <input type="text" id="search-emp" placeholder="🔍 Pesquisar..." oninput="filtrarEmpresas()">
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+    <input type="checkbox" id="show-arquivadas" onchange="filtrarEmpresas()"> Mostrar arquivadas
+  </label>
+  <button class="btn btn-primary" onclick="novaEmpresa()">+ Nova Empresa</button>
+  <button class="btn btn-ghost" onclick="modalImportar()" style="font-size:12px">⬆ Re-importar Excel</button>
+</div>
+<div id="lista-empresas">
+${empresas.map(e => renderEmpresaCard(e)).join('')}
+</div>
+<div style="margin-top:16px;color:var(--cinza);font-size:12px">${activas.length} activas · ${arquivadas.length} arquivadas</div>`;
+}
+
+function renderEmpresaCard(e) {
+  const semSenha = !e.senhaAT;
+  return `<div class="empresa-card ${e.arquivado?'arquivado':''}" data-nif="${e.nif}" data-nome="${e.nome.toLowerCase()}" data-arq="${e.arquivado}">
+  <div>
+    <div style="font-weight:700;font-size:14px">${e.nome}</div>
+    <div class="empresa-nif">NIF: ${e.nif}</div>
+  </div>
+  <div>
+    ${semSenha
+      ? '<span class="sem-senha">⚠ Sem senha AT</span>'
+      : `<span class="empresa-senha" onclick="copiarSenha('${e.nif}')" title="Clicar para copiar">🔑 ${e.senhaAT}</span>`
+    }
+  </div>
+  ${e.arquivado ? '<span class="badge badge-cinza">Arquivada</span>' : ''}
+  <div class="empresa-actions">
+    <button class="btn btn-ghost btn-sm" onclick="editarEmpresa('${e.nif}')">✏ Editar</button>
+    <button class="btn btn-sm ${e.arquivado?'btn-success':'btn-warn'}" onclick="arquivarEmpresa('${e.nif}',${!e.arquivado})">${e.arquivado?'Reactivar':'Arquivar'}</button>
+  </div>
+</div>`;
+}
+
+window.filtrarEmpresas = function() {
+  const q = (document.getElementById('search-emp')?.value || '').toLowerCase();
+  const showArq = document.getElementById('show-arquivadas')?.checked;
+  document.querySelectorAll('#lista-empresas .empresa-card').forEach(card => {
+    const nome = card.dataset.nome || '';
+    const nif = card.dataset.nif || '';
+    const arq = card.dataset.arq === 'true';
+    const ok = (!q || nome.includes(q) || nif.includes(q)) && (showArq || !arq);
+    card.style.display = ok ? '' : 'none';
+  });
+};
+
+window.copiarSenha = function(nif) {
+  const e = empresasCache[nif];
+  navigator.clipboard.writeText(e.senhaAT).then(() => toast('Senha copiada!'));
+};
+
+window.novaEmpresa = function() {
+  document.getElementById('modal-title').textContent = 'Nova Empresa';
+  document.getElementById('modal-body').innerHTML = formEmpresa({});
+  document.getElementById('modal-footer').innerHTML = `
+<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+<button class="btn btn-primary" onclick="guardarEmpresa(null)">💾 Adicionar</button>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+};
+
+window.editarEmpresa = function(nif) {
+  const e = empresasCache[nif];
+  document.getElementById('modal-title').textContent = 'Editar Empresa';
+  document.getElementById('modal-body').innerHTML = formEmpresa(e);
+  document.getElementById('modal-footer').innerHTML = `
+<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+<button class="btn btn-primary" onclick="guardarEmpresa('${nif}')">💾 Guardar</button>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+};
+
+function formEmpresa(e) {
+  return `<div class="form-grid">
+<div class="form-group span2"><label>Nome da Empresa</label><input type="text" id="emp-nome" value="${e.nome||''}" placeholder="Designação social completa"></div>
+<div class="form-group"><label>NIF</label><input type="text" id="emp-nif" value="${e.nif||''}" placeholder="9 dígitos" maxlength="9" ${e.nif?'readonly':''}></div>
+<div class="form-group"><label>Senha AT</label><input type="text" id="emp-senha" value="${e.senhaAT||''}" placeholder="Senha Portal AT"></div>
+<div class="form-group span2"><label>Observações</label><textarea id="emp-obs">${e.obs||''}</textarea></div>
+</div>`;
+}
+
+window.guardarEmpresa = async function(nifOld) {
+  const nome = document.getElementById('emp-nome').value.trim();
+  const nif = document.getElementById('emp-nif').value.trim();
+  const senha = document.getElementById('emp-senha').value.trim();
+  const obs = document.getElementById('emp-obs').value.trim();
+  if (!nome || !nif) { toast('Nome e NIF são obrigatórios!', 'error'); return; }
+  if (nif.length !== 9 || isNaN(nif)) { toast('NIF deve ter 9 dígitos!', 'error'); return; }
+  const dados = { nome, nif, senhaAT: senha, obs, arquivado: false, actualizadoEm: Date.now() };
+  if (!nifOld) dados.criadoEm = Date.now();
+  await set(ref(db, `empresas/${nif}`), dados);
+  empresasCache[nif] = dados;
+  if (nifOld && nifOld !== nif) { await remove(ref(db, `empresas/${nifOld}`)); delete empresasCache[nifOld]; }
+  closeModal();
+  showTab('empresas');
+  toast('Empresa guardada!', 'success');
+};
+
+window.arquivarEmpresa = async function(nif, estado) {
+  await update(ref(db, `empresas/${nif}`), { arquivado: estado });
+  empresasCache[nif].arquivado = estado;
+  showTab('empresas');
+  toast(estado ? 'Empresa arquivada.' : 'Empresa reactivada.', 'success');
+};
+
+window.modalImportar = function() {
+  document.getElementById('modal-title').textContent = 'Re-importar Empresas do Excel';
+  document.getElementById('modal-body').innerHTML = `
+<p style="color:var(--texto2);margin-bottom:16px">Esta operação re-importa as 68 empresas do seed original (Excel de arranque), preservando as que já existem no Firebase.</p>
+<p style="color:var(--vermelho);font-weight:600">⚠ Atenção: as empresas já existentes não são sobrescritas. Apenas adiciona novas.</p>`;
+  document.getElementById('modal-footer').innerHTML = `
+<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+<button class="btn btn-warn" onclick="closeModal();importarEmpresas()">Importar</button>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+};
+
+// ===================== EXPORTAR EXCEL =====================
+window.exportarExcelMod22 = function() {
+  const empresas = Object.values(empresasCache).filter(e => !e.arquivado).sort((a,b) => a.nome.localeCompare(b.nome));
+  let csv = 'Nº;Empresa;NIF;Fase;Data Envio;Data Validação;Resultado;Valor (€);Método Pag.;Data Pag.;IES;Observações\n';
+  empresas.forEach((e,i) => {
+    const m = mod22Cache[e.nif] || {};
+    const ies = iesCache[e.nif] || {};
+    csv += `${i+1};"${e.nome}";${e.nif};${faseLbl(m.fase||'pendente')};${m.dataEnvio||''};${m.dataValidacao||''};${m.resultado||''};${m.valor||''};${m.metodoPag||''};${m.dataPag||''};${faseLbl(ies.fase||'pendente')};"${m.obs||''}"\n`;
+  });
+  downloadCSV(csv, `Mod22_IRC_${anoActivo}.csv`);
+};
+
+window.exportarExcelIES = function() {
+  const empresas = Object.values(empresasCache).filter(e => !e.arquivado).sort((a,b) => a.nome.localeCompare(b.nome));
+  let csv = 'Nº;Empresa;NIF;Fase;Data Envio;Data Validação;Mod.22 Assoc.;Contab. Anex.;Despacho;Observações\n';
+  empresas.forEach((e,i) => {
+    const d = iesCache[e.nif] || {};
+    csv += `${i+1};"${e.nome}";${e.nif};${faseLbl(d.fase||'pendente')};${d.dataEnvio||''};${d.dataValidacao||''};${d.mod22Assoc==='sim'?'Sim':'Não'};${d.contabAnex==='sim'?'Sim':'Não'};${d.despacho||''};"${d.obs||''}"\n`;
+  });
+  downloadCSV(csv, `IES_${anoActivo}.csv`);
+};
+
+function downloadCSV(csv, filename) {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Exportação concluída!', 'success');
+}
+
+// ===================== PDF HELPERS =====================
+function lerFicheiroBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+window.verPDF = function(tipo, nif) {
+  const cache = tipo === 'mod22' ? mod22Cache : iesCache;
+  const campo = tipo === 'mod22' ? 'pdfMod22' : 'pdfIES';
+  const d = cache[nif];
+  if (!d || !d[campo]) { toast('PDF não encontrado!', 'error'); return; }
+  const win = window.open('', '_blank');
+  win.document.write(`<html><head><title>${d[campo+'Nome']||'Declaração'}</title></head><body style="margin:0"><embed src="${d[campo]}" type="application/pdf" width="100%" height="100%"></body></html>`);
+};
+
+window.apagarPDF = async function(tipo, nif) {
+  if (!confirm('Remover PDF arquivado?')) return;
+  const path = tipo === 'mod22' ? `anos/${anoActivo}/mod22/${nif}` : `anos/${anoActivo}/ies/${nif}`;
+  const cache = tipo === 'mod22' ? mod22Cache : iesCache;
+  const campo = tipo === 'mod22' ? 'pdfMod22' : 'pdfIES';
+  const dadosAtuais = {...cache[nif]};
+  delete dadosAtuais[campo];
+  delete dadosAtuais[campo+'Nome'];
+  delete dadosAtuais[campo+'Data'];
+  await set(ref(db, path), dadosAtuais);
+  cache[nif] = dadosAtuais;
+  closeModal();
+  toast('PDF removido.', 'success');
+};
+
+// ===================== HELPERS =====================
+function faseLbl(f) {
+  const m = { pendente:'Pendente', processo:'Em Processo', pronto:'Pronto', enviado:'Enviado AT', validado:'Validado AT', erro:'Erro AT', isento:'Isento' };
+  return m[f] || f;
+}
+function resultadoLbl(r) {
+  const m = { pagar:'A Pagar', receber:'A Receber', zero:'Zero' };
+  return m[r] || r;
+}
+function formatEur(v, resultado) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return '—';
+  const f = n.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
+  if (resultado === 'pagar') return `<span class="valor-pos">${f}</span>`;
+  if (resultado === 'receber') return `<span class="valor-neg">${f}</span>`;
+  return f;
+}
+
+// ===================== MODAL =====================
+window.closeModal = function() { document.getElementById('modal-overlay').style.display = 'none'; };
+window.closeModalClick = function(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); };
+
+// ===================== TOAST =====================
+window.toast = function(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+};
+
+// ===================== SEED DATA =====================
+const EMPRESAS_SEED = [
+  {id:1,nome:"1966 A EVOLUÇÃO DO PARQUET UNIPESSOAL, LDA.",nif:"517502070",senhaAT:"MVYE1HQ1FSLA"},
+  {id:2,nome:"ACOLHINICIATIVA UNIPESSOAL LDA",nif:"518195902",senhaAT:"WFYE4NJLX8D5"},
+  {id:3,nome:"ALBINO RICARDO CARVALHO UNIPESSOAL, LDA",nif:"509309127",senhaAT:"DAFILALBINO"},
+  {id:4,nome:"ALCANCEPOPEIA, SA",nif:"510401503",senhaAT:"ALCANCE2023*"},
+  {id:5,nome:"ALESCKDOOM UNIPESSOAL,LDA",nif:"507620178",senhaAT:"ALESSANDRE1980"},
+  {id:6,nome:"AMANDIA FERNANDES UNIPESSOAL, LDA",nif:"513357360",senhaAT:"KBVK2HK48M35"},
+  {id:7,nome:"ANDRÉ RIBAS RIBEIRO UNIPESSOAL, LDA.",nif:"513835873",senhaAT:"belavista"},
+  {id:8,nome:"ARMINDO MARTINS OLIVEIRA, LDA",nif:"505490633",senhaAT:"ARMINDOOLIVEIRA"},
+  {id:9,nome:"AROMA ASSIDUO LAVANDARIAS SELF SERV.LDA.",nif:"515923613",senhaAT:"AROMA2022"},
+  {id:10,nome:"ASSOCIAÇÃO DE ARTESÕES",nif:"510692095",senhaAT:"TU949M9MBA1S"},
+  {id:11,nome:"ASSOCIAÇÃO DE PAIS ENCARREGADOS DE EDUCAÇÃO JARDIM DE INFÂNCIA CAMPO DA VINHA",nif:"506223434",senhaAT:"DAFILCAMPOVINHA"},
+  {id:12,nome:"ASSOCIAÇÃO DE PAIS JARDIM DE INFÂNCIA DE S.JOÃO",nif:"506844226",senhaAT:"QLCVGBRHSVZQ"},
+  {id:13,nome:"ASSOCIAÇÃO MUSICAL FAMILIA PEIXOTO",nif:"508253187",senhaAT:"DAFILPEIXOTO"},
+  {id:14,nome:"ASSOCIAÇÃO SOSHINKAI",nif:"508558247",senhaAT:"SOSHINKAI"},
+  {id:15,nome:"BOMBOS GEMEOS",nif:"509349706",senhaAT:"5852B8BPVV28"},
+  {id:16,nome:"CALCULO VIBRANTE UNIPESSOAL,LDA",nif:"510360858",senhaAT:"DAFILCALCULO"},
+  {id:17,nome:"CARLOS SILVA & RUI SILVA - CONSTRUÇÕES E REMODELAÇÕES LDA",nif:"518928560",senhaAT:""},
+  {id:18,nome:"CASUAL E BREVE CONSTRUÇÕES UNIPESSOAL,LDA",nif:"515279293",senhaAT:"CASUAL2020"},
+  {id:19,nome:"CONCEITOS E SIMETRIAS UNIPESSOAL,LDA",nif:"514072970",senhaAT:""},
+  {id:20,nome:"CONQUISTA CONVICTA IMOBILIÁRIA LDA",nif:"518017230",senhaAT:"7J2XYLA3D5AD"},
+  {id:21,nome:"CONSTROVIZELA LDA",nif:"508041210",senhaAT:"508041210CONST"},
+  {id:22,nome:"CONSTRUÇÕES PEDRO VAZ FERREIRA LDA",nif:"505102498",senhaAT:"505102498DAFIL"},
+  {id:23,nome:"CRISTINA MOITA UNIPESSOAL, LDA.",nif:"518124665",senhaAT:"BWB8W659DG42"},
+  {id:24,nome:"DAFILGEST – GABINETE DE CONTABILIDADE, UNIPESSOAL, LDA",nif:"505403447",senhaAT:"DAFILGESTLDA"},
+  {id:25,nome:"DALILA FERNANDES MACHADO UNIPESSOAL, LDA",nif:"513121587",senhaAT:"JKB1WQFN8VLL"},
+  {id:26,nome:"DIAMANTINO COSTA ALONSO LDA",nif:"513074805",senhaAT:"QQGGTNU5SEUK"},
+  {id:27,nome:"DIGNIDADE GARRIDA TRANSPORTES UNIPESSOAL LDA",nif:"518242226",senhaAT:"TLTHWCDRGFZ3"},
+  {id:28,nome:"DOCE FORUM UNIPESSOAL, LDA",nif:"510247717",senhaAT:"DOCEFORUM"},
+  {id:29,nome:"ENJOY VIEW GESTÃO E ADMINISTRAÇÃO DE BENS S A",nif:"513033556",senhaAT:"513033556DAFIL"},
+  {id:30,nome:"ENTREPRISE LUIS FERREIRA COSTA, LDA",nif:"513848100",senhaAT:"Y2VS2FYSBTGB"},
+  {id:31,nome:"EXTRURECICLA,LDA.",nif:"517302470",senhaAT:"CRLJLEFKTVYJ"},
+  {id:32,nome:"FANVICLIMA- INSTALAÇÕES DE CLIMATIZAÇÕES, LDA",nif:"504518879",senhaAT:"DAFILFANVICLIMA"},
+  {id:33,nome:"FERNANDO BRÁS MARTINS UNIPESSOAL, LDA",nif:"513363696",senhaAT:"A6M36TZJ2Q7B"},
+  {id:34,nome:"FEYDOM SOFA SYSTEMS UNIPESSOAL LDA",nif:"517260255",senhaAT:"XSW8SN23QKDF"},
+  {id:35,nome:"FILIPE SILVA LOPES UNIPESSOAL, LDA",nif:"513360212",senhaAT:"8P2NB4CTYYXZ"},
+  {id:36,nome:"FRANCISCO DANIEL PEDROSA DA SILVA UNIPESSOAL LDA.",nif:"518529347",senhaAT:"HBK7SLY4F8SF"},
+  {id:37,nome:"H.C ARAUJO, COMERCIO DE MATERIAL INFORMATICO MOBILIARIO E ACESSORIOS, LDA",nif:"506027104",senhaAT:"HCARAUJO"},
+  {id:38,nome:"HELDER CARNEIRO UNIPESSOAL, LDA",nif:"510397859",senhaAT:"DAFILHELDER"},
+  {id:39,nome:"JOAQUIM CUNHA FARIA UNIPESSOAL LDA.",nif:"513030425",senhaAT:"DAFILCUNHAFARIA"},
+  {id:40,nome:"JOAQUIM DAVID ABREU UNIPESSOAL, LDA",nif:"510513719",senhaAT:"JOAQUIMDAVID"},
+  {id:41,nome:"JP INOVAÇÕES UNIPESSOAL LDA",nif:"518373312",senhaAT:""},
+  {id:42,nome:"LUCILIA MAGALHÃES UNIPESSOAL,LDA",nif:"513257845",senhaAT:"ZTQTA36LCL4E"},
+  {id:43,nome:"LUIS MANUEL COSTA UNIPESSOAL,LDA",nif:"509842054",senhaAT:"LUISCOSTA"},
+  {id:44,nome:"MANUEL COSTA & FILHOS LDA.",nif:"502217677",senhaAT:"COSTAVINHOS"},
+  {id:45,nome:"MARIA MACHADO ALMEIDA UNIPESSOAL, LDA",nif:"510557759",senhaAT:"MARIAMACHADO"},
+  {id:46,nome:"MAURA MARLENE FERREIRA SILVA UNIPESSOAL, LDA",nif:"513415076",senhaAT:"513415076DAFIL"},
+  {id:47,nome:"MENDES DE FREITAS, LDA",nif:"507209710",senhaAT:"MENDESFREITAS"},
+  {id:48,nome:"METAS E PARÂMETROS UNIPESSOAL,LDA",nif:"514312483",senhaAT:""},
+  {id:49,nome:"MOTIVOS UNIVERSAIS UNIPESSOAL,LDA",nif:"517110008",senhaAT:"JH6F7PTP47T2"},
+  {id:50,nome:"MOTOCLUBE VIZELA",nif:"506327698",senhaAT:"MOTA2014"},
+  {id:51,nome:"MÉRITO INALTERÁVEL, LDA",nif:"513659099",senhaAT:"J7AU2F7S63M8"},
+  {id:52,nome:"NOTAS ELEGANTES, LDA",nif:"509646344",senhaAT:"NOTASELEGANTES"},
+  {id:53,nome:"ORIGINAL FLAME, LDA",nif:"517384825",senhaAT:"ORIGINAL23*"},
+  {id:54,nome:"PAULO JORGE FELIX UNIPESSOAL LDA",nif:"515473154",senhaAT:"PAULO2020"},
+  {id:55,nome:"PEDRO ABREU - MATERIAIS DE CONSTRUÇÃO, UNIPESSOAL LDA",nif:"510937330",senhaAT:""},
+  {id:56,nome:"PORTAL FUCHSIA UNIPESSOAL LDA.",nif:"510102662",senhaAT:""},
+  {id:57,nome:"POSTURA DE FADA UNIPESSOAL,LDA",nif:"514857501",senhaAT:"POSTURA2020"},
+  {id:58,nome:"RANCHO FOLCLORICO PENACOVA",nif:"502727390",senhaAT:"RANCHOPENACOVA"},
+  {id:59,nome:"RICARDO MENDES FERNANDES, UNIPESSOAL, LDA",nif:"514263890",senhaAT:"JFVGKCBYPJAZ"},
+  {id:60,nome:"SOCIEDADE AGRICOLA SOCALCOS DE TRESOURAS LDA",nif:"513713182",senhaAT:"SOCALCOS2022"},
+  {id:61,nome:"SPORTCALÇAR UNIPESSOAL LDA",nif:"517437538",senhaAT:"VJHEZ5TYVMK5"},
+  {id:62,nome:"SUPERMERCADOS VILELA, LDA",nif:"507550200",senhaAT:"SUPERVILELA"},
+  {id:63,nome:"SUSTENTATEORIA UNIPESSOAL,LDA",nif:"514971509",senhaAT:"SUSTENTATEORIA"},
+  {id:64,nome:"TC MENDES TEXTIL, LDA",nif:"514182628",senhaAT:"GPZGKHITGJPK"},
+  {id:65,nome:"TEIXEIRA DOS SANTOS & CARNEIRO, LDA",nif:"515126136",senhaAT:"DAFILTEIXEIRA"},
+  {id:66,nome:"URBOOST CREATIVE SOLUTIONS, LDA",nif:"516152467",senhaAT:"URBOOST2022"},
+  {id:67,nome:"VENGON PRECISION ENGINEERING, UNIPESSOAL, LDA.",nif:"519289129",senhaAT:""},
+  {id:68,nome:"WELCOME GENIALITY UNIPESSOAL, LDA",nif:"515100803",senhaAT:"DAFILWELCOME"}
+];
+
+
+// AuditNux: entrada automática com a sessão do AuditNux
+if (window.PROCDB && PROCDB.ligado()) window.doLogin();
+</script>
+</body>

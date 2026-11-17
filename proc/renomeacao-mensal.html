@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dafilgest — Renomeação de Documentos do Processamento Mensal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  :root {
+    --bg1: #0f1e35; --bg2: #1a3a5c;
+    --card: rgba(255,255,255,.06);
+    --card-hover: rgba(255,255,255,.1);
+    --border: rgba(255,255,255,.14);
+    --border2: rgba(255,255,255,.28);
+    --text: #ffffff;
+    --muted: rgba(255,255,255,.55);
+    --muted2: rgba(255,255,255,.35);
+    --accent: #c8a84b;
+    --accent-dark: #b8983b;
+    --accent-ink: #1a2535;
+    --accent-light: rgba(200,168,75,.14);
+    --warn-bg: rgba(230,126,34,.14);
+    --warn-border: rgba(230,126,34,.4);
+    --warn-text: #f0b06a;
+    --error: #e8615a;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 50%, var(--bg1) 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 28px 24px 60px;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .brand { text-align: center; margin-bottom: 8px; }
+  .brand-logo { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+  .brand-logo span { color: var(--accent); }
+  h1 { font-size: 16px; font-weight: 600; margin: 18px 0 4px; color: var(--text); text-align: center; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; line-height: 1.6; text-align: center; max-width: 620px; margin-left: auto; margin-right: auto; }
+
+  .stepline {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; justify-content: center;
+  }
+  .steplabel {
+    font-size: 10.5px; color: var(--muted); background: var(--card); border: 1px solid var(--border);
+    padding: 4px 11px; border-radius: 20px;
+  }
+
+  .tabs {
+    display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 16px; cursor: pointer; font-size: 13px; font-weight: 600;
+    color: var(--muted); border-bottom: 2px solid transparent; user-select: none;
+    white-space: nowrap; transition: color .15s;
+  }
+  .tab:hover:not(.active) { color: rgba(255,255,255,.8); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .tag {
+    display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+    background: var(--accent-light); color: var(--accent); border-radius: 8px; padding: 1px 6px; margin-left: 5px;
+  }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 16px; backdrop-filter: blur(6px); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  label.opt { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  input[type="file"] { font-size: 13px; color: var(--muted); }
+  input.field {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12.5px;
+    font-family: inherit; background: rgba(255,255,255,.07); color: var(--text); width: 100%;
+  }
+  input.field:focus { outline: none; border-color: var(--accent); }
+  input.field::placeholder { color: var(--muted2); }
+
+  button { background: var(--accent); color: var(--accent-ink); border: none; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s; }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { background: rgba(255,255,255,.15); color: var(--muted); cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--border2); }
+  button.secondary:hover { background: var(--accent-light); }
+  button.iconbtn { background: transparent; color: var(--accent); border: 1px solid var(--border); padding: 5px 10px; font-size: 12px; font-weight: 700; }
+  button.iconbtn:hover { border-color: var(--accent); background: var(--accent-light); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 14px; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); }
+  td.mono, th.mono { font-family: var(--mono); }
+  th { font-family: 'Inter', sans-serif; color: var(--muted); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  td.old { color: var(--muted); font-family: var(--mono); font-size: 11.5px; word-break: break-all; }
+  td.arrow { font-family: sans-serif; color: var(--muted); width: 20px; }
+  td.new { color: var(--accent); font-weight: 600; font-family: var(--mono); font-size: 12px; }
+  tr.rowwarn td { background: var(--warn-bg); }
+  .badge { display: inline-block; font-size: 9.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
+  .badge.ok { background: rgba(46,204,113,.14); color: #4fd88a; }
+  .badge.warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+
+  .note { font-size: 12.5px; color: var(--muted); background: var(--accent-light); border: 1px solid rgba(200,168,75,.2); border-radius: 8px; padding: 11px 13px; margin-bottom: 14px; line-height: 1.6; }
+  .note b { color: var(--accent); }
+  .warn { font-size: 12.5px; background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 10px 12px; margin-top: 12px; line-height: 1.5; color: var(--warn-text); }
+  .error-text { color: var(--error); font-weight: 700; }
+  .count-badge { display: inline-block; background: var(--accent-light); color: var(--accent); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; margin-left: 6px; }
+  .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .empty-hint { color: var(--muted); font-size: 13px; padding: 10px 0; }
+  .dropzone {
+    border: 2px dashed var(--border2); border-radius: 10px; background: rgba(255,255,255,.03);
+    padding: 24px 16px; text-align: center; cursor: pointer; margin-bottom: 12px; transition: background .15s, border-color .15s;
+  }
+  .dropzone:hover { border-color: var(--accent); background: var(--accent-light); }
+  .dropzone strong { display: block; font-size: 13.5px; margin-bottom: 3px; color: var(--text); }
+  .dropzone span { font-size: 12px; color: var(--muted); }
+  .processing { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+  .hidden { display: none !important; }
+  .footer-note { text-align: center; margin-top: 26px; font-size: 11px; color: var(--muted2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-logo">Dafil<span>gest</span></div>
+  </div>
+  <h1>Renomeação de Documentos — Processamento Mensal</h1>
+  <div class="sub">Tudo corre no teu browser — nenhum ficheiro é enviado para a internet. Escolhe o separador correspondente à fase do teu processo mensal.</div>
+
+  <div class="stepline">
+    <span class="steplabel">1. Processar salários</span>
+    <span class="steplabel">2. DMR (AT)</span>
+    <span class="steplabel">3. DRI (Seg. Social)</span>
+    <span class="steplabel">4. Guias de pagamento SS</span>
+    <span class="steplabel">5. Folhas de férias/remunerações</span>
+    <span class="steplabel">6. Faturas de avenças (fim do mês)</span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="dri">DMR — AT <span class="tag">Pastas</span></div>
+    <div class="tab" data-tab="dmr">DRI — Seg. Social <span class="tag">Soltos</span></div>
+    <div class="tab" data-tab="guias">Guias Pagamento SS <span class="tag">PDF</span></div>
+    <div class="tab" data-tab="folhas">Folhas de Férias/Remun. <span class="tag">PDF</span></div>
+    <div class="tab" data-tab="faturas">Faturas de Avenças <span class="tag">PDF</span></div>
+  </div>
+
+  <!-- ================= DMR (AT) ================= -->
+
+  <div class="panel active" id="panel-dri">
+    <div class="card">
+      <div class="note">
+        <b>O que faz:</b> pega na pasta principal com as ~50 subpastas (ex: "002", "015"...), uma por empresa, e junta o nome de cada ficheiro dentro dela com o número da subpasta — tudo sai solto, sem subpastas, pronto para o robot do crmcontab.<br>
+        <b>Exemplo:</b> pasta <b>002</b> → ficheiro <b>DMRAT0626.Txt</b> → resultado <b>DMRAT0626002.Txt</b>
+      </div>
+      <div class="row">
+        <input type="file" id="at-input" webkitdirectory directory multiple>
+      </div>
+      <div class="row">
+        <label class="opt"><input type="checkbox" id="at-keep-ext" checked> Manter extensão original do ficheiro (ex: .Txt)</label>
+      </div>
+      <div id="at-results"></div>
+      <div class="actions" id="at-actions" style="display:none;">
+        <button id="at-download">⬇ Descarregar ZIP com os ficheiros prontos</button>
+        <button class="secondary" id="at-clear">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DRI (SS soltos) ================= -->
+  <div class="panel" id="panel-dmr">
+    <div class="card">
+      <div class="note">
+        <b>O que faz:</b> pega diretamente nos ~50 ficheiros da Segurança Social (não é preciso escolher pasta, seleciona-os todos de uma vez). Remove espaços/pontos e acrescenta "SS" no fim.<br>
+        <b>Exemplo:</b> <b>002 202606.0</b> → resultado <b>002202606SS</b>
+      </div>
+      <div class="row">
+        <input type="file" id="ss-input" multiple>
+      </div>
+      <div class="row">
+        <label class="opt"><input type="checkbox" id="ss-keep-ext"> Manter extensão original do ficheiro (desligado = sem extensão, como no exemplo)</label>
+      </div>
+      <div id="ss-results"></div>
+      <div class="actions" id="ss-actions" style="display:none;">
+        <button id="ss-download">⬇ Descarregar ZIP com os ficheiros prontos</button>
+        <button class="secondary" id="ss-clear">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Guias SS (PDF) ================= -->
+  <div class="panel" id="panel-guias">
+    <div class="card">
+      <div class="note">
+        <b>O que faz:</b> lê o conteúdo de cada guia de pagamento SS (PDF gerado pelo CentralGest) e propõe o nome <b>Empresa_GuiaSS_mm-aaaa.pdf</b>. Podes arrastar vários de uma vez, mesmo de empresas diferentes.
+      </div>
+      <div class="dropzone" id="dz-guias">
+        <input type="file" id="input-guias" multiple accept="application/pdf" style="display:none;">
+        <strong>Arraste os PDFs das guias SS para aqui, ou clique para escolher</strong>
+        <span>Pode selecionar vários ficheiros de uma vez</span>
+      </div>
+      <div class="processing hidden" id="proc-guias">A processar…</div>
+      <div id="results-guias"></div>
+      <div class="actions" id="actions-guias" style="display:none;">
+        <button id="zip-guias">⬇ Descarregar ZIP com os ficheiros renomeados</button>
+        <button class="secondary" id="clear-guias">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Folhas de Férias / Remunerações (PDF) ================= -->
+  <div class="panel" id="panel-folhas">
+    <div class="card">
+      <div class="note">
+        <b>O que faz:</b> lê o conteúdo de cada folha de férias/remunerações (PDF gerado pelo CentralGest — "aFolfer06") e propõe o nome <b>Empresa_FolhaFerias_mm-aaaa.pdf</b>, usando o período de processamento indicado no documento.
+      </div>
+      <div class="dropzone" id="dz-folhas">
+        <input type="file" id="input-folhas" multiple accept="application/pdf" style="display:none;">
+        <strong>Arraste os PDFs das folhas para aqui, ou clique para escolher</strong>
+        <span>Pode selecionar vários ficheiros de uma vez</span>
+      </div>
+      <div class="processing hidden" id="proc-folhas">A processar…</div>
+      <div id="results-folhas"></div>
+      <div class="actions" id="actions-folhas" style="display:none;">
+        <button id="zip-folhas">⬇ Descarregar ZIP com os ficheiros renomeados</button>
+        <button class="secondary" id="clear-folhas">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Faturas de Avenças (PDF) ================= -->
+  <div class="panel" id="panel-faturas">
+    <div class="card">
+      <div class="note">
+        <b>O que faz:</b> lê o conteúdo de cada fatura de avença (PDF TOConline) e propõe o nome <b>Empresa_FT-ano-nº_mm-aaaa.pdf</b>, identificando o cliente pelo campo "Cliente" da fatura.
+      </div>
+      <div class="dropzone" id="dz-faturas">
+        <input type="file" id="input-faturas" multiple accept="application/pdf" style="display:none;">
+        <strong>Arraste os PDFs das faturas para aqui, ou clique para escolher</strong>
+        <span>Pode selecionar vários ficheiros de uma vez</span>
+      </div>
+      <div class="processing hidden" id="proc-faturas">A processar…</div>
+      <div id="results-faturas"></div>
+      <div class="actions" id="actions-faturas" style="display:none;">
+        <button id="zip-faturas">⬇ Descarregar ZIP com os ficheiros renomeados</button>
+        <button class="secondary" id="clear-faturas">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">Contabilista Certificado — Inscrito na OCC 46003 · © Rui Gonçalves</div>
+
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+function splitExt(filename) {
+  const idx = filename.lastIndexOf('.');
+  if (idx <= 0) return [filename, ''];
+  return [filename.slice(0, idx), filename.slice(idx)];
+}
+function sanitize(name) {
+  return (name || '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/[.,]/g, '')
+    .replace(/&/g, 'E')
+    .trim()
+    .replace(/\s+/g, '_');
+}
+function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ================= DMR (AT) LOGIC =================
+let atFiles = [];
+
+document.getElementById('at-input').addEventListener('change', (e) => {
+  const files = Array.from(e.target.files);
+  const byFolder = {};
+  const rootIssues = [];
+  files.forEach(f => {
+    const parts = f.webkitRelativePath.split('/');
+    if (parts.length < 3) { rootIssues.push(f.webkitRelativePath); return; }
+    const folder = parts[1];
+    if (!byFolder[folder]) byFolder[folder] = [];
+    byFolder[folder].push(f);
+  });
+  const keepExt = document.getElementById('at-keep-ext').checked;
+  atFiles = [];
+  Object.keys(byFolder).sort().forEach(folder => {
+    const list = byFolder[folder];
+    list.forEach((f, i) => {
+      const [base, ext] = splitExt(f.name);
+      let newName = base + folder;
+      if (list.length > 1) newName += '_' + (i + 1);
+      if (keepExt) newName += ext;
+      atFiles.push({ file: f, folder, oldName: f.name, newName });
+    });
+  });
+  renderAtResults(rootIssues);
+});
+document.getElementById('at-keep-ext').addEventListener('change', () => {
+  const keepExt = document.getElementById('at-keep-ext').checked;
+  atFiles.forEach(item => {
+    const [base, ext] = splitExt(item.oldName);
+    const sameFolderCount = atFiles.filter(x => x.folder === item.folder).length;
+    let newName = base + item.folder;
+    if (sameFolderCount > 1) {
+      const idx = atFiles.filter(x => x.folder === item.folder).indexOf(item) + 1;
+      newName += '_' + idx;
+    }
+    if (keepExt) newName += ext;
+    item.newName = newName;
+  });
+  renderAtResults([]);
+});
+function renderAtResults(rootIssues) {
+  const el = document.getElementById('at-results');
+  if (atFiles.length === 0) {
+    el.innerHTML = '<div class="empty-hint">Nenhum ficheiro carregado ainda.</div>';
+    document.getElementById('at-actions').style.display = 'none';
+    return;
+  }
+  let html = '<table><thead><tr><th>Pasta</th><th>Nome original</th><th></th><th>Nome final</th></tr></thead><tbody>';
+  atFiles.forEach(item => {
+    html += `<tr><td class="old">${item.folder}</td><td class="old">${escapeHtml(item.oldName)}</td><td class="arrow">→</td><td class="new">${escapeHtml(item.newName)}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  html += `<div class="note" style="margin-top:12px;">Total: <span class="count-badge">${atFiles.length} ficheiros</span></div>`;
+  if (rootIssues.length > 0) {
+    html += `<div class="warn"><span class="error-text">Atenção:</span> ${rootIssues.length} ficheiro(s) na pasta principal (fora de subpastas numeradas) foram ignorados: ${rootIssues.join(', ')}</div>`;
+  }
+  el.innerHTML = html;
+  document.getElementById('at-actions').style.display = 'flex';
+}
+document.getElementById('at-clear').addEventListener('click', () => {
+  atFiles = []; document.getElementById('at-input').value = ''; renderAtResults([]);
+});
+document.getElementById('at-download').addEventListener('click', async () => {
+  const zip = new JSZip();
+  for (const item of atFiles) zip.file(item.newName, await item.file.arrayBuffer());
+  triggerDownload(await zip.generateAsync({ type: 'blob' }), 'DMR_AT_ficheiros_prontos.zip');
+});
+
+// ================= DRI (SS soltos) LOGIC =================
+let ssFiles = [];
+document.getElementById('ss-input').addEventListener('change', (e) => {
+  ssFiles = Array.from(e.target.files).map(f => ({ file: f, oldName: f.name }));
+  recomputeSsNames(); renderSsResults();
+});
+document.getElementById('ss-keep-ext').addEventListener('change', () => { recomputeSsNames(); renderSsResults(); });
+function recomputeSsNames() {
+  const keepExt = document.getElementById('ss-keep-ext').checked;
+  ssFiles.forEach(item => {
+    const [base, ext] = splitExt(item.oldName);
+    const cleaned = base.replace(/[^0-9]/g, '');
+    item.newName = cleaned + 'SS' + (keepExt ? ext : '');
+  });
+}
+function renderSsResults() {
+  const el = document.getElementById('ss-results');
+  if (ssFiles.length === 0) {
+    el.innerHTML = '<div class="empty-hint">Nenhum ficheiro carregado ainda.</div>';
+    document.getElementById('ss-actions').style.display = 'none';
+    return;
+  }
+  let html = '<table><thead><tr><th>Nome original</th><th></th><th>Nome final</th></tr></thead><tbody>';
+  ssFiles.forEach(item => {
+    html += `<tr><td class="old">${escapeHtml(item.oldName)}</td><td class="arrow">→</td><td class="new">${escapeHtml(item.newName)}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  html += `<div class="note" style="margin-top:12px;">Total: <span class="count-badge">${ssFiles.length} ficheiros</span></div>`;
+  const names = ssFiles.map(f => f.newName);
+  const dups = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dups.length > 0) {
+    html += `<div class="warn"><span class="error-text">Atenção:</span> nomes finais repetidos: ${[...new Set(dups)].join(', ')} — confirma os ficheiros de origem.</div>`;
+  }
+  el.innerHTML = html;
+  document.getElementById('ss-actions').style.display = 'flex';
+}
+document.getElementById('ss-clear').addEventListener('click', () => {
+  ssFiles = []; document.getElementById('ss-input').value = ''; renderSsResults();
+});
+document.getElementById('ss-download').addEventListener('click', async () => {
+  const zip = new JSZip();
+  for (const item of ssFiles) zip.file(item.newName, await item.file.arrayBuffer());
+  triggerDownload(await zip.generateAsync({ type: 'blob' }), 'DRI_SS_ficheiros_prontos.zip');
+});
+
+// ================= PDF-BASED PANELS (Guias SS / Folhas / Faturas) =================
+const MESES = {"janeiro":"01","fevereiro":"02","marco":"03","março":"03","abril":"04","maio":"05","junho":"06","julho":"07","agosto":"08","setembro":"09","outubro":"10","novembro":"11","dezembro":"12"};
+
+async function extractText(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    text += content.items.map(it => it.str).join(' ') + ' ';
+  }
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function buildGuiaName(empresa, mes, ano) { return `${sanitize(empresa)}_GuiaSS_${mes}-${ano}.pdf`; }
+function buildFolhaName(empresa, mes, ano) { return `${sanitize(empresa)}_FolhaFerias_${mes}-${ano}.pdf`; }
+function buildFaturaName(empresa, anoFT, numFT, mes, ano) { return `${sanitize(empresa)}_FT${anoFT}-${numFT}_${mes}-${ano}.pdf`; }
+
+function parseGuia(text) {
+  const mesMatch = text.match(/Referente a:\s*([A-Za-zçÇ]+)\s+de\s+(\d{4})/i);
+  let empresa = null;
+  // Estratégia 1: ancorar no NIF (rótulo "Nº Identificação Fiscal") — mais robusta a variações
+  // no comprimento do nº de contribuinte SS, do código de estabelecimento, ou a dígitos dentro
+  // do próprio nome da empresa (ex: "1966 A Evolução do Parquet..."). O NIF pode aparecer antes
+  // ou depois do rótulo consoante o documento.
+  const nifMatch = text.match(/(\d{9})\s*N[ºo°]\s*Identifica[cç][aã]o Fiscal|N[ºo°]\s*Identifica[cç][aã]o Fiscal:?\s*(\d{9})/i);
+  const nif = nifMatch ? (nifMatch[1] || nifMatch[2]) : null;
+  if (nif) {
+    const escNif = nif.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp("\\d{9,13}\\s+(.{2,100}?)\\s+\\d{1,4}\\s+" + escNif + "\\b");
+    const m = text.match(re);
+    if (m) empresa = m[1].trim();
+  }
+  // Estratégia 2 (recurso): padrão genérico nº contribuinte + nome + código + NIF de 9 dígitos
+  if (!empresa) {
+    const empMatch = text.match(/\d{9,13}\s+([^\d]{2,90}?)\s+\d{1,4}\s+\d{9}\b/);
+    if (empMatch) empresa = empMatch[1].trim();
+  }
+  const mes = mesMatch ? MESES[mesMatch[1].toLowerCase()] : null;
+  const ano = mesMatch ? mesMatch[2] : null;
+  const ok = !!(mes && ano && empresa);
+  return {
+    fields: { empresa: empresa || '', mes: mes || '', ano: ano || '' },
+    ok,
+    newName: buildGuiaName(empresa || 'EMPRESA', mes || 'MM', ano || 'AAAA')
+  };
+}
+function parseFolha(text) {
+  const compMatch = text.match(/\d{3}\s*-\s*(.+?)\s+Folha de Férias/i);
+  const dateMatch = text.match(/Data Processamento:\s*\d{2}-(\d{2})-(\d{4})/i);
+  const empresa = compMatch ? compMatch[1].trim() : null;
+  const mes = dateMatch ? dateMatch[1] : null;
+  const ano = dateMatch ? dateMatch[2] : null;
+  const ok = !!(empresa && mes && ano);
+  return {
+    fields: { empresa: empresa || '', mes: mes || '', ano: ano || '' },
+    ok,
+    newName: buildFolhaName(empresa || 'EMPRESA', mes || 'MM', ano || 'AAAA')
+  };
+}
+function parseFatura(text) {
+  const numMatch = text.match(/FT\s*(\d{4})\/(\d+)/);
+  const dataMatch = text.match(/Data\s+(\d{4})-(\d{2})-(\d{2})\s+Moeda/);
+  const cliMatch = text.match(/Cliente\s+(.+?)\s+Data de Vencimento/);
+  const anoFT = numMatch ? numMatch[1] : null;
+  const numFT = numMatch ? numMatch[2] : null;
+  const ano = dataMatch ? dataMatch[1] : anoFT;
+  const mes = dataMatch ? dataMatch[2] : null;
+  const empresa = cliMatch ? cliMatch[1].trim() : null;
+  const ok = !!(empresa && numFT && ano && mes);
+  return {
+    fields: { empresa: empresa || '', numFT: numFT || '', anoFT: anoFT || ano || '', mes: mes || '', ano: ano || '' },
+    ok,
+    newName: buildFaturaName(empresa || 'EMPRESA', anoFT || ano || 'AAAA', numFT || '0', mes || 'MM', ano || 'AAAA')
+  };
+}
+
+function makePdfPanel(config) {
+  // config: {key, parseFn, buildFn, fieldDefs: [{key,label,width}], zipNamePrefix}
+  let items = [];
+  const dz = document.getElementById('dz-' + config.key);
+  const input = document.getElementById('input-' + config.key);
+  const proc = document.getElementById('proc-' + config.key);
+  const resultsEl = document.getElementById('results-' + config.key);
+  const actionsEl = document.getElementById('actions-' + config.key);
+  const zipBtn = document.getElementById('zip-' + config.key);
+  const clearBtn = document.getElementById('clear-' + config.key);
+
+  dz.addEventListener('click', () => input.click());
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.background = '#d7ece1'; });
+  dz.addEventListener('dragleave', () => dz.style.background = '');
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.style.background = ''; handleFiles(e.dataTransfer.files); });
+  input.addEventListener('change', e => handleFiles(e.target.files));
+
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+    if (!files.length) return;
+    proc.classList.remove('hidden');
+    for (const file of files) {
+      const text = await extractText(file).catch(() => '');
+      const parsed = config.parseFn(text);
+      items.push({ id: 'i' + Math.random().toString(36).slice(2), file, ...parsed });
+    }
+    proc.classList.add('hidden');
+    render();
+  }
+
+  function render() {
+    if (!items.length) {
+      resultsEl.innerHTML = '<div class="empty-hint">Nenhum ficheiro carregado ainda.</div>';
+      actionsEl.style.display = 'none';
+      return;
+    }
+    const fieldCols = config.fieldDefs.map(fd => `<th>${fd.label}</th>`).join('');
+    let html = `<table><thead><tr><th>Ficheiro original</th><th>Estado</th>${fieldCols}<th>Nome novo</th><th>Ação</th></tr></thead><tbody>`;
+    items.forEach(it => {
+      const rowClass = it.ok ? '' : 'rowwarn';
+      const badgeHtml = it.ok ? '<span class="badge ok">OK</span>' : '<span class="badge warn">Rever</span>';
+      const fieldCells = config.fieldDefs.map(fd =>
+        `<td><input class="field" data-id="${it.id}" data-field="${fd.key}" value="${escapeHtml(it.fields[fd.key])}" style="${fd.width ? 'width:' + fd.width + ';' : ''}" placeholder="${fd.placeholder || ''}"></td>`
+      ).join('');
+      html += `<tr class="${rowClass}" data-row="${it.id}">
+        <td class="old">${escapeHtml(it.file.name)}</td>
+        <td>${badgeHtml}</td>
+        ${fieldCells}
+        <td class="new" data-newname="${it.id}">${escapeHtml(it.newName)}</td>
+        <td><button class="iconbtn" data-dl="${it.id}">Baixar</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    html += `<div class="note" style="margin-top:12px;">Total: <span class="count-badge">${items.length} ficheiros</span></div>`;
+    resultsEl.innerHTML = html;
+    actionsEl.style.display = 'flex';
+
+    resultsEl.querySelectorAll('input.field').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const it = items.find(x => x.id === inp.dataset.id);
+        it.fields[inp.dataset.field] = inp.value;
+        it.newName = config.buildFn(it.fields);
+        resultsEl.querySelector(`[data-newname="${it.id}"]`).textContent = it.newName;
+      });
+    });
+    resultsEl.querySelectorAll('[data-dl]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const it = items.find(x => x.id === btn.dataset.dl);
+        triggerDownload(it.file, it.newName || it.file.name);
+      });
+    });
+  }
+
+  zipBtn.addEventListener('click', async () => {
+    if (!items.length) return;
+    const zip = new JSZip();
+    for (const it of items) zip.file(it.newName || it.file.name, await it.file.arrayBuffer());
+    triggerDownload(await zip.generateAsync({ type: 'blob' }), config.zipNamePrefix + '.zip');
+  });
+  clearBtn.addEventListener('click', () => {
+    items = []; input.value = ''; render();
+  });
+
+  render();
+}
+
+makePdfPanel({
+  key: 'guias',
+  parseFn: parseGuia,
+  buildFn: (f) => buildGuiaName(f.empresa || 'EMPRESA', f.mes || 'MM', f.ano || 'AAAA'),
+  fieldDefs: [
+    { key: 'empresa', label: 'Empresa' },
+    { key: 'mes', label: 'Mês', width: '40px', placeholder: 'mm' },
+    { key: 'ano', label: 'Ano', width: '55px', placeholder: 'aaaa' }
+  ],
+  zipNamePrefix: 'guias_ss_renomeadas'
+});
+
+makePdfPanel({
+  key: 'folhas',
+  parseFn: parseFolha,
+  buildFn: (f) => buildFolhaName(f.empresa || 'EMPRESA', f.mes || 'MM', f.ano || 'AAAA'),
+  fieldDefs: [
+    { key: 'empresa', label: 'Empresa' },
+    { key: 'mes', label: 'Mês', width: '40px', placeholder: 'mm' },
+    { key: 'ano', label: 'Ano', width: '55px', placeholder: 'aaaa' }
+  ],
+  zipNamePrefix: 'folhas_ferias_renomeadas'
+});
+
+makePdfPanel({
+  key: 'faturas',
+  parseFn: parseFatura,
+  buildFn: (f) => buildFaturaName(f.empresa || 'EMPRESA', f.anoFT || f.ano || 'AAAA', f.numFT || '0', f.mes || 'MM', f.ano || 'AAAA'),
+  fieldDefs: [
+    { key: 'empresa', label: 'Empresa' },
+    { key: 'numFT', label: 'Nº Fatura', width: '55px' },
+    { key: 'mes', label: 'Mês', width: '40px', placeholder: 'mm' },
+    { key: 'ano', label: 'Ano', width: '55px', placeholder: 'aaaa' }
+  ],
+  zipNamePrefix: 'faturas_avencas_renomeadas'
+});
+
+renderAtResults([]);
+renderSsResults();
+</script>
+</body>
+</html>

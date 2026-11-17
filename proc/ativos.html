@@ -1,0 +1,3850 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<script src="procdb.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ativos Fixos — Dafilgest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+/* ── RESET E BASE ── */
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#eef0f3;color:#1a1f2e;font-family:'Inter',sans-serif;font-size:13px;line-height:1.45;}
+input,select,button,textarea{font-family:'Inter',sans-serif;font-size:13px;}
+
+/* ── LOGIN ── */
+#af-login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1a2a3d 0%,#1a6fc4 100%);}
+.lc-box{background:#fff;border-radius:12px;padding:36px 40px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.lc-logo{text-align:center;margin-bottom:24px;}
+.lc-logo h1{font-size:18px;font-weight:700;color:#1a1f2e;}
+.lc-logo p{font-size:11px;color:#6b7585;margin-top:4px;}
+.lc-field{margin-bottom:14px;}
+.lc-field label{display:block;font-size:11px;font-weight:600;color:#3d4a5c;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+.lc-field input{width:100%;padding:9px 12px;border:1.5px solid #d4d8de;border-radius:5px;outline:none;font-size:13px;}
+.lc-field input:focus{border-color:#1a6fc4;box-shadow:0 0 0 3px rgba(26,111,196,.1);}
+.lc-btn{width:100%;padding:10px;background:#1a6fc4;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;}
+.lc-btn:hover{background:#1560ad;}
+.lc-err{color:#dc2626;font-size:11px;margin-top:8px;text-align:center;min-height:16px;}
+
+/* ── APP ── */
+#af-app{display:none;}
+.af-topbar{background:#1a2a3d;color:#fff;padding:0 16px;height:44px;display:flex;align-items:center;justify-content:space-between;}
+.af-topbar-left{display:flex;align-items:center;gap:10px;}
+.af-topbar h1{font-size:13px;font-weight:700;letter-spacing:.3px;}
+.af-topbar-badge{font-size:10px;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:20px;}
+.af-topbar-right{display:flex;align-items:center;gap:10px;}
+.af-topbar .role-badge{font-size:10px;background:rgba(26,111,196,.5);padding:2px 8px;border-radius:20px;}
+.af-topbar button{background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;}
+.af-topbar button:hover{background:rgba(255,255,255,.1);}
+.af-main{padding:14px 16px;}
+
+
+/* ── REUTILIZA DESIGN SYSTEM DO DAFILGEST ── */
+:root{
+  --bg:#eef0f3;--bg2:#f7f8fa;--bg3:#fff;
+  --border:#d4d8de;--border2:#e8eaed;
+  --text:#1a1f2e;--text2:#3d4a5c;--text3:#6b7585;--text4:#a0aab8;
+  --blue:#1a6fc4;--blue2:#1560ad;--blue-light:#e8f1fb;--blue-mid:#c5d9f1;
+  --slate:#3d4a5c;--slate2:#2e3848;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-bd:#86efac;
+  --red:#dc2626;--red-bg:#fef2f2;--red-bd:#fca5a5;
+  --amber:#d97706;--amber-bg:#fffbeb;--amber-bd:#fcd34d;
+  --purple:#7c3aed;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.06);
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08);
+  --r:5px;--r-lg:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.45;}
+input,select,button,textarea{font-family:'Inter',sans-serif;font-size:13px;}
+
+/* ── ATIVOS: SUB-NAV ── */
+.af-subnav{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;}
+.af-tab{padding:5px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg3);color:var(--text3);cursor:pointer;font-size:11px;font-weight:500;transition:all .12s;}
+.af-tab:hover{background:var(--blue-light);color:var(--blue);border-color:var(--blue-mid);}
+.af-tab.active{background:var(--blue);color:#fff;border-color:var(--blue2);font-weight:600;}
+.af-panel{display:none;}
+.af-panel.active{display:block;}
+
+/* ── EMPRESA SELECTOR ── */
+.emp-sel-wrap{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.emp-sel-wrap label{font-size:11px;font-weight:600;color:var(--text2);}
+.emp-sel-wrap select{padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--r);min-width:280px;outline:none;}
+.emp-sel-wrap select:focus{border-color:var(--blue);}
+
+/* ── STATS ROW ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:14px;}
+.stat-card{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);padding:13px 15px;box-shadow:var(--shadow-sm);}
+.stat-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.stat-value{font-size:20px;font-weight:700;color:var(--text);line-height:1;}
+.stat-sub{font-size:11px;color:var(--text4);margin-top:4px;}
+.stat-card.blue .stat-value{color:var(--blue);}
+.stat-card.green .stat-value{color:var(--green);}
+.stat-card.amber .stat-value{color:var(--amber);}
+.stat-card.red .stat-value{color:var(--red);}
+
+/* ── TABLE WRAP ── */
+.table-wrap{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:16px;}
+.tw-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border2);flex-wrap:wrap;gap:8px;}
+.tw-title{font-size:12px;font-weight:700;color:var(--text2);}
+.tw-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--bg2);padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--border2);}
+td{padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--text2);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--blue-light);}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+td.center{text-align:center;}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+.badge.green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);}
+.badge.red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd);}
+.badge.amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd);}
+.badge.blue{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-mid);}
+.badge.grey{background:var(--bg2);color:var(--text3);border:1px solid var(--border2);}
+
+/* ── BUTTONS ── */
+.btn{padding:5px 12px;border-radius:var(--r);border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .12s;display:inline-flex;align-items:center;gap:5px;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:var(--blue2);}
+.btn-secondary{background:var(--bg2);color:var(--text2);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--border2);}
+.btn-success{background:var(--green);color:#fff;}
+.btn-success:hover{background:#15803d;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#b91c1c;}
+.btn-amber{background:var(--amber);color:#fff;}
+.btn-amber:hover{background:#b45309;}
+.btn-sm{padding:3px 8px;font-size:11px;}
+.btn-xs{padding:2px 6px;font-size:10px;}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:10px;width:100%;max-width:780px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal-lg{max-width:1000px;}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
+.modal-header h3{font-size:14px;font-weight:700;color:var(--text);}
+.modal-close{background:none;border:none;cursor:pointer;font-size:18px;color:var(--text3);padding:2px 6px;border-radius:var(--r);}
+.modal-close:hover{background:var(--bg2);}
+.modal-body{padding:20px;}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border2);display:flex;justify-content:flex-end;gap:8px;}
+
+/* ── FORM ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.form-full{grid-column:1/-1;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
+.form-group input,.form-group select,.form-group textarea{padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;transition:border .15s,box-shadow .15s;background:#fff;color:var(--text);}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,111,196,.1);}
+.form-group textarea{resize:vertical;min-height:60px;}
+.form-hint{font-size:10px;color:var(--text4);margin-top:2px;}
+.form-section{margin-bottom:16px;}
+.form-section-title{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid var(--blue-mid);}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--r-lg);padding:20px;text-align:center;cursor:pointer;transition:all .15s;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:var(--blue-light);}
+.upload-zone .upload-icon{font-size:24px;margin-bottom:6px;}
+.upload-zone p{font-size:12px;color:var(--text3);}
+.upload-zone .upload-name{font-size:11px;color:var(--green);font-weight:600;margin-top:4px;}
+.upload-zone input[type=file]{display:none;}
+
+/* ── CALC BOX ── */
+.calc-box{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:var(--r-lg);padding:12px 14px;margin-top:10px;}
+.calc-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;}
+.calc-row.total{font-weight:700;border-top:1px solid var(--blue-mid);margin-top:5px;padding-top:8px;font-size:13px;}
+.calc-row .lbl{color:var(--text3);}
+.calc-row .val{color:var(--text);font-variant-numeric:tabular-nums;}
+.calc-row.positive .val{color:var(--green);font-weight:700;}
+.calc-row.negative .val{color:var(--red);font-weight:700;}
+
+/* ── ALERT ── */
+.alert{border-radius:var(--r-lg);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;border:1px solid;}
+.alert.info{background:var(--blue-light);border-color:var(--blue-mid);}
+.alert.warning{background:var(--amber-bg);border-color:var(--amber-bd);}
+.alert.success{background:var(--green-bg);border-color:var(--green-bd);}
+.alert-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.alert-text{font-size:11px;color:var(--text2);line-height:1.6;}
+
+/* ── TABELA FISCAL ── */
+.tf-row-header{background:var(--slate);color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;}
+.tf-row-subheader{background:var(--bg2);font-size:10px;font-weight:700;color:var(--text3);padding:4px 10px;border-bottom:1px solid var(--border2);}
+
+/* ── MAIS/MENOS VALIAS ── */
+.mv-positiva td{background:#f0fdf4 !important;}
+.mv-negativa td{background:#fef2f2 !important;}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty-state .es-icon{font-size:32px;margin-bottom:10px;}
+.empty-state p{font-size:12px;}
+.empty-state .es-action{margin-top:12px;}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;gap:8px;padding:20px;color:var(--text3);font-size:12px;}
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+.ph-left h1{font-size:15px;font-weight:700;color:var(--text);}
+.ph-left p{font-size:11px;color:var(--text3);margin-top:2px;}
+.ph-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+
+/* ── SEARCH BAR ── */
+.search-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.search-input{padding:6px 10px 6px 30px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;width:220px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7585' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 8px center;}
+.search-input:focus{border-color:var(--blue);}
+
+/* ── TABS FISCAIS ── */
+.mod-tabs{display:flex;gap:3px;margin-bottom:12px;flex-wrap:wrap;}
+.mod-tab{padding:4px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg2);color:var(--text3);cursor:pointer;font-size:11px;font-weight:500;}
+.mod-tab:hover{background:var(--blue-light);color:var(--blue);}
+.mod-tab.active{background:var(--blue);color:#fff;border-color:var(--blue2);}
+
+/* ── FICHA DETALHE ── */
+.ficha-detail{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-lg);padding:14px;}
+.ficha-detail-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border2);font-size:12px;}
+.ficha-detail-row:last-child{border-bottom:none;}
+.ficha-detail-lbl{color:var(--text3);font-weight:500;}
+.ficha-detail-val{color:var(--text);font-weight:600;text-align:right;}
+
+/* ── AMORT TABLE ── */
+.amort-table{font-size:11px;}
+.amort-table th{font-size:9px;}
+.amort-table td{padding:4px 8px;}
+.amort-table .ano-atual td{background:#fffbeb;font-weight:600;}
+.amort-table .amort-zero td{background:#f0fdf4;color:var(--green);}
+
+/* ── PRINT STYLES (PDF via jsPDF) ── */
+@media print{
+  .af-subnav,.tw-actions,.btn,.modal-footer{display:none!important;}
+  .modal{box-shadow:none;}
+}
+
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="af-login">
+  <div class="lc-box">
+    <div class="lc-logo">
+      <h1>🏭 Ativos Fixos</h1>
+      <p>Dafilgest Gab. de Contabilidade</p>
+    </div>
+    <div class="lc-field">
+      <label>Senha de acesso</label>
+      <input type="password" id="af-pass" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')afDoLogin()">
+    </div>
+    <button class="lc-btn" onclick="afDoLogin()">Entrar</button>
+    <div class="lc-err" id="af-login-err"></div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="af-app">
+  <div class="af-topbar">
+    <div class="af-topbar-left">
+      <h1>🏭 Ativos Fixos — Dafilgest</h1>
+      <span class="af-topbar-badge">Contabilista Certificado OCC 46003</span>
+    </div>
+    <div class="af-topbar-right">
+      <span class="role-badge" id="af-role-badge"></span>
+      <a href="https://dafilgest.pt" style="color:#fff;font-size:11px;text-decoration:none;">← Sistema Principal</a>
+      <button onclick="afLogout()">Sair</button>
+    </div>
+  </div>
+  <div class="af-main">
+    <div id="sec-ativos" class="section" style="display:block">
+
+  <!-- SUB-NAVEGAÇÃO -->
+  <div class="af-subnav">
+    <button class="af-tab active" onclick="afShowTab('dashboard')">📊 Dashboard</button>
+    <button class="af-tab" onclick="afShowTab('fichas')">🗂️ Fichas de Ativos</button>
+    <button class="af-tab" onclick="afShowTab('mod32')">📋 Mod. 32 — Depreciações</button>
+    <button class="af-tab" onclick="afShowTab('mod31')">💰 Mod. 31 — Mais/Menos-Valias</button>
+    <button class="af-tab" onclick="afShowTab('mod33')">⚠️ Mod. 33 — Imparidades</button>
+    <button class="af-tab" onclick="afShowTab('mod34')">📝 Mod. 34 — Provisões</button>
+    <button class="af-tab" id="af-tab-tabfiscal" onclick="afShowTab('tabfiscal')" style="margin-left:auto">⚙️ Tabela Fiscal</button>
+  </div>
+
+  <!-- EMPRESA SELECTOR -->
+  <div class="emp-sel-wrap">
+    <label>EMPRESA:</label>
+    <select id="af-emp-sel" onchange="afLoadEmpresa()">
+      <option value="">— Selecionar empresa —</option>
+    </select>
+    <span id="af-emp-nif" style="font-size:11px;color:var(--text3)"></span>
+    <div style="margin-left:auto;display:flex;gap:6px;">
+      <select id="af-ano-sel" onchange="afRefresh()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;">
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026" selected>2026</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ── PAINEL DASHBOARD ── -->
+  <div id="af-panel-dashboard" class="af-panel active">
+    <div class="ph">
+      <div class="ph-left"><h1>🏭 Ativos Fixos</h1><p>Gestão e controlo de ativos tangíveis e intangíveis</p></div>
+    </div>
+
+    <div id="af-dash-stats" class="stats">
+      <div class="stat-card blue"><div class="stat-label">Total Ativos</div><div class="stat-value" id="af-stat-total">—</div><div class="stat-sub">em carteira</div></div>
+      <div class="stat-card"><div class="stat-label">Valor Bruto</div><div class="stat-value" id="af-stat-vb">—</div><div class="stat-sub">total aquisição</div></div>
+      <div class="stat-card amber"><div class="stat-label">Depreciações Acum.</div><div class="stat-value" id="af-stat-da">—</div><div class="stat-sub">acumuladas</div></div>
+      <div class="stat-card green"><div class="stat-label">VLC Total</div><div class="stat-value" id="af-stat-vlc">—</div><div class="stat-sub">valor líquido</div></div>
+      <div class="stat-card"><div class="stat-label">Dep. Exercício</div><div class="stat-value" id="af-stat-de">—</div><div class="stat-sub" id="af-stat-de-ano">—</div></div>
+      <div class="stat-card red"><div class="stat-label">Alienações</div><div class="stat-value" id="af-stat-alien">—</div><div class="stat-sub">com mais/menos-valias</div></div>
+    </div>
+
+    <div id="af-dash-empty" class="table-wrap" style="display:none">
+      <div class="empty-state">
+        <div class="es-icon">🏭</div>
+        <p>Nenhum ativo registado para esta empresa.</p>
+        <p style="margin-top:4px">Importe o mapa Excel de 2024 ou crie fichas individuais.</p>
+        <div class="es-action" style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-primary" onclick="afShowTab('fichas');openModalNovaFicha()">➕ Nova Ficha</button>
+          <button class="btn btn-secondary" onclick="afShowImportExcel()">📥 Importar Excel 2024</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="af-dash-table" class="table-wrap">
+      <div class="tw-header">
+        <span class="tw-title">Resumo por Categoria</span>
+        <div class="tw-actions">
+          <button class="btn btn-secondary btn-sm" onclick="afShowImportExcel()">📥 Importar Excel</button>
+          <button class="btn btn-primary btn-sm" onclick="afShowTab('fichas');openModalNovaFicha()">➕ Nova Ficha</button>
+        </div>
+      </div>
+      <div class="tbl-scroll">
+        <table id="af-dash-cat-table">
+          <thead><tr>
+            <th>Categoria</th>
+            <th>Nº Ativos</th>
+            <th class="num">Valor Bruto (€)</th>
+            <th class="num">Dep. Acum. (€)</th>
+            <th class="num">VLC (€)</th>
+            <th class="num">Dep. Exercício (€)</th>
+            <th>Estado</th>
+          </tr></thead>
+          <tbody id="af-dash-cat-body">
+            <tr><td colspan="7" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAINEL FICHAS ── -->
+  <div id="af-panel-fichas" class="af-panel">
+    <div class="ph">
+      <div class="ph-left"><h1>🗂️ Fichas de Ativos</h1><p>Registo individual de cada ativo fixo</p></div>
+      <div class="ph-right">
+        <button class="btn btn-danger btn-sm" id="af-btn-apagar-sel" onclick="afApagarSeleccionados()" style="display:none">🗑 Apagar seleccionados</button>
+        <a href="importar.html" target="_blank" class="btn btn-secondary btn-sm">📥 Importar Mapas 2024</a>
+        <button class="btn btn-primary btn-sm" onclick="openModalNovaFicha()">➕ Nova Ficha</button>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <input type="text" id="af-fichas-search" class="search-input" placeholder="Pesquisar ativo..." oninput="afRenderFichas()">
+      <select id="af-fichas-estado" onchange="afRenderFichas()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;">
+        <option value="">Todos os estados</option>
+        <option value="Ativo">Ativo</option>
+        <option value="Alienado">Alienado</option>
+        <option value="Abatido">Abatido</option>
+        <option value="Migrado">Migrado (Excel 2024)</option>
+      </select>
+      <select id="af-fichas-cat" onchange="afRenderFichas()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;">
+        <option value="">Todas as categorias</option>
+      </select>
+      <span id="af-fichas-count" style="font-size:11px;color:var(--text3);margin-left:auto"></span>
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th style="width:30px"><input type="checkbox" id="af-sel-all" onclick="afToggleAll(this)" title="Seleccionar todos"></th>
+            <th>Ref.</th>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Data Aquis.</th>
+            <th class="num">V. Aquisição (€)</th>
+            <th class="num">Dep. Acum. (€)</th>
+            <th class="num">VLC (€)</th>
+            <th>Taxa</th>
+            <th>Método</th>
+            <th>Estado</th>
+            <th>Fatura</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="af-fichas-body">
+            <tr><td colspan="12" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAINEL MOD. 32 ── -->
+  <div id="af-panel-mod32" class="af-panel">
+    <div class="ph">
+      <div class="ph-left"><h1>📋 Mapa de Depreciações e Amortizações</h1><p>Mapa Modelo 32 — Exercício <span id="af-mod32-ano-title">—</span></p></div>
+      <div class="ph-right">
+        <select id="af-mod32-ano" onchange="afRenderMod32()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="afExportMod32Excel()">📊 Excel</button>
+        <button class="btn btn-primary btn-sm" onclick="afExportMod32PDF()">📄 PDF A4</button>
+      </div>
+    </div>
+
+    <div id="af-mod32-totais" class="stats" style="display:none">
+      <div class="stat-card"><div class="stat-label">Valor Bruto</div><div class="stat-value" id="af-m32-vb">—</div></div>
+      <div class="stat-card amber"><div class="stat-label">Dep. Acumuladas Ant.</div><div class="stat-value" id="af-m32-da">—</div></div>
+      <div class="stat-card blue"><div class="stat-label">Dep. do Exercício</div><div class="stat-value" id="af-m32-de">—</div></div>
+      <div class="stat-card green"><div class="stat-label">VLC Final</div><div class="stat-value" id="af-m32-vlc">—</div></div>
+      <div class="stat-card red"><div class="stat-label">Limitação Viaturas</div><div class="stat-value" id="af-m32-lim">—</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-scroll">
+        <table id="af-mod32-table">
+          <thead><tr>
+            <th>Cód. DR25</th>
+            <th>Descrição do Bem</th>
+            <th>Cód. SNC</th>
+            <th>Data Início</th>
+            <th class="num">V. Aquisição (€)</th>
+            <th>Método</th>
+            <th>Taxa Máx %</th>
+            <th>Taxa Prat %</th>
+            <th class="num">Dep. Acum. Ant. (€)</th>
+            <th class="num">Dep. Exercício (€)</th>
+            <th class="num">Dep. Acum. Total (€)</th>
+            <th class="num">VLC (€)</th>
+            <th>Obs.</th>
+          </tr></thead>
+          <tbody id="af-mod32-body">
+            <tr><td colspan="13" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAINEL MOD. 31 ── -->
+  <div id="af-panel-mod31" class="af-panel">
+    <div class="ph">
+      <div class="ph-left"><h1>💰 Mais-Valias e Menos-Valias Fiscais</h1><p>Mapa Modelo 31 — Exercício <span id="af-mod31-ano-title">—</span></p></div>
+      <div class="ph-right">
+        <select id="af-mod31-ano" onchange="afRenderMod31()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="afExportMod31Excel()">📊 Excel</button>
+        <button class="btn btn-primary btn-sm" onclick="afExportMod31PDF()">📄 PDF A4</button>
+      </div>
+    </div>
+
+    <div id="af-mod31-coef-info" class="alert info" style="display:none">
+      <span class="alert-icon">ℹ️</span>
+      <span class="alert-text" id="af-mod31-coef-text"></span>
+    </div>
+
+    <div id="af-mod31-totais" class="stats" style="display:none">
+      <div class="stat-card green"><div class="stat-label">Mais-Valias Fiscais</div><div class="stat-value" id="af-m31-mv">—</div></div>
+      <div class="stat-card red"><div class="stat-label">Menos-Valias Fiscais</div><div class="stat-value" id="af-m31-mmv">—</div></div>
+      <div class="stat-card blue"><div class="stat-label">Saldo Fiscal Líquido</div><div class="stat-value" id="af-m31-saldo">—</div></div>
+      <div class="stat-card amber"><div class="stat-label">Com Reinvestimento</div><div class="stat-value" id="af-m31-reinv">—</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="tw-header">
+        <span class="tw-title">Alienações do Exercício</span>
+        <div class="tw-actions">
+          <span style="font-size:10px;color:var(--text3)">Coeficiente aplicado conforme portaria do ano de referência</span>
+        </div>
+      </div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Descrição</th>
+            <th>Cód. SNC</th>
+            <th>Data Aquis.</th>
+            <th>Data Alien.</th>
+            <th class="num">V. Aquisição (€)</th>
+            <th>Coef.</th>
+            <th class="num">V. Aquis. Corrigido (€)</th>
+            <th class="num">Dep. Acum. Aceites (€)</th>
+            <th class="num">VLC Fiscal (€)</th>
+            <th class="num">V. Realização (€)</th>
+            <th class="num">MV/mMV Contab. (€)</th>
+            <th class="num">MV/mMV Fiscal (€)</th>
+            <th>Reinvest.</th>
+          </tr></thead>
+          <tbody id="af-mod31-body">
+            <tr><td colspan="13" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="af-mod31-empty" class="table-wrap" style="display:none">
+      <div class="empty-state">
+        <div class="es-icon">💰</div>
+        <p>Nenhuma alienação registada para o exercício selecionado.</p>
+        <p style="margin-top:4px">Quando alienar um ativo, registe a alienação na ficha correspondente.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAINEL MOD. 33 ── -->
+  <div id="af-panel-mod33" class="af-panel">
+    <div class="ph">
+      <div class="ph-left"><h1>⚠️ Imparidades em Ativos</h1><p>Mapa Modelo 33 — Exercício <span id="af-mod33-ano-title">—</span></p></div>
+      <div class="ph-right">
+        <button class="btn btn-secondary btn-sm" onclick="openModalNovaImparidade()">➕ Nova Imparidade</button>
+        <button class="btn btn-secondary btn-sm" onclick="afExportMod33Excel()">📊 Excel</button>
+        <button class="btn btn-primary btn-sm" onclick="afExportMod33PDF()">📄 PDF A4</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Cód. SNC</th>
+            <th>Descrição</th>
+            <th class="num">V. Bruto (€)</th>
+            <th class="num">Impar. Acum. Ant. (€)</th>
+            <th class="num">Impar. Exercício (€)</th>
+            <th class="num">Reversão (€)</th>
+            <th class="num">Impar. Acum. Total (€)</th>
+            <th class="num">V. Líquido (€)</th>
+            <th>Aceite Fiscal</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="af-mod33-body">
+            <tr><td colspan="10"><div class="empty-state"><div class="es-icon">⚠️</div><p>Nenhuma imparidade registada.</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAINEL MOD. 34 ── -->
+  <div id="af-panel-mod34" class="af-panel">
+    <div class="ph">
+      <div class="ph-left"><h1>📝 Provisões e Imparidades em Créditos</h1><p>Mapa Modelo 34 — Exercício <span id="af-mod34-ano-title">—</span></p></div>
+      <div class="ph-right">
+        <button class="btn btn-secondary btn-sm" onclick="openModalNovaProvisao()">➕ Nova Provisão</button>
+        <button class="btn btn-secondary btn-sm" onclick="afExportMod34Excel()">📊 Excel</button>
+        <button class="btn btn-primary btn-sm" onclick="afExportMod34PDF()">📄 PDF A4</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>NIF Devedor</th>
+            <th>Nome Devedor</th>
+            <th>Cód. SNC</th>
+            <th class="num">V. Dívida (€)</th>
+            <th>Data Vencim.</th>
+            <th>Antiguidade</th>
+            <th class="num">Imparidade (€)</th>
+            <th>% Impar.</th>
+            <th>Contencioso</th>
+            <th>Aceite Fiscal</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="af-mod34-body">
+            <tr><td colspan="11"><div class="empty-state"><div class="es-icon">📝</div><p>Nenhuma provisão registada.</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAINEL TABELA FISCAL ── -->
+  <div id="af-panel-tabfiscal" class="af-panel">
+    <div class="ph">
+      <div class="ph-left"><h1>⚙️ Tabela Fiscal</h1><p>Gestão das taxas e coeficientes fiscais — editável pelo administrador</p></div>
+      <div class="ph-right" id="af-tf-admin-actions" style="display:none">
+        <button class="btn btn-secondary btn-sm" onclick="afExportTabelaFiscalExcel()">📊 Exportar</button>
+        <button class="btn btn-warning btn-sm" onclick="openModalActualizarTabela()" title="Importar nova versão da tabela fiscal quando sair novo decreto">📥 Actualizar Tabela Base</button>
+        <button class="btn btn-primary btn-sm" onclick="openModalNovaTaxa()">➕ Nova Taxa</button>
+      </div>
+    </div>
+
+    <div class="mod-tabs">
+      <button class="mod-tab active" onclick="afShowTFTab('tab2')">Tabela II — Genérica</button>
+      <button class="mod-tab" onclick="afShowTFTab('tab1')">Tabela I — Específica</button>
+      <button class="mod-tab" onclick="afShowTFTab('coef')">Coeficientes Mod. 31</button>
+    </div>
+
+    <!-- Tabela II Genérica -->
+    <div id="af-tf-tab2" class="af-panel active">
+      <div class="alert info"><span class="alert-icon">ℹ️</span><span class="alert-text">Taxas genéricas do DR 25/2009 (Tabela II) — aplicáveis quando não existe taxa específica para o setor. <strong>Versão em vigor:</strong> DR 25/2009 com alterações introduzidas pelo DR 4/2015 de 22 de abril.</span></div>
+      <div class="table-wrap">
+        <div class="tw-header">
+          <span class="tw-title">Taxas Genéricas — Tabela II</span>
+          <span id="af-tf-update-label" style="font-size:10px;color:var(--text3)"></span>
+        </div>
+        <div class="tbl-scroll">
+          <table id="af-tf-tab2-table">
+            <thead><tr>
+              <th>Código</th>
+              <th>Descrição</th>
+              <th>Grupo SNC</th>
+              <th class="num">Taxa Máx %</th>
+              <th class="num">Taxa Mín %</th>
+              <th>Vida Útil (anos)</th>
+              <th>Degressivas</th>
+              <th>Diploma</th>
+              <th id="af-tf-acoes-header" style="display:none">Ações</th>
+            </tr></thead>
+            <tbody id="af-tf-tab2-body">
+              <tr><td colspan="9" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela I Específica -->
+    <div id="af-tf-tab1" class="af-panel">
+      <div class="alert warning"><span class="alert-icon">⚠️</span><span class="alert-text">Taxas específicas por setor de atividade (DR 25/2009, Tabela I). Aplique quando a empresa tem atividade específica coberta por estas taxas. Consulte sempre o diploma para o grupo correto.</span></div>
+      <div class="table-wrap">
+        <div class="tbl-scroll">
+          <table id="af-tf-tab1-table">
+            <thead><tr>
+              <th>Código</th>
+              <th>Divisão / Grupo</th>
+              <th>Descrição</th>
+              <th class="num">Taxa Máx %</th>
+              <th class="num">Taxa Mín %</th>
+              <th>Diploma</th>
+            </tr></thead>
+            <tbody id="af-tf-tab1-body">
+              <tr><td colspan="6" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coeficientes Mod. 31 -->
+    <div id="af-tf-coef" class="af-panel">
+      <div class="alert info"><span class="alert-icon">ℹ️</span><span class="alert-text">Coeficientes de desvalorização da moeda para cálculo de mais-valias e menos-valias fiscais (Art. 47.º CIRC). Publicados anualmente por Portaria. O coeficiente a aplicar depende do ano de aquisição do bem alienado.</span></div>
+      <div class="table-wrap">
+        <div class="tw-header">
+          <span class="tw-title">Coeficientes de Desvalorização da Moeda</span>
+          <span id="af-coef-update" style="font-size:10px;color:var(--text3)"></span>
+        </div>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr>
+              <th>Ano Aquisição</th>
+              <th class="num">Coeficiente</th>
+              <th>Portaria</th>
+              <th id="af-coef-acoes-header" style="display:none">Ações</th>
+            </tr></thead>
+            <tbody id="af-coef-body">
+              <tr><td colspan="4" class="loading"><div class="spinner"></div> A carregar...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- /sec-ativos -->
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ MODAIS ═══════════════════════════════════ -->
+
+<!-- MODAL: NOVA FICHA -->
+<div id="af-modal-ficha" class="modal-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="af-modal-ficha-title">➕ Nova Ficha de Ativo</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-ficha')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-section">
+        <div class="form-section-title">Identificação</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Descrição do Bem *</label>
+            <input type="text" id="af-f-descricao" placeholder="Ex: Viatura ligeira VW Golf...">
+          </div>
+          <div class="form-group">
+            <label>Número de Série / Referência</label>
+            <input type="text" id="af-f-ref" placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>Código SNC *</label>
+            <select id="af-f-snc">
+              <option value="">— Selecionar —</option>
+              <option value="431">431 — Terrenos e Recursos Naturais</option>
+              <option value="432">432 — Edifícios e Outras Construções</option>
+              <option value="433">433 — Equipamento Básico</option>
+              <option value="434">434 — Equipamento de Transporte</option>
+              <option value="435">435 — Equipamento Administrativo</option>
+              <option value="436">436 — Equipamentos Biológicos</option>
+              <option value="437">437 — Outros Ativos Fixos Tangíveis</option>
+              <option value="441">441 — Goodwill</option>
+              <option value="442">442 — Projetos de Desenvolvimento</option>
+              <option value="443">443 — Programas de Computador</option>
+              <option value="444">444 — Propriedade Industrial</option>
+              <option value="446">446 — Outros Ativos Intangíveis</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Categoria</label>
+            <select id="af-f-categoria">
+              <option value="Imóveis">Imóveis</option>
+              <option value="Viaturas">Viaturas</option>
+              <option value="Equipamento Básico">Equipamento Básico</option>
+              <option value="Equipamento Informático">Equipamento Informático</option>
+              <option value="Mobiliário">Mobiliário</option>
+              <option value="Ferramentas">Ferramentas e Utensílios</option>
+              <option value="Intangíveis">Ativos Intangíveis</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Aquisição e Valor</div>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label>Data de Aquisição *</label>
+            <input type="month" id="af-f-data" onchange="afCalcDepreciacoes()">
+          </div>
+          <div class="form-group">
+            <label>Valor de Aquisição (€) *</label>
+            <input type="number" id="af-f-valor" step="0.01" min="0" placeholder="0,00" oninput="afCalcDepreciacoes()">
+          </div>
+          <div class="form-group">
+            <label>NIF Fornecedor</label>
+            <input type="text" id="af-f-forn-nif" placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>Nome Fornecedor</label>
+            <input type="text" id="af-f-forn-nome" placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>Nº Fatura</label>
+            <input type="text" id="af-f-fatura-num" placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>% Afetação Empresarial</label>
+            <input type="number" id="af-f-afetacao" value="100" min="1" max="100" oninput="afCalcDepreciacoes()">
+            <span class="form-hint">Para viaturas mistas: % de uso empresarial</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Depreciação / Amortização</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Código DR 25/2009 *</label>
+            <select id="af-f-coddp" onchange="afOnCodDPChange()">
+              <option value="">— Selecionar da tabela fiscal —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Método *</label>
+            <select id="af-f-metodo" onchange="afCalcDepreciacoes()">
+              <option value="QC">Quotas Constantes</option>
+              <option value="QD">Quotas Degressivas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Taxa Máxima (%) *</label>
+            <input type="number" id="af-f-taxa-max" step="0.01" readonly style="background:var(--bg2)">
+          </div>
+          <div class="form-group">
+            <label>Taxa Praticada (%) *</label>
+            <input type="number" id="af-f-taxa" step="0.01" placeholder="0,00" oninput="afCalcDepreciacoes()">
+            <span class="form-hint">Entre taxa mínima e máxima</span>
+          </div>
+          <div class="form-group">
+            <label>Vida Útil (anos)</label>
+            <input type="number" id="af-f-vidautil" readonly style="background:var(--bg2)">
+          </div>
+          <div class="form-group">
+            <label>Bem usado</label>
+            <select id="af-f-usado" onchange="afCalcDepreciacoes()">
+              <option value="0">Não (novo)</option>
+              <option value="1">Sim (usado)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" id="af-f-migrado-section">
+        <div class="form-section-title">Migração de Saldo (Excel 2024)</div>
+        <div class="alert warning"><span class="alert-icon">⚠️</span><span class="alert-text">Preencha apenas se estiver a importar dados históricos do Excel. O saldo acumulado registado será assumido como ponto de partida (Ano 0 = 2024).</span></div>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label>Migrado do Excel 2024</label>
+            <select id="af-f-migrado" onchange="afToggleMigrado()">
+              <option value="0">Não (ativo novo)</option>
+              <option value="1">Sim (saldo histórico)</option>
+            </select>
+          </div>
+          <div class="form-group" id="af-f-dep-acum-wrap" style="display:none">
+            <label>Dep. Acumuladas até 31/12/2024 (€)</label>
+            <input type="number" id="af-f-dep-acum" step="0.01" min="0" placeholder="0,00" oninput="afCalcDepreciacoes()">
+          </div>
+          <div class="form-group" id="af-f-dep-acum-nota-wrap" style="display:none">
+            <label>Nota</label>
+            <input type="text" id="af-f-dep-acum-nota" placeholder="Ex: Importado do mapa Excel 2024">
+          </div>
+        </div>
+      </div>
+
+      <!-- Cálculo automático -->
+      <div class="calc-box" id="af-f-calc-box">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px;">⚙️ Cálculo Automático</div>
+        <div class="calc-row"><span class="lbl">Valor de Aquisição</span><span class="val" id="af-calc-va">—</span></div>
+        <div class="calc-row"><span class="lbl">Taxa praticada</span><span class="val" id="af-calc-taxa">—</span></div>
+        <div class="calc-row"><span class="lbl">Dep. ano aquisição (pro-rata)</span><span class="val" id="af-calc-dep0">—</span></div>
+        <div class="calc-row"><span class="lbl">Dep. anual (anos seguintes)</span><span class="val" id="af-calc-depanual">—</span></div>
+        <div class="calc-row total"><span class="lbl">VLC estimado final do exercício</span><span class="val" id="af-calc-vlc">—</span></div>
+      </div>
+
+      <div class="form-section" style="margin-top:14px">
+        <div class="form-section-title">Fatura de Suporte</div>
+        <div class="upload-zone" id="af-f-upload-zone" onclick="document.getElementById('af-f-fatura-file').click()" ondragover="afDragOver(event)" ondrop="afDrop(event)">
+          <div class="upload-icon">📎</div>
+          <p>Clique para anexar fatura em PDF</p>
+          <p style="font-size:10px;color:var(--text4)">Máx. 3MB · PDF apenas</p>
+          <p class="upload-name" id="af-f-upload-name"></p>
+          <input type="file" id="af-f-fatura-file" accept=".pdf" onchange="afOnFileSelect(event)">
+        </div>
+        <div class="form-hint" style="margin-top:6px">Para fichas novas (2025+), a fatura é obrigatória para guardar o registo.</div>
+      </div>
+
+      <div class="form-group" style="margin-top:10px">
+        <label>Observações</label>
+        <textarea id="af-f-obs" rows="2" placeholder="Notas adicionais..."></textarea>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-ficha')">Cancelar</button>
+      <button class="btn btn-primary" onclick="afSaveFicha()">💾 Guardar Ficha</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETALHE / AMORTIZAÇÕES -->
+<div id="af-modal-detalhe" class="modal-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="af-modal-detalhe-title">Ficha de Ativo</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-detalhe')">✕</button>
+    </div>
+    <div class="modal-body" id="af-modal-detalhe-body">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-detalhe')">Fechar</button>
+      <button class="btn btn-danger btn-sm" id="af-btn-alienar" onclick="afOpenAlienarModal()">🔄 Registar Alienação</button>
+      <button class="btn btn-secondary btn-sm" id="af-btn-abate" onclick="afRegistarAbate()">🗑️ Abate/Inutilização</button>
+      <button class="btn btn-primary btn-sm" id="af-btn-edit-ficha" onclick="afEditFicha()">✏️ Editar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ALIENAÇÃO -->
+<div id="af-modal-alienacao" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>💰 Registar Alienação</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-alienacao')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Dados da Alienação</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Data de Alienação *</label>
+            <input type="date" id="af-al-data" onchange="afCalcMaisValia()">
+          </div>
+          <div class="form-group">
+            <label>Valor de Realização (€) *</label>
+            <input type="number" id="af-al-valor" step="0.01" placeholder="0,00" oninput="afCalcMaisValia()">
+          </div>
+          <div class="form-group">
+            <label>NIF Comprador</label>
+            <input type="text" id="af-al-nif" placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>Nome Comprador</label>
+            <input type="text" id="af-al-nome" placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>Reinvestimento (Art. 48.º CIRC)</label>
+            <select id="af-al-reinv" onchange="afCalcMaisValia()">
+              <option value="0">Não aplicável</option>
+              <option value="1">Sim — reinvestimento previsto</option>
+            </select>
+          </div>
+          <div class="form-group" id="af-al-reinv-valor-wrap" style="display:none">
+            <label>Valor de Reinvestimento Previsto (€)</label>
+            <input type="number" id="af-al-reinv-valor" step="0.01" placeholder="0,00">
+          </div>
+        </div>
+      </div>
+      <div class="calc-box" id="af-al-calc">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px;">⚙️ Cálculo Mais/Menos-Valia Fiscal</div>
+        <div class="calc-row"><span class="lbl">Valor de Aquisição</span><span class="val" id="af-al-c-va">—</span></div>
+        <div class="calc-row"><span class="lbl">Coeficiente de desvalorização</span><span class="val" id="af-al-c-coef">—</span></div>
+        <div class="calc-row"><span class="lbl">V. Aquisição Corrigido</span><span class="val" id="af-al-c-vac">—</span></div>
+        <div class="calc-row"><span class="lbl">Dep. Acumuladas aceites fiscalmente</span><span class="val" id="af-al-c-da">—</span></div>
+        <div class="calc-row"><span class="lbl">VLC Fiscal</span><span class="val" id="af-al-c-vlcf">—</span></div>
+        <div class="calc-row"><span class="lbl">Valor de Realização</span><span class="val" id="af-al-c-vr">—</span></div>
+        <div class="calc-row total" id="af-al-c-mv-row"><span class="lbl">Mais/Menos-Valia Fiscal</span><span class="val" id="af-al-c-mv">—</span></div>
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label>Observações</label>
+        <textarea id="af-al-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-alienacao')">Cancelar</button>
+      <button class="btn btn-success" onclick="afSaveAlienacao()">💾 Confirmar Alienação</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: IMPORTAR EXCEL -->
+<div id="af-modal-import" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📥 Importar Mapa Excel 2024 (Ano 0)</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-import')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert warning">
+        <span class="alert-icon">⚠️</span>
+        <span class="alert-text">
+          <strong>Importação de Ano 0 (31/12/2024)</strong><br>
+          Os dados do Excel serão importados tal como estão — sem correção de erros históricos.
+          As linhas ficam marcadas como "Migrado" e servem de ponto de partida para 2025 em diante.
+          <br><strong>Formato esperado:</strong> Colunas: Descrição | Data Início | Valor Aquisição | Taxa % | Dep. Acumuladas | Método | Código DR25 (opcional)
+        </span>
+      </div>
+
+      <div class="upload-zone" id="af-import-zone" onclick="document.getElementById('af-import-file').click()">
+        <div class="upload-icon">📊</div>
+        <p>Clique para selecionar um ou vários ficheiros Excel</p>
+        <p style="font-size:10px;color:var(--text4)">Pode seleccionar vários de uma vez (Ctrl+click) — Viaturas, Edifícios, Equipamentos, etc.</p>
+        <p class="upload-name" id="af-import-name"></p>
+        <input type="file" id="af-import-file" accept=".xlsx,.xls" multiple onchange="afOnImportFileSelect(event)">
+      </div>
+
+      <div id="af-import-preview" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-lg);padding:12px;">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;" id="af-import-count"></div>
+
+      <div id="af-import-map" style="display:none;margin-top:12px">
+        <div class="form-section-title">Mapeamento de Colunas</div>
+        <div id="af-import-map-body"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-import')">Cancelar</button>
+      <button class="btn btn-primary" id="af-import-btn" onclick="afDoImport()" disabled>📥 Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOVA TAXA FISCAL -->
+<div id="af-modal-taxa" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="af-modal-taxa-title">➕ Nova Taxa Fiscal</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-taxa')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tabela</label>
+          <select id="af-tx-tabela">
+            <option value="tab2">Tabela II — Genérica</option>
+            <option value="tab1">Tabela I — Específica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Código DR 25/2009</label>
+          <input type="text" id="af-tx-codigo" placeholder="Ex: 2005">
+        </div>
+        <div class="form-group form-full">
+          <label>Descrição *</label>
+          <input type="text" id="af-tx-desc" placeholder="Ex: Edifícios industriais">
+        </div>
+        <div class="form-group">
+          <label>Grupo SNC / Divisão</label>
+          <input type="text" id="af-tx-grupo" placeholder="Ex: 432">
+        </div>
+        <div class="form-group">
+          <label>Taxa Máxima % *</label>
+          <input type="number" id="af-tx-taxa-max" step="0.01" oninput="afCalcTaxaMin()">
+        </div>
+        <div class="form-group">
+          <label>Taxa Mínima % (auto)</label>
+          <input type="number" id="af-tx-taxa-min" step="0.01" readonly style="background:var(--bg2)">
+          <span class="form-hint">= metade da taxa máxima (art. 18.º DR 25/2009)</span>
+        </div>
+        <div class="form-group">
+          <label>Admite Quotas Degressivas</label>
+          <select id="af-tx-degressivas">
+            <option value="1">Sim</option>
+            <option value="0">Não</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Diploma Legal</label>
+          <input type="text" id="af-tx-diploma" placeholder="Ex: DR 25/2009, art. 5.º" value="DR 25/2009 + DR 4/2015">
+        </div>
+        <div class="form-group form-full">
+          <label>Data de Entrada em Vigor</label>
+          <input type="date" id="af-tx-vigencia">
+        </div>
+        <div class="form-group form-full">
+          <label>Observações</label>
+          <input type="text" id="af-tx-obs" placeholder="Notas...">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-taxa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="afSaveTaxa()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ACTUALIZAR TABELA BASE -->
+<div id="af-modal-actualizar-tabela" class="modal-overlay">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>📥 Actualizar Tabela Fiscal Base</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-actualizar-tabela')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert info" style="margin-bottom:1rem">
+        <span class="alert-icon">ℹ️</span>
+        <span class="alert-text">
+          Use esta ferramenta quando sair um novo decreto que altere taxas fiscais.<br>
+          Cole abaixo o JSON com as entradas a <strong>adicionar ou substituir</strong> — as entradas existentes não referidas mantêm-se.<br>
+          Para apagar uma entrada, inclua-a com <code style="background:#1e293b;padding:2px 5px;border-radius:3px">"apagar": true</code>.
+        </span>
+      </div>
+
+      <!-- Tabs: Manual vs JSON -->
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+        <button id="af-act-tab-json" class="btn btn-primary btn-sm" onclick="afActShowTab('json')">📋 Colar JSON</button>
+        <button id="af-act-tab-manual" class="btn btn-secondary btn-sm" onclick="afActShowTab('manual')">✏️ Editar entrada a entrada</button>
+        <button id="af-act-tab-info" class="btn btn-secondary btn-sm" onclick="afActShowTab('info')">📖 Formato</button>
+      </div>
+
+      <!-- Painel JSON -->
+      <div id="af-act-panel-json">
+        <div style="margin-bottom:0.5rem;font-size:12px;color:var(--text2)">Diploma de referência da actualização:</div>
+        <input type="text" id="af-act-diploma" placeholder="Ex: DR 4/2025, de 15 de Março" style="width:100%;margin-bottom:0.75rem;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+        <div style="margin-bottom:0.5rem;font-size:12px;color:var(--text2)">JSON com as entradas a actualizar:</div>
+        <textarea id="af-act-json" rows="12" placeholder='[
+  {"cod":"2375","desc":"Veículos automóveis — ligeiros e mistos","taxa_max":25,"grupo":"434","degressivas":false,"diploma":"DR X/2025"},
+  {"cod":"9998","desc":"Nova entrada exemplo","taxa_max":15,"grupo":"433","degressivas":true,"diploma":"DR X/2025"},
+  {"cod":"2060","apagar":true}
+]' style="width:100%;padding:0.75rem;background:#0f172a;border:1px solid var(--border);color:#93c5fd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
+        <div id="af-act-json-erro" style="display:none;margin-top:0.5rem;padding:0.5rem 0.75rem;background:#7f1d1d;border:1px solid #ef4444;color:#fca5a5;border-radius:6px;font-size:12px"></div>
+        <div id="af-act-json-preview" style="display:none;margin-top:0.75rem"></div>
+      </div>
+
+      <!-- Painel manual (entrada a entrada) -->
+      <div id="af-act-panel-manual" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Código DR *</label>
+            <input type="text" id="af-act-m-cod" placeholder="Ex: 2375" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Grupo SNC *</label>
+            <input type="text" id="af-act-m-grupo" placeholder="Ex: 434" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Descrição *</label>
+            <input type="text" id="af-act-m-desc" placeholder="Descrição conforme o decreto" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Taxa máxima % *</label>
+            <input type="number" id="af-act-m-taxa" placeholder="Ex: 25" step="0.01" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Diploma *</label>
+            <input type="text" id="af-act-m-diploma" placeholder="Ex: DR 4/2025" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Degressivas</label>
+            <select id="af-act-m-deg" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+              <option value="false">Não</option>
+              <option value="true">Sim</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Nota vida útil (opcional)</label>
+            <input type="text" id="af-act-m-nota" placeholder="Ex: até 5 anos (Art. 3.º)" style="width:100%;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;font-size:13px">
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="afActAdicionarManual()">➕ Adicionar à lista</button>
+        <div id="af-act-manual-lista" style="margin-top:0.75rem;max-height:200px;overflow-y:auto"></div>
+      </div>
+
+      <!-- Painel formato/ajuda -->
+      <div id="af-act-panel-info" style="display:none;font-size:12px;color:var(--text2);line-height:1.7">
+        <p style="margin-bottom:0.5rem"><strong style="color:var(--text1)">Campos obrigatórios:</strong> <code style="background:#1e293b;padding:1px 4px;border-radius:3px">cod</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">desc</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">taxa_max</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">grupo</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">degressivas</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">diploma</code></p>
+        <p style="margin-bottom:0.5rem"><strong style="color:var(--text1)">Campos opcionais:</strong> <code style="background:#1e293b;padding:1px 4px;border-radius:3px">nota_vida_util</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">limite_viatura</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">nao_amortizavel</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">vida_util_fixa</code>, <code style="background:#1e293b;padding:1px 4px;border-radius:3px">taxa_variavel</code></p>
+        <p style="margin-bottom:0.5rem"><strong style="color:var(--text1)">Para apagar:</strong> inclua <code style="background:#1e293b;padding:1px 4px;border-radius:3px">"apagar": true</code> na entrada com o código a remover</p>
+        <p style="margin-bottom:0.5rem"><strong style="color:var(--text1)">Grupos SNC comuns:</strong> 431=Terrenos · 432=Edifícios · 433=Equipamento básico · 434=Transporte · 435=Administrativo/social · 437=Outros AFT · 441=Goodwill · 442=Proj.Desenv. · 443=Software · 444=Prop.Industrial</p>
+        <p><strong style="color:var(--text1)">Nota:</strong> As alterações são gravadas no Firebase. A tabela base do código não é alterada — serve de fallback se o Firebase estiver indisponível.</p>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <div style="font-size:11px;color:var(--text3)" id="af-act-estado"></div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn btn-secondary" onclick="closeModal('af-modal-actualizar-tabela')">Cancelar</button>
+        <button class="btn btn-secondary" id="af-act-btn-preview" onclick="afActPreview()">👁️ Pré-visualizar</button>
+        <button class="btn btn-primary" onclick="afActAplicar()">✅ Aplicar Actualização</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOVO COEFICIENTE -->
+<div id="af-modal-coef" class="modal-overlay">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h3>➕ Coeficiente de Desvalorização</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-coef')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Ano de Aquisição *</label>
+          <input type="number" id="af-coef-ano" placeholder="Ex: 2010" min="1970" max="2030">
+        </div>
+        <div class="form-group">
+          <label>Coeficiente *</label>
+          <input type="number" id="af-coef-val" step="0.01" placeholder="Ex: 1.25">
+        </div>
+        <div class="form-group form-full">
+          <label>Portaria</label>
+          <input type="text" id="af-coef-portaria" placeholder="Ex: Portaria 291/2024">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-coef')">Cancelar</button>
+      <button class="btn btn-primary" onclick="afSaveCoef()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOVA IMPARIDADE -->
+<div id="af-modal-impar" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚠️ Nova Imparidade</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-impar')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Código SNC</label>
+          <input type="text" id="af-imp-snc" placeholder="Ex: 6551">
+        </div>
+        <div class="form-group form-full">
+          <label>Descrição *</label>
+          <input type="text" id="af-imp-desc">
+        </div>
+        <div class="form-group">
+          <label>Valor Bruto (€)</label>
+          <input type="number" id="af-imp-vb" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Impar. Acum. Anterior (€)</label>
+          <input type="number" id="af-imp-ant" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Impar. do Exercício (€)</label>
+          <input type="number" id="af-imp-ex" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Reversão (€)</label>
+          <input type="number" id="af-imp-rev" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Aceite Fiscalmente</label>
+          <select id="af-imp-fiscal">
+            <option value="Sim">Sim</option>
+            <option value="Não">Não</option>
+            <option value="Parcial">Parcialmente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Exercício</label>
+          <input type="number" id="af-imp-ano" value="2026" min="2020" max="2035">
+        </div>
+        <div class="form-group form-full">
+          <label>Justificação</label>
+          <textarea id="af-imp-just" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-impar')">Cancelar</button>
+      <button class="btn btn-primary" onclick="afSaveImparidade()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOVA PROVISÃO -->
+<div id="af-modal-provisao" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📝 Nova Provisão / Imparidade em Crédito</h3>
+      <button class="modal-close" onclick="closeModal('af-modal-provisao')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>NIF Devedor</label>
+          <input type="text" id="af-pr-nif" placeholder="Ex: 500123456">
+        </div>
+        <div class="form-group">
+          <label>Nome Devedor *</label>
+          <input type="text" id="af-pr-nome">
+        </div>
+        <div class="form-group">
+          <label>Código SNC</label>
+          <select id="af-pr-snc">
+            <option value="2171">2171 — Clientes c/c — Imparidade</option>
+            <option value="2181">2181 — Outros devedores — Imparidade</option>
+            <option value="2191">2191 — Adiantamentos a fornecedores — Impar.</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Valor em Dívida (€) *</label>
+          <input type="number" id="af-pr-divida" step="0.01" oninput="afCalcProvisao()">
+        </div>
+        <div class="form-group">
+          <label>Data de Vencimento</label>
+          <input type="date" id="af-pr-venc" onchange="afCalcProvisao()">
+        </div>
+        <div class="form-group">
+          <label>Imparidade (€)</label>
+          <input type="number" id="af-pr-impar" step="0.01" oninput="afCalcProvisao()">
+        </div>
+        <div class="form-group">
+          <label>Em Contencioso</label>
+          <select id="af-pr-cont">
+            <option value="Não">Não</option>
+            <option value="Sim">Sim</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Aceite Fiscalmente</label>
+          <select id="af-pr-fiscal">
+            <option value="Sim">Sim — Art. 28.º-A CIRC</option>
+            <option value="Não">Não</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Exercício</label>
+          <input type="number" id="af-pr-ano" value="2026" min="2020" max="2035">
+        </div>
+        <div class="form-group form-full">
+          <label>Observações</label>
+          <textarea id="af-pr-obs" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="calc-box" id="af-pr-calc-box" style="display:none">
+        <div class="calc-row"><span class="lbl">Antiguidade da dívida</span><span class="val" id="af-pr-antiguidade">—</span></div>
+        <div class="calc-row"><span class="lbl">% Imparidade aplicada</span><span class="val" id="af-pr-pct">—</span></div>
+        <div class="calc-row total"><span class="lbl">Enquadramento Art. 28.º-A CIRC</span><span class="val" id="af-pr-enquad">—</span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('af-modal-provisao')">Cancelar</button>
+      <button class="btn btn-primary" onclick="afSaveProvisao()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCRIPTS ═══════════════════════════════════ -->
+
+<script>
+// ── CONFIGURAÇÃO ──────────────────────────────────────────────
+const PASS_ADMIN  = null;
+const PASS_EQUIPA = null;
+const EMPRESAS    = [{"num":1,"nome":"1966 A Evolução do Parquet Unipessoal, Lda."},{"num":2,"nome":"ACOLHINICIATIVA UNIPESSOAL LDA"},{"num":3,"nome":"Adão Carlos Ferreira Pereira"},{"num":4,"nome":"Agostinho Eduardo Silva Magalhães"},{"num":5,"nome":"Albino Ricardo Carvalho Unipessoal, Lda"},{"num":6,"nome":"Alcina de Jesus Pereira Alves"},{"num":7,"nome":"Alesckdoom Unipessoal,Lda"},{"num":8,"nome":"ANA CRISTINA FERREIRA DOS SANTOS"},{"num":9,"nome":"André Filipe de Oliveira Moutas Macedo"},{"num":10,"nome":"André Ribas Ribeiro Unipessoal, Lda."},{"num":11,"nome":"Angela Beatriz Gomes da Silva"},{"num":12,"nome":"Antonio Miguel Costa Silva"},{"num":13,"nome":"ARMINDA ALVES BAPTISTA"},{"num":14,"nome":"ARMINDO FERNANDO PINTO MONTEIRO"},{"num":15,"nome":"AROMA ASSIDUO LAVANDARIAS SELF SERV.LDA."},{"num":16,"nome":"Augusto Leite da Costa"},{"num":17,"nome":"Bruno António de Oliveira Moutas Macedo"},{"num":18,"nome":"Calculo Vibrante Unipessoal,Lda"},{"num":19,"nome":"Carlos Ferreira Magalhães"},{"num":20,"nome":"Carlos Silva & Rui Silva - Construções e Remodelações Lda"},{"num":21,"nome":"CASUAL E BREVE CONSTRUÇÕES UNIPESSOAL,LDA"},{"num":22,"nome":"CONSTRUÇÕES PEDRO VAZ FERREIRA LDA"},{"num":23,"nome":"CRISTINA MOITA UNIPESSOAL, LDA."},{"num":24,"nome":"Daniel Jose da Costa Ferreira"},{"num":25,"nome":"Diamantino Costa Alonso Lda"},{"num":26,"nome":"DIGNIDADE GARRIDA TRANSPORTES UNIPESSOAL LDA"},{"num":27,"nome":"Doce Forum Unipessoal, Lda"},{"num":28,"nome":"ENJOY VIEW GESTÃO E ADMINISTRAÇÃO DE BENS S A"},{"num":29,"nome":"Espírito Inalterável, Lda"},{"num":30,"nome":"EXTRURECICLA,LDA."},{"num":31,"nome":"Fanviclima - Instalações de Climatização, lda"},{"num":32,"nome":"Fernando Brás Martins Unipessoal, Lda"},{"num":33,"nome":"FEYDOM SOFA SYSTEMS UNIPESSOAL LDA"},{"num":34,"nome":"Filipe Silva Lopes Unipessoal, Lda"},{"num":35,"nome":"FRANCISCO DANIEL PEDROSA DA SILVA UNIPESSOAL LDA."},{"num":36,"nome":"H.C Araújo,Lda"},{"num":37,"nome":"Helder Carneiro Unipessoal, Lda"},{"num":38,"nome":"Joao Pedro Coelho Magalhaes"},{"num":39,"nome":"JOAQUIM CUNHA FARIA UNIPESSOAL LDA."},{"num":40,"nome":"Joaquim David Abreu Unipessoal, Lda"},{"num":41,"nome":"João Carlos Ferreira Pereira"},{"num":42,"nome":"João Fernandes de Castro"},{"num":43,"nome":"JP INOVAÇÕES UNIPESSOAL LDA"},{"num":44,"nome":"Justina Pereira da Costa"},{"num":45,"nome":"Luis Manuel Costa Unipessoal,Lda"},{"num":46,"nome":"Manuel António Mendes Ribeiro"},{"num":47,"nome":"Manuel Costa & Filhos Lda."},{"num":48,"nome":"Manuel Fernando Ferreira Gomes"},{"num":49,"nome":"MARCO PAULO RIBEIRO ALVES"},{"num":50,"nome":"MARIA DA CONCEIÇÃO FERREIRA LEAO TORRES"},{"num":51,"nome":"Maria de Fátima Miranda Vaz"},{"num":52,"nome":"MARIA JÚLIA AMORIM DE BARROS"},{"num":53,"nome":"Maria Machado Almeida Unipessoal, Lda"},{"num":54,"nome":"Maria Orquídia Alves Ferreira Silva"},{"num":55,"nome":"MARIANA GABRIELA DE FREITAS GOMES"},{"num":56,"nome":"Marina Fernanda R. Martins"},{"num":57,"nome":"Maura Marlene Ferreira Silva Unipessoal, Lda"},{"num":58,"nome":"Mendes de Freitas, Lda"},{"num":59,"nome":"MOTIVOS UNIVERSAIS UNIPESSOAL,LDA"},{"num":60,"nome":"Nelson Fernando Gomes Silva"},{"num":61,"nome":"Original Flame, Lda"},{"num":62,"nome":"Paulo Joaquim Faria Leite"},{"num":63,"nome":"PAULO JORGE FELIX UNIPESSOAL LDA"},{"num":64,"nome":"Pedro Abreu - Materiais de Construção, Unipessoal Lda"},{"num":65,"nome":"PORTAL FUCHSIA UNIPESSOAL LDA."},{"num":66,"nome":"POSTURA DE FADA UNIPESSOAL,LDA"},{"num":67,"nome":"Ricardo Mendes Fernandes, Unipessoal, Lda"},{"num":68,"nome":"ROGERIO DE SOUSA PEREIRA CARNEIRO"},{"num":69,"nome":"ROSA MARIA GOMES DA SILVA"},{"num":70,"nome":"Sara Maria Costa Oliveira"},{"num":71,"nome":"SOCIEDADE AGRICOLA SOCALCOS DE TRESOURAS LDA"},{"num":72,"nome":"SPORTCALÇAR UNIPESSOAL LDA"},{"num":73,"nome":"Supermercados Vilela, Lda"},{"num":74,"nome":"Susana Filipa Oliveira Novais"},{"num":75,"nome":"Tania Patricia Silva Pinto"},{"num":76,"nome":"TC Mendes Têxtil, Lda"},{"num":77,"nome":"URBOOST CREATIVE SOLUTIONS, LDA"},{"num":78,"nome":"WELCOME GENIALITY UNIPESSOAL, LDA"}];
+
+// ── LOGIN ─────────────────────────────────────────────────────
+function afDoLogin() {
+  if (window.PROCDB && PROCDB.ligado()) { const r = PROCDB.role(); sessionStorage.setItem('af_role', r); afStartApp(r); return; }
+  const p = document.getElementById('af-pass').value;
+  if (p === PASS_ADMIN) {
+    sessionStorage.setItem('af_role', 'admin');
+    afStartApp('admin');
+  } else if (p === PASS_EQUIPA) {
+    sessionStorage.setItem('af_role', 'equipa');
+    afStartApp('equipa');
+  } else {
+    document.getElementById('af-login-err').textContent = 'Senha incorreta.';
+  }
+}
+
+function afStartApp(role) {
+  document.getElementById('af-login').style.display = 'none';
+  document.getElementById('af-app').style.display = 'block';
+  document.getElementById('af-role-badge').textContent = role === 'admin' ? '👤 Admin' : '👤 Equipa';
+  const empresas = EMPRESAS.map(e => ({nome: e.nome, nif: ''}));
+  afInit(empresas, role);
+}
+
+function afLogout() {
+  sessionStorage.removeItem('af_role');
+  document.getElementById('af-login').style.display = 'flex';
+  document.getElementById('af-app').style.display = 'none';
+  document.getElementById('af-pass').value = '';
+  document.getElementById('af-login-err').textContent = '';
+}
+
+// Verificar sessão ao carregar
+window.addEventListener('load', () => {
+  // Se está dentro de um iframe (programa principal) salta o login
+  if (window.self !== window.top) {
+    // Herdar role do pai se disponível, senão usar admin
+    const r = (window.PROCDB && PROCDB.ligado()) ? PROCDB.role() : (sessionStorage.getItem('af_role') || 'equipa');
+    afStartApp(r);
+    // Esconder o botão Sair e o link Sistema Principal dentro do iframe
+    const topbar = document.querySelector('.af-topbar-right');
+    if (topbar) topbar.style.display = 'none';
+    return;
+  }
+  // Standalone — verificar sessão normal
+  if (window.PROCDB && PROCDB.ligado()) { afDoLogin(); return; }
+  const r = null;
+  if (r) afStartApp(r);
+});
+
+// ── MÓDULO ATIVOS FIXOS ───────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO ATIVOS FIXOS — DAFILGEST
+// Firebase: dafilgest-interno-default-rtdb.europe-west1
+// Path: /dafilgest/ativos/{emp_key}/
+// ═══════════════════════════════════════════════════════════════
+
+// ── CONSTANTES ──────────────────────────────────────────────────
+const AF_FB_URL  = 'https://dafilgest-interno-default-rtdb.europe-west1.firebasedatabase.app';
+const AF_FB_PATH = '/dafilgest/ativos';
+const AF_TF_PATH = '/dafilgest/tabelas_fiscais';
+
+// ── ESTADO GLOBAL ────────────────────────────────────────────────
+let afState = {
+  empresas: [],         // lista de empresas do sistema principal
+  empKey: null,         // chave Firebase empresa selecionada
+  empNome: '',
+  empNif: '',
+  fichas: {},           // fichas do ativo fixo
+  tabelaII: {},         // taxas genéricas
+  tabelaI: {},          // taxas específicas
+  coeficientes: {},     // coeficientes desvalorização
+  imparidades: {},
+  provisoes: {},
+  fichaEditId: null,    // ID da ficha em edição
+  fichaAlienarId: null, // ID da ficha a alienar
+  fichaDetalheId: null,
+  importData: null,
+  userRole: 'equipa',
+};
+
+// ── TABELA II GENÉRICA (DR 25/2009, Tabela II) + ACTIVOS INTANGÍVEIS ────────────
+// Códigos reais conforme DR 25/2009, de 14 de Setembro (Diário da República n.º 178)
+// Carregado do Firebase; se não existir, usa estes valores base
+// TABELA II — TAXAS GENÉRICAS — DR 25/2009, de 14 de Setembro
+// Fonte: Diário da República n.º 178, 1.ª série — transcrição integral
+const AF_TABELA_II_BASE = [
+  // ── DIVISÃO I — ACTIVOS FIXOS TANGÍVEIS E PROPRIEDADES DE INVESTIMENTO ──
+  // Grupo 1 — Imóveis
+  {cod:'2005',desc:'Edificações ligeiras (fibrocimento, madeira, zinco, etc.)',grupo:'432',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2010',desc:'Edifícios — habitacionais',grupo:'432',taxa_max:2,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2015',desc:'Edifícios — comerciais e administrativos',grupo:'432',taxa_max:2,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2020',desc:'Edifícios — industriais ou edificações integradas em conjuntos industriais',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2025',desc:'Edifícios — afectos a hotéis, restaurantes e similares, garagens, serviços de saúde, ensino, recreativos e culturais',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2035',desc:'Fornos',grupo:'432',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2040',desc:'Obras hidráulicas, incluindo poços de água',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2045',desc:'Obras de pavimentação de pedra, cimento, betão, etc.',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2050',desc:'Pontes e aquedutos — de betão ou alvenaria',grupo:'432',taxa_max:3.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2055',desc:'Pontes e aquedutos — de madeira',grupo:'432',taxa_max:20,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2060',desc:'Pontes e aquedutos — metálicos',grupo:'432',taxa_max:8.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2065',desc:'Reservatórios de água — de torre ou de superfície',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2070',desc:'Reservatórios de água — subterrâneos',grupo:'432',taxa_max:3.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2075',desc:'Silos',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2080',desc:'Vedações e arranjos urbanísticos — arranjos urbanísticos',grupo:'432',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2085',desc:'Vedações e arranjos urbanísticos — vedações ligeiras',grupo:'432',taxa_max:8.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2090',desc:'Vedações e arranjos urbanísticos — muros',grupo:'432',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  // Grupo 2 — Instalações
+  {cod:'2095',desc:'Instalações de água, electricidade, ar comprimido, refrigeração e telefónicas (interiores)',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2100',desc:'Instalações de aquecimento central',grupo:'433',taxa_max:6.66,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2105',desc:'Ascensores, monta-cargas e escadas mecânicas',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2110',desc:'Instalações de cabos aéreos e suportes',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2115',desc:'Instalações de caldeiras e alambiques',grupo:'433',taxa_max:7.14,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2120',desc:'Instalações de captação e distribuição de água (privativas)',grupo:'433',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2125',desc:'Instalações de carga, descarga e embarque (privativas)',grupo:'433',taxa_max:7.14,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2130',desc:'Centrais telefónicas privativas',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2135',desc:'Instalações de distribuição de combustíveis líquidos (privativas)',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2140',desc:'Instalações de embalagem',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2145',desc:'Instalações de armazenagem e depósito — de betão',grupo:'433',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2150',desc:'Instalações de armazenagem e depósito — de madeira',grupo:'433',taxa_max:6.66,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2155',desc:'Instalações de armazenagem e depósito — metálicos',grupo:'433',taxa_max:8.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2160',desc:'Instalações de lagares e prensas',grupo:'433',taxa_max:7.14,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2165',desc:'Postos de transformação',grupo:'433',taxa_max:5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2170',desc:'Instalações radiofónicas, radiotelegráficas e de televisão (privativas)',grupo:'433',taxa_max:12.5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2175',desc:'Refeitórios e cozinhas privativas',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2180',desc:'Reservatórios para combustíveis líquidos',grupo:'433',taxa_max:6.66,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2185',desc:'Vitrinas e estantes fixas',grupo:'433',taxa_max:12.5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2186',desc:'Espaços expositivos de carácter itinerante',grupo:'433',taxa_max:25,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2190',desc:'Instalações de centros de formação profissional',grupo:'433',taxa_max:16.66,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2195',desc:'Instalações não especificadas',grupo:'433',taxa_max:10,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  // Grupo 3 — Máquinas, aparelhos e ferramentas
+  {cod:'2200',desc:'Aparelhagem e máquinas electrónicas',grupo:'433',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2205',desc:'Aparelhagem de reprodução de som',grupo:'433',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2210',desc:'Aparelhos de ar condicionado',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2215',desc:'Aparelhos de aquecimento (irradiadores e outros)',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2220',desc:'Aparelhos de laboratório e precisão',grupo:'433',taxa_max:14.28,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2225',desc:'Aparelhos de ventilação (ventoinhas e outros)',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2230',desc:'Balanças',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2235',desc:'Compressores',grupo:'433',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2240',desc:'Computadores',grupo:'435',taxa_max:33.33,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2245',desc:'Equipamento de centros de formação profissional',grupo:'433',taxa_max:16.66,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2250',desc:'Equipamentos de energia solar',grupo:'433',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2251',desc:'Aparelhos telemóveis',grupo:'435',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2255',desc:'Equipamento de oficinas privativas — de carpintaria',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2260',desc:'Equipamento de oficinas privativas — de serralharia e mecânica',grupo:'433',taxa_max:14.28,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2265',desc:'Ferramentas e utensílios',grupo:'437',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2270',desc:'Guindastes',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2275',desc:'Máquinas de escrever, de calcular, de contabilidade e de fotocopiar',grupo:'435',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2280',desc:'Máquinas-ferramentas — ligeiras',grupo:'433',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2285',desc:'Máquinas-ferramentas — pesadas',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2290',desc:'Máquinas de lavagem automática de veículos',grupo:'433',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2295',desc:'Máquinas não especificadas',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2300',desc:'Material de incêndio (extintores e outros)',grupo:'433',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2305',desc:'Material de queima',grupo:'433',taxa_max:14.28,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2310',desc:'Motores',grupo:'433',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2315',desc:'Televisores',grupo:'433',taxa_max:14.28,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  // Grupo 4 — Material rolante ou de transporte
+  {cod:'2320',desc:'Aeronaves',grupo:'434',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2325',desc:'Barcos — de ferro',grupo:'434',taxa_max:7.14,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2330',desc:'Barcos — de madeira',grupo:'434',taxa_max:10,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2335',desc:'Barcos — de borracha',grupo:'434',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2340',desc:'Bicicletas, triciclos e motociclos',grupo:'434',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2345',desc:'Tractores e atrelados, empilhadores e carros com caixa basculante (dumpers)',grupo:'434',taxa_max:16.66,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2350',desc:'Vagões',grupo:'434',taxa_max:4,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2355',desc:'Veículos de tracção animal, compreendendo animais de tiro',grupo:'434',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2360',desc:'Vias-férreas normais',grupo:'434',taxa_max:4,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2365',desc:'Vias-férreas (sistema Decauville) e respectivo material rolante',grupo:'434',taxa_max:10,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2370',desc:'Veículos automóveis — funerários',grupo:'434',taxa_max:12.5,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2375',desc:'Veículos automóveis — ligeiros e mistos (cap. €40.000 — Art. 11.º)',grupo:'434',taxa_max:25,degressivas:false,diploma:'DR 25/2009, Tab.II + Art. 11.º',limite_viatura:true},
+  {cod:'2380',desc:'Veículos automóveis — pesados de passageiros',grupo:'434',taxa_max:14.28,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2385',desc:'Veículos automóveis — pesados e reboques de mercadorias',grupo:'434',taxa_max:20,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2390',desc:'Veículos automóveis — pesados e reboques de mercadorias em vias de forte desgaste',grupo:'434',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2395',desc:'Tanques',grupo:'434',taxa_max:16.66,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  // Grupo 5 — Elementos diversos
+  {cod:'2400',desc:'Artigos de conforto e decoração — alcatifas',grupo:'437',taxa_max:25,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2405',desc:'Artigos de conforto e decoração — outros',grupo:'437',taxa_max:12.5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2410',desc:'Encerados',grupo:'437',taxa_max:50,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2415',desc:'Equipamento publicitário colocado na via pública',grupo:'437',taxa_max:12.5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2420',desc:'Filmes, discos e cassettes',grupo:'437',taxa_max:25,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2425',desc:'Material de desenho e topografia',grupo:'437',taxa_max:12.5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2430',desc:'Mobiliário',grupo:'435',taxa_max:12.5,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2435',desc:'Moldes, matrizes, formas e cunhos',grupo:'437',taxa_max:25,degressivas:true,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2440',desc:'Programas de computadores',grupo:'443',taxa_max:33.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2445',desc:'Taras e vasilhame — de madeira',grupo:'437',taxa_max:20,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2450',desc:'Taras e vasilhame — de metal',grupo:'437',taxa_max:14.28,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  {cod:'2455',desc:'Taras e vasilhame — de outros materiais',grupo:'437',taxa_max:33.33,degressivas:false,diploma:'DR 25/2009, Tab.II'},
+  // ── DIVISÃO II — ACTIVOS INTANGÍVEIS ──
+  {cod:'2470',desc:'Projectos de desenvolvimento',grupo:'442',taxa_max:33.33,degressivas:false,diploma:'DR 25/2009, Tab.II',nota_vida_util:'até 5 anos (Art. 3.º n.º 3)'},
+  {cod:'2475',desc:'Elementos da propriedade industrial — patentes, marcas, alvarás, processos, modelos e outros direitos adquiridos a título oneroso com utilização exclusiva por período limitado',grupo:'444',taxa_max:0,degressivas:false,diploma:'DR 25/2009, Tab.II',nota_vida_util:'Em função do período de utilização exclusiva (Art. 16.º)',taxa_variavel:true},
+  // ── TERRENOS — não amortizável ──
+  {cod:'4310',desc:'Terrenos e recursos naturais — não sujeito a depreciação',grupo:'431',taxa_max:0,degressivas:false,diploma:'N/A',nao_amortizavel:true},
+  // ── BENS DE REDUZIDO VALOR (Art. 19.º) ──
+  {cod:'9999',desc:'Bens de custo unitário ≤ €1.000 — amortização total imediata (Art. 19.º)',grupo:'437',taxa_max:100,degressivas:false,diploma:'DR 25/2009, Art. 19.º',vida_util_fixa:1},
+];
+
+const AF_COEF_BASE = {
+  1970:57.21,1971:52.46,1972:48.76,1973:44.78,1974:36.43,1975:30.39,
+  1976:24.14,1977:18.67,1978:15.76,1979:13.33,1980:11.40,1981:9.44,
+  1982:7.74,1983:5.99,1984:4.58,1985:3.83,1986:3.38,1987:3.10,
+  1988:2.84,1989:2.60,1990:2.36,1991:2.14,1992:1.99,1993:1.89,
+  1994:1.84,1995:1.79,1996:1.74,1997:1.71,1998:1.68,1999:1.65,
+  2000:1.60,2001:1.54,2002:1.49,2003:1.46,2004:1.43,2005:1.40,
+  2006:1.37,2007:1.33,2008:1.27,2009:1.28,2010:1.27,2011:1.22,
+  2012:1.19,2013:1.19,2014:1.19,2015:1.19,2016:1.18,2017:1.17,
+  2018:1.15,2019:1.13,2020:1.13,2021:1.10,2022:1.02,2023:1.00,
+  2024:1.00,2025:1.00,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// INICIALIZAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+function afInit(empresas, role) {
+  afState.empresas = empresas || [];
+  afState.userRole = role || 'equipa';
+  afPopulateEmpSel();
+  afLoadTabelaFiscal();
+  afRefreshAdminUI();
+}
+
+function afPopulateEmpSel() {
+  const sel = document.getElementById('af-emp-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Selecionar empresa —</option>';
+  afState.empresas.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.nome;
+    opt.textContent = e.nome;
+    sel.appendChild(opt);
+  });
+}
+
+function afRefreshAdminUI() {
+  const isAdmin = afState.userRole === 'admin';
+  const adminBtn = document.getElementById('af-tab-tabfiscal');
+  if (adminBtn) adminBtn.style.display = isAdmin ? '' : '';
+  const tfActions = document.getElementById('af-tf-admin-actions');
+  if (tfActions) tfActions.style.display = isAdmin ? 'flex' : 'none';
+  const acoesHeader = document.getElementById('af-tf-acoes-header');
+  if (acoesHeader) acoesHeader.style.display = isAdmin ? '' : 'none';
+  const coefHeader = document.getElementById('af-coef-acoes-header');
+  if (coefHeader) coefHeader.style.display = isAdmin ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVEGAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+function afShowTab(tab) {
+  document.querySelectorAll('.af-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.af-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.af-tab[onclick="afShowTab('${tab}')"]`);
+  if (btn) btn.classList.add('active');
+  const panel = document.getElementById(`af-panel-${tab}`);
+  if (panel) panel.classList.add('active');
+
+  // Render conforme tab
+  if (tab === 'dashboard') afRenderDashboard();
+  if (tab === 'fichas') afRenderFichas();
+  if (tab === 'mod32') { afSyncAno(); afRenderMod32(); }
+  if (tab === 'mod31') { afSyncAno(); afRenderMod31(); }
+  if (tab === 'mod33') afRenderMod33();
+  if (tab === 'mod34') afRenderMod34();
+  if (tab === 'tabfiscal') afRenderTabelaFiscal();
+}
+
+function afShowTFTab(tab) {
+  document.querySelectorAll('.mod-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#af-panel-tabfiscal .af-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  const p = document.getElementById(`af-tf-${tab}`);
+  if (p) p.classList.add('active');
+}
+
+function afSyncAno() {
+  const ano = document.getElementById('af-ano-sel')?.value || '2026';
+  const m32 = document.getElementById('af-mod32-ano');
+  const m31 = document.getElementById('af-mod31-ano');
+  if (m32) m32.value = ano;
+  if (m31) m31.value = ano;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function afFBKey(str) {
+  if (!str) return str;
+  return str.replace(/\./g,'_').replace(/\//g,'_').replace(/#/g,'_').replace(/\$/g,'_').replace(/\[/g,'_').replace(/\]/g,'_');
+}
+
+async function afFBGet(path) {
+  try {
+    const r = await fetch(`${AF_FB_URL}${path}.json`);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function afFBSet(path, data) {
+  try {
+    const r = await fetch(`${AF_FB_URL}${path}.json`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function afFBPatch(path, data) {
+  try {
+    const r = await fetch(`${AF_FB_URL}${path}.json`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function afFBDelete(path) {
+  try {
+    const r = await fetch(`${AF_FB_URL}${path}.json`, {method:'DELETE'});
+    return r.ok;
+  } catch { return false; }
+}
+
+function afGenId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2,5);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CARREGAR EMPRESA
+// ═══════════════════════════════════════════════════════════════
+
+async function afLoadEmpresa() {
+  const sel = document.getElementById('af-emp-sel');
+  const nome = sel?.value;
+  if (!nome) { afState.empKey = null; return; }
+
+  afState.empNome = nome;
+  afState.empKey = afFBKey(nome);
+
+  // Tenta obter NIF do sistema
+  const emp = afState.empresas.find(e => e.nome === nome);
+  afState.empNif = emp?.nif || '';
+  const nifEl = document.getElementById('af-emp-nif');
+  if (nifEl) nifEl.textContent = afState.empNif ? `NIF: ${afState.empNif}` : '';
+
+  // Carrega fichas
+  afSetLoading(true);
+  const data = await afFBGet(`${AF_FB_PATH}/${afState.empKey}/fichas`);
+  afState.fichas = data || {};
+
+  // Carrega imparidades e provisões
+  const imp = await afFBGet(`${AF_FB_PATH}/${afState.empKey}/imparidades`);
+  afState.imparidades = imp || {};
+  const prov = await afFBGet(`${AF_FB_PATH}/${afState.empKey}/provisoes`);
+  afState.provisoes = prov || {};
+
+  afSetLoading(false);
+  afRefresh();
+}
+
+function afSetLoading(on) {
+  // Visual feedback
+}
+
+async function afRefresh() {
+  const tab = document.querySelector('.af-tab.active');
+  const tabId = tab?.getAttribute('onclick')?.match(/'([^']+)'/)?.[1] || 'dashboard';
+  afShowTab(tabId);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CÁLCULO DE DEPRECIAÇÕES
+// ═══════════════════════════════════════════════════════════════
+
+function afCalcDepAno(ficha, ano) {
+  // Calcula a depreciação para um exercício específico
+  const anoAquis = ficha.data_aquisicao ? parseInt(ficha.data_aquisicao.split('-')[0]) : null;
+  const mesAquis = ficha.data_aquisicao ? parseInt(ficha.data_aquisicao.split('-')[1]) : 1;
+  if (!anoAquis || !ficha.valor || !ficha.taxa) return 0;
+
+  const taxa = parseFloat(ficha.taxa) / 100;
+  const valor = parseFloat(ficha.valor);
+  const metodo = ficha.metodo || 'QC';
+
+  // Pro-rata no ano de aquisição
+  if (ano === anoAquis) {
+    const mesesRestantes = 13 - mesAquis; // meses desde o de aquisição até Dez
+    return valor * taxa * (mesesRestantes / 12);
+  }
+
+  if (ano < anoAquis) return 0;
+
+  // Quotas Constantes
+  if (metodo === 'QC') {
+    const depAnual = valor * taxa;
+    // Verificar se ainda há valor a depreciar
+    const depAcumAntEs = afCalcDepAcum(ficha, ano - 1);
+    const vlcAnterior = valor - depAcumAntEs;
+    if (vlcAnterior <= 0.01) return 0;
+    return Math.min(depAnual, vlcAnterior);
+  }
+
+  // Quotas Degressivas
+  if (metodo === 'QD') {
+    const vidaUtil = Math.round(1 / taxa);
+    let coefDegressivo = 1.5;
+    if (vidaUtil >= 5 && vidaUtil <= 6) coefDegressivo = 2;
+    if (vidaUtil > 6) coefDegressivo = 2.5;
+    const taxaD = Math.min(taxa * coefDegressivo, 1);
+    const depAcumAnt = afCalcDepAcum(ficha, ano - 1);
+    const vlcAnt = valor - depAcumAnt;
+    if (vlcAnt <= 0.01) return 0;
+    const anosRestantes = Math.max(1, vidaUtil - (ano - anoAquis));
+    const depQD = vlcAnt * taxaD;
+    const depSL = vlcAnt / anosRestantes;
+    return Math.max(depQD, depSL);
+  }
+
+  return 0;
+}
+
+function afCalcDepAcum(ficha, ateAno) {
+  // Depreciações acumuladas até fim do ano 'ateAno'
+  if (ficha.migrado && ficha.dep_acum_migracao !== undefined && ficha.dep_acum_migracao !== null) {
+    // Para fichas migradas, usa o saldo de 2024 como base
+    if (ateAno <= 2024) return parseFloat(ficha.dep_acum_migracao) || 0;
+    let acum = parseFloat(ficha.dep_acum_migracao) || 0;
+    for (let a = 2025; a <= ateAno; a++) {
+      acum += afCalcDepAno(ficha, a);
+    }
+    return acum;
+  }
+
+  const anoAquis = ficha.data_aquisicao ? parseInt(ficha.data_aquisicao.split('-')[0]) : null;
+  if (!anoAquis) return 0;
+  let acum = 0;
+  for (let a = anoAquis; a <= ateAno; a++) {
+    acum += afCalcDepAno(ficha, a);
+  }
+  return acum;
+}
+
+function afCalcVLC(ficha, ano) {
+  const valor = parseFloat(ficha.valor) || 0;
+  const acum = afCalcDepAcum(ficha, ano);
+  return Math.max(0, valor - acum);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+function afRenderDashboard() {
+  if (!afState.empKey) {
+    afShowDashEmpty(true);
+    return;
+  }
+
+  const ano = parseInt(document.getElementById('af-ano-sel')?.value || '2026');
+  const fichas = Object.values(afState.fichas);
+  const ativas = fichas.filter(f => f.estado !== 'Alienado' && f.estado !== 'Abatido');
+
+  if (ativas.length === 0) {
+    afShowDashEmpty(true);
+    return;
+  }
+  afShowDashEmpty(false);
+
+  let totalVB = 0, totalDA = 0, totalVLC = 0, totalDE = 0;
+  fichas.forEach(f => {
+    totalVB += parseFloat(f.valor) || 0;
+    totalDA += afCalcDepAcum(f, ano - 1);
+    totalDE += afCalcDepAno(f, ano);
+    totalVLC += afCalcVLC(f, ano);
+  });
+
+  const alienacoes = fichas.filter(f => {
+    const anoAlien = f.data_alienacao ? parseInt(f.data_alienacao.split('-')[0]) : null;
+    return anoAlien === ano;
+  });
+
+  document.getElementById('af-stat-total').textContent = ativas.length;
+  document.getElementById('af-stat-vb').textContent = afFmt(totalVB);
+  document.getElementById('af-stat-da').textContent = afFmt(totalDA);
+  document.getElementById('af-stat-vlc').textContent = afFmt(totalVLC);
+  document.getElementById('af-stat-de').textContent = afFmt(totalDE);
+  document.getElementById('af-stat-de-ano').textContent = `exercício ${ano}`;
+  document.getElementById('af-stat-alien').textContent = alienacoes.length;
+
+  // Tabela por categoria
+  const cats = {};
+  fichas.forEach(f => {
+    const cat = f.categoria || 'Outros';
+    if (!cats[cat]) cats[cat] = {n:0, vb:0, da:0, vlc:0, de:0};
+    cats[cat].n++;
+    cats[cat].vb += parseFloat(f.valor) || 0;
+    cats[cat].da += afCalcDepAcum(f, ano - 1);
+    cats[cat].de += afCalcDepAno(f, ano);
+    cats[cat].vlc += afCalcVLC(f, ano);
+  });
+
+  const body = document.getElementById('af-dash-cat-body');
+  body.innerHTML = '';
+  Object.entries(cats).forEach(([cat, v]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${cat}</strong></td>
+      <td class="center">${v.n}</td>
+      <td class="num">${afFmt(v.vb)}</td>
+      <td class="num">${afFmt(v.da)}</td>
+      <td class="num" style="color:${v.vlc <= 0 ? 'var(--green)' : 'var(--text)'}">${afFmt(v.vlc)}</td>
+      <td class="num">${afFmt(v.de)}</td>
+      <td><span class="badge ${v.vlc <= 0 ? 'green' : 'blue'}">${v.vlc <= 0 ? '✓ Amortizado' : '● Ativo'}</span></td>`;
+    body.appendChild(tr);
+  });
+}
+
+function afShowDashEmpty(show) {
+  document.getElementById('af-dash-empty').style.display = show ? '' : 'none';
+  document.getElementById('af-dash-table').style.display = show ? 'none' : '';
+  document.getElementById('af-dash-stats').style.display = show ? 'none' : '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FICHAS
+// ═══════════════════════════════════════════════════════════════
+
+function afRenderFichas() {
+  const search = document.getElementById('af-fichas-search')?.value?.toLowerCase() || '';
+  const estado = document.getElementById('af-fichas-estado')?.value || '';
+  const cat = document.getElementById('af-fichas-cat')?.value || '';
+  const ano = parseInt(document.getElementById('af-ano-sel')?.value || '2026');
+
+  let fichas = Object.entries(afState.fichas);
+
+  if (search) fichas = fichas.filter(([,f]) => f.descricao?.toLowerCase().includes(search) || f.ref?.toLowerCase().includes(search));
+  if (estado) {
+    if (estado === 'Migrado') fichas = fichas.filter(([,f]) => f.migrado);
+    else fichas = fichas.filter(([,f]) => f.estado === estado);
+  }
+  if (cat) fichas = fichas.filter(([,f]) => f.categoria === cat);
+
+  document.getElementById('af-fichas-count').textContent = `${fichas.length} ativo(s)`;
+
+  // Populat cat select
+  const catSel = document.getElementById('af-fichas-cat');
+  if (catSel && catSel.children.length <= 1) {
+    const cats = [...new Set(Object.values(afState.fichas).map(f => f.categoria))].filter(Boolean);
+    cats.forEach(c => {
+      const o = document.createElement('option'); o.value = c; o.textContent = c;
+      catSel.appendChild(o);
+    });
+  }
+
+  const body = document.getElementById('af-fichas-body');
+  if (fichas.length === 0) {
+    body.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="es-icon">🗂️</div><p>Nenhuma ficha encontrada.</p></div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = '';
+  fichas.forEach(([id, f]) => {
+    const da = afCalcDepAcum(f, ano - 1);
+    const de = afCalcDepAno(f, ano);
+    const vlc = afCalcVLC(f, ano);
+    const estadoBadge = f.estado === 'Alienado' ? 'red' : f.estado === 'Abatido' ? 'amber' : f.migrado ? 'grey' : 'green';
+    const estadoLabel = f.estado || (f.migrado ? 'Migrado' : 'Ativo');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="center"><input type="checkbox" class="af-sel-cb" data-id="${id}" onchange="afUpdateSeleccao()"></td>
+      <td style="font-size:10px;color:var(--text4)">${id.substr(-6)}</td>
+      <td><strong>${f.descricao || '—'}</strong>${f.ref ? `<br><span style="font-size:10px;color:var(--text4)">${f.ref}</span>` : ''}</td>
+      <td>${f.categoria || '—'}</td>
+      <td>${f.data_aquisicao ? afFmtMes(f.data_aquisicao) : '—'}</td>
+      <td class="num">${afFmt(f.valor)}</td>
+      <td class="num">${afFmt(da + de)}</td>
+      <td class="num" style="color:${vlc <= 0.01 ? 'var(--green)' : 'var(--text)'};font-weight:${vlc <= 0.01 ? 700 : 400}">${vlc <= 0.01 ? '✓ Amort.' : afFmt(vlc)}</td>
+      <td>${f.taxa ? f.taxa + '%' : '—'}</td>
+      <td><span style="font-size:10px">${f.metodo === 'QD' ? 'Degressivas' : 'Constantes'}</span></td>
+      <td><span class="badge ${estadoBadge}">${estadoLabel}</span></td>
+      <td class="center">${f.fatura_b64 ? '<span title="Fatura anexa">📎</span>' : '<span style="color:var(--text4)">—</span>'}</td>
+      <td>
+        <button class="btn btn-secondary btn-xs" onclick="afOpenDetalhe('${id}')">👁</button>
+        <button class="btn btn-secondary btn-xs" onclick="afEditFichaById('${id}')">✏️</button>
+        <button class="btn btn-danger btn-xs" onclick="afConfirmDelete('${id}')">🗑</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOD. 32 — DEPRECIAÇÕES
+// ═══════════════════════════════════════════════════════════════
+
+function afRenderMod32() {
+  const ano = parseInt(document.getElementById('af-mod32-ano')?.value || '2026');
+  document.getElementById('af-mod32-ano-title').textContent = ano;
+
+  const fichas = Object.values(afState.fichas).filter(f =>
+    f.estado !== 'Alienado' && f.estado !== 'Abatido'
+  );
+
+  let totalVB=0, totalDAant=0, totalDE=0, totalDAtotal=0, totalVLC=0, totalLim=0;
+
+  const body = document.getElementById('af-mod32-body');
+  if (fichas.length === 0) {
+    body.innerHTML = `<tr><td colspan="13"><div class="empty-state"><div class="es-icon">📋</div><p>Sem ativos para gerar o Mapa 32.</p></div></td></tr>`;
+    return;
+  }
+
+  // Agrupar por categoria
+  const grupos = {};
+  fichas.forEach(f => {
+    const g = f.categoria || 'Outros';
+    if (!grupos[g]) grupos[g] = [];
+    grupos[g].push(f);
+  });
+
+  body.innerHTML = '';
+  Object.entries(grupos).forEach(([grupo, gfichas]) => {
+    // Header grupo
+    const trh = document.createElement('tr');
+    trh.innerHTML = `<td colspan="13" class="tf-row-subheader">📁 ${grupo}</td>`;
+    body.appendChild(trh);
+
+    let gVB=0, gDAant=0, gDE=0, gDAtotal=0, gVLC=0;
+
+    gfichas.forEach(f => {
+      const va = parseFloat(f.valor) || 0;
+      const daAnt = afCalcDepAcum(f, ano - 1);
+      const de = afCalcDepAno(f, ano);
+      const daTotal = daAnt + de;
+      const vlc = Math.max(0, va - daTotal);
+
+      // Limitação viaturas art. 11.º
+      let limViatura = '';
+      let deAceite = de;
+      if (f.categoria === 'Viaturas' && f.snc === '434' && va > 40000) {
+        const fatorLimitacao = 40000 / va;
+        deAceite = de * fatorLimitacao;
+        limViatura = `Cap. €40k`;
+        totalLim += (de - deAceite);
+      }
+
+      gVB += va; gDAant += daAnt; gDE += deAceite; gDAtotal += daTotal; gVLC += vlc;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-size:10px">${f.cod_dp || '—'}</td>
+        <td>${f.descricao || '—'}${f.migrado ? ' <span style="font-size:9px;color:var(--text4)">[Migrado]</span>' : ''}</td>
+        <td style="font-size:10px">${f.snc || '—'}</td>
+        <td style="font-size:10px">${f.data_aquisicao ? afFmtMes(f.data_aquisicao) : '—'}</td>
+        <td class="num">${afFmt(va)}</td>
+        <td style="font-size:10px">${f.metodo === 'QD' ? 'QD' : 'QC'}</td>
+        <td class="num">${f.taxa_max || '—'}</td>
+        <td class="num">${f.taxa || '—'}</td>
+        <td class="num">${afFmt(daAnt)}</td>
+        <td class="num ${de <= 0 ? '' : ''}">${afFmt(deAceite)}</td>
+        <td class="num">${afFmt(daTotal)}</td>
+        <td class="num" style="color:${vlc <= 0.01 ? 'var(--green)' : 'var(--text)'}">${afFmt(vlc)}</td>
+        <td style="font-size:10px;color:var(--amber)">${limViatura}</td>`;
+      body.appendChild(tr);
+    });
+
+    // Subtotal grupo
+    const trs = document.createElement('tr');
+    trs.style.background = 'var(--bg2)';
+    trs.innerHTML = `
+      <td colspan="4" style="font-weight:700;font-size:11px;padding-left:20px">Subtotal ${grupo}</td>
+      <td class="num" style="font-weight:700">${afFmt(gVB)}</td>
+      <td colspan="3"></td>
+      <td class="num" style="font-weight:700">${afFmt(gDAant)}</td>
+      <td class="num" style="font-weight:700">${afFmt(gDE)}</td>
+      <td class="num" style="font-weight:700">${afFmt(gDAtotal)}</td>
+      <td class="num" style="font-weight:700">${afFmt(gVLC)}</td>
+      <td></td>`;
+    body.appendChild(trs);
+
+    totalVB += gVB; totalDAant += gDAant; totalDE += gDE; totalDAtotal += gDAtotal; totalVLC += gVLC;
+  });
+
+  // Total geral
+  const trTotal = document.createElement('tr');
+  trTotal.style.cssText = 'background:var(--slate);color:#fff;';
+  trTotal.innerHTML = `
+    <td colspan="4" style="font-weight:700;padding-left:10px">TOTAL GERAL</td>
+    <td class="num" style="font-weight:700">${afFmt(totalVB)}</td>
+    <td colspan="3"></td>
+    <td class="num" style="font-weight:700">${afFmt(totalDAant)}</td>
+    <td class="num" style="font-weight:700">${afFmt(totalDE)}</td>
+    <td class="num" style="font-weight:700">${afFmt(totalDAtotal)}</td>
+    <td class="num" style="font-weight:700">${afFmt(totalVLC)}</td>
+    <td></td>`;
+  body.appendChild(trTotal);
+
+  // Atualizar totais stats
+  document.getElementById('af-mod32-totais').style.display = 'grid';
+  document.getElementById('af-m32-vb').textContent = afFmt(totalVB);
+  document.getElementById('af-m32-da').textContent = afFmt(totalDAant);
+  document.getElementById('af-m32-de').textContent = afFmt(totalDE);
+  document.getElementById('af-m32-vlc').textContent = afFmt(totalVLC);
+  document.getElementById('af-m32-lim').textContent = totalLim > 0 ? afFmt(totalLim) : '—';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOD. 31 — MAIS/MENOS-VALIAS
+// ═══════════════════════════════════════════════════════════════
+
+function afRenderMod31() {
+  const ano = parseInt(document.getElementById('af-mod31-ano')?.value || '2026');
+  document.getElementById('af-mod31-ano-title').textContent = ano;
+
+  const alienacoes = Object.values(afState.fichas).filter(f => {
+    if (!f.data_alienacao) return false;
+    const anoAlien = parseInt(f.data_alienacao.split('-')[0]);
+    return anoAlien === ano;
+  });
+
+  if (alienacoes.length === 0) {
+    document.getElementById('af-mod31-empty').style.display = '';
+    document.getElementById('af-mod31-totais').style.display = 'none';
+    document.getElementById('af-mod31-coef-info').style.display = 'none';
+    document.querySelector('#af-panel-mod31 .table-wrap').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('af-mod31-empty').style.display = 'none';
+  document.querySelector('#af-panel-mod31 .table-wrap').style.display = '';
+  document.getElementById('af-mod31-coef-info').style.display = 'flex';
+
+  const body = document.getElementById('af-mod31-body');
+  body.innerHTML = '';
+
+  let totalMV = 0, totalMMV = 0, nReinv = 0;
+
+  alienacoes.forEach(f => {
+    const anoAquis = f.data_aquisicao ? parseInt(f.data_aquisicao.split('-')[0]) : null;
+    const anoAlien = parseInt(f.data_alienacao.split('-')[0]);
+    const va = parseFloat(f.valor) || 0;
+    const vr = parseFloat(f.valor_realizacao) || 0;
+    const coef = afGetCoeficiente(anoAquis, anoAlien);
+    const vac = va * coef;
+    const daAceites = afCalcDepAcum(f, anoAlien - 1);
+    const vlcFiscal = Math.max(0, vac - daAceites);
+    const mvFiscal = vr - vlcFiscal;
+    const mvContab = vr - Math.max(0, va - afCalcDepAcum(f, anoAlien - 1));
+
+    if (mvFiscal > 0) totalMV += mvFiscal;
+    else totalMMV += Math.abs(mvFiscal);
+    if (f.reinvestimento) nReinv++;
+
+    const isMV = mvFiscal >= 0;
+    const tr = document.createElement('tr');
+    tr.className = isMV ? 'mv-positiva' : 'mv-negativa';
+    tr.innerHTML = `
+      <td>${f.descricao || '—'}</td>
+      <td style="font-size:10px">${f.snc || '—'}</td>
+      <td style="font-size:10px">${anoAquis || '—'}</td>
+      <td style="font-size:10px">${f.data_alienacao || '—'}</td>
+      <td class="num">${afFmt(va)}</td>
+      <td class="num" style="font-weight:600;color:var(--blue)">${coef.toFixed(2)}</td>
+      <td class="num">${afFmt(vac)}</td>
+      <td class="num">${afFmt(daAceites)}</td>
+      <td class="num">${afFmt(vlcFiscal)}</td>
+      <td class="num">${afFmt(vr)}</td>
+      <td class="num" style="color:${mvContab >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:600">${afFmt(mvContab)}</td>
+      <td class="num" style="color:${isMV ? 'var(--green)' : 'var(--red)'};font-weight:700">${isMV ? '+' : ''}${afFmt(mvFiscal)}</td>
+      <td class="center">${f.reinvestimento ? '<span class="badge green">Sim</span>' : '—'}</td>`;
+    body.appendChild(tr);
+  });
+
+  // Total
+  const saldo = totalMV - totalMMV;
+  const trTotal = document.createElement('tr');
+  trTotal.style.cssText = 'background:var(--slate);color:#fff;font-weight:700;';
+  trTotal.innerHTML = `
+    <td colspan="10" style="padding-left:10px">TOTAIS</td>
+    <td class="num"></td>
+    <td class="num" style="color:${saldo >= 0 ? '#4ade80' : '#f87171'}">${saldo >= 0 ? '+' : ''}${afFmt(saldo)}</td>
+    <td class="center">${nReinv > 0 ? nReinv + ' bens' : '—'}</td>`;
+  body.appendChild(trTotal);
+
+  document.getElementById('af-mod31-totais').style.display = 'grid';
+  document.getElementById('af-m31-mv').textContent = afFmt(totalMV);
+  document.getElementById('af-m31-mmv').textContent = afFmt(totalMMV);
+  document.getElementById('af-m31-saldo').textContent = (saldo >= 0 ? '+' : '') + afFmt(saldo);
+  document.getElementById('af-m31-reinv').textContent = nReinv;
+
+  // Info coeficientes
+  const years = [...new Set(alienacoes.map(f => f.data_aquisicao?.split('-')[0]).filter(Boolean))];
+  document.getElementById('af-mod31-coef-text').innerHTML =
+    `Coeficientes aplicados aos anos de aquisição presentes neste mapa: ${years.map(y => `<strong>${y}: ${afGetCoeficiente(parseInt(y), ano).toFixed(2)}</strong>`).join(', ')}. Fonte: tabela de coeficientes editável em Tabela Fiscal.`;
+}
+
+function afGetCoeficiente(anoAquis, anoAlien) {
+  // Obtém coeficiente do Firebase ou usa base
+  if (!anoAquis) return 1.00;
+
+  // Verifica Firebase carregado
+  if (afState.coeficientes && afState.coeficientes[anoAquis]) {
+    return parseFloat(afState.coeficientes[anoAquis].coef) || 1.00;
+  }
+  // Fallback base
+  return AF_COEF_BASE[anoAquis] || 1.00;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOD. 33 — IMPARIDADES
+// ═══════════════════════════════════════════════════════════════
+
+function afRenderMod33() {
+  const body = document.getElementById('af-mod33-body');
+  const imps = Object.entries(afState.imparidades);
+
+  if (imps.length === 0) {
+    body.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="es-icon">⚠️</div><p>Nenhuma imparidade registada para esta empresa.</p></div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = '';
+  imps.forEach(([id, imp]) => {
+    const acumTotal = (parseFloat(imp.imp_ant) || 0) + (parseFloat(imp.imp_ex) || 0) - (parseFloat(imp.reversao) || 0);
+    const vliq = (parseFloat(imp.vb) || 0) - acumTotal;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${imp.snc || '—'}</td>
+      <td>${imp.descricao || '—'}</td>
+      <td class="num">${afFmt(imp.vb)}</td>
+      <td class="num">${afFmt(imp.imp_ant)}</td>
+      <td class="num">${afFmt(imp.imp_ex)}</td>
+      <td class="num">${afFmt(imp.reversao)}</td>
+      <td class="num">${afFmt(acumTotal)}</td>
+      <td class="num">${afFmt(vliq)}</td>
+      <td><span class="badge ${imp.fiscal === 'Sim' ? 'green' : imp.fiscal === 'Não' ? 'red' : 'amber'}">${imp.fiscal || '—'}</span></td>
+      <td>
+        <button class="btn btn-danger btn-xs" onclick="afDeleteImparidade('${id}')">🗑</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOD. 34 — PROVISÕES
+// ═══════════════════════════════════════════════════════════════
+
+function afRenderMod34() {
+  const body = document.getElementById('af-mod34-body');
+  const provs = Object.entries(afState.provisoes);
+
+  if (provs.length === 0) {
+    body.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="es-icon">📝</div><p>Nenhuma provisão registada para esta empresa.</p></div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = '';
+  provs.forEach(([id, p]) => {
+    const divida = parseFloat(p.divida) || 0;
+    const impar = parseFloat(p.impar) || 0;
+    const pct = divida > 0 ? ((impar / divida) * 100).toFixed(1) : '—';
+    const dias = p.venc ? Math.floor((new Date() - new Date(p.venc)) / 86400000) : null;
+    const antiguidade = dias !== null ? (dias > 0 ? `${dias} dias em mora` : 'Não vencida') : '—';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.nif || '—'}</td>
+      <td>${p.nome || '—'}</td>
+      <td style="font-size:10px">${p.snc || '—'}</td>
+      <td class="num">${afFmt(divida)}</td>
+      <td>${p.venc || '—'}</td>
+      <td style="color:${dias > 0 ? 'var(--red)' : 'var(--text3)'};font-size:11px">${antiguidade}</td>
+      <td class="num">${afFmt(impar)}</td>
+      <td class="num">${pct}%</td>
+      <td><span class="badge ${p.cont === 'Sim' ? 'amber' : 'grey'}">${p.cont || 'Não'}</span></td>
+      <td><span class="badge ${p.fiscal === 'Sim' ? 'green' : 'red'}">${p.fiscal || '—'}</span></td>
+      <td>
+        <button class="btn btn-danger btn-xs" onclick="afDeleteProvisao('${id}')">🗑</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABELA FISCAL
+// ═══════════════════════════════════════════════════════════════
+
+const AF_TABELA_I_BASE = {
+  C001:{cod:'C001',desc:'Edifícios e construções em explorações agrícolas',grupo:'Agricultura / 432',taxa_max:5,taxa_min:2.5,degressivas:false,diploma:'DR 25/2009, Tabela I'},
+  C002:{cod:'C002',desc:'Tractores e máquinas agrícolas (alfaias)',grupo:'Agricultura / 434',taxa_max:25,taxa_min:12.5,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C010:{cod:'C010',desc:'Andaimes e cofragens metálicas',grupo:'Construção / 433',taxa_max:20,taxa_min:10,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C011:{cod:'C011',desc:'Equipamento de perfuração, escavação e betonagem',grupo:'Construção / 433',taxa_max:25,taxa_min:12.5,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C012:{cod:'C012',desc:'Gruas, guinchos e guindastes de construção',grupo:'Construção / 433',taxa_max:20,taxa_min:10,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C013:{cod:'C013',desc:'Instalações de estaleiro provisórias',grupo:'Construção / 432',taxa_max:33.33,taxa_min:16.67,degressivas:false,diploma:'DR 25/2009, Tabela I'},
+  C020:{cod:'C020',desc:'Máquinas de corte e costura industrial',grupo:'Têxtil / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C021:{cod:'C021',desc:'Teares, tricoteiras e máquinas de tecelagem',grupo:'Têxtil / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C030:{cod:'C030',desc:'Câmaras frigoríficas e arcas congeladoras',grupo:'Alimentação / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C031:{cod:'C031',desc:'Máquinas de embalagem e rotulagem',grupo:'Alimentação / 433',taxa_max:20,taxa_min:10,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C032:{cod:'C032',desc:'Equipamento de transformação alimentar (fornos, misturadoras)',grupo:'Alimentação / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C033:{cod:'C033',desc:'Mobiliário e equipamento de restauração',grupo:'Restauração / 435',taxa_max:14.28,taxa_min:7.14,degressivas:false,diploma:'DR 25/2009, Tabela I'},
+  C040:{cod:'C040',desc:'Equipamento de lavandaria industrial',grupo:'Lavandaria / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C050:{cod:'C050',desc:'Instalações de abastecimento de combustíveis',grupo:'Transportes / 433',taxa_max:10,taxa_min:5,degressivas:false,diploma:'DR 25/2009, Tabela I'},
+  C051:{cod:'C051',desc:'Equipamento GPS e gestão de frota',grupo:'Transportes / 435',taxa_max:33.33,taxa_min:16.67,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C060:{cod:'C060',desc:'Equipamento de climatização AVAC',grupo:'Climatização / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C070:{cod:'C070',desc:'Mobiliário e equipamento de cabeleireiro e estética',grupo:'Serviços / 435',taxa_max:20,taxa_min:10,degressivas:false,diploma:'DR 25/2009, Tabela I'},
+  C080:{cod:'C080',desc:'Prateleiras, expositores e gôndolas de comércio',grupo:'Comércio / 435',taxa_max:14.28,taxa_min:7.14,degressivas:false,diploma:'DR 25/2009, Tabela I'},
+  C081:{cod:'C081',desc:'Caixas registadoras e terminais POS',grupo:'Comércio / 435',taxa_max:33.33,taxa_min:16.67,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C090:{cod:'C090',desc:'Equipamento de extrusão de plásticos',grupo:'Plásticos / 433',taxa_max:14.28,taxa_min:7.14,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+  C091:{cod:'C091',desc:'Moldes de injecção de plástico',grupo:'Plásticos / 437',taxa_max:33.33,taxa_min:16.67,degressivas:true,diploma:'DR 25/2009, Tabela I'},
+};
+
+async function afLoadTabelaFiscal() {
+  const data = await afFBGet(`${AF_TF_PATH}`);
+
+  // Sempre actualiza tab2 com a versão correcta
+  const tab2Obj = {};
+  AF_TABELA_II_BASE.forEach(t => { tab2Obj[t.cod] = {...t, taxa_min: t.taxa_max / 2}; });
+  afState.tabelaII = tab2Obj;
+
+  // NÃO sobrescrever tabelas — geridas pelo carregar_tabelas.html
+  // Usar Firebase se já existir, senão usar base local
+  if (!data?.tab2 || Object.keys(data.tab2).length < 10) {
+    afFBSet(`${AF_TF_PATH}/tab2`, tab2Obj);
+  }
+
+  // Tab1 — usar Firebase se existir (gerido pelo carregar_tabelas.html)
+  if (data?.tab1 && Object.keys(data.tab1).length > 10) {
+    afState.tabelaI = data.tab1;
+  } else {
+    afState.tabelaI = AF_TABELA_I_BASE;
+  }
+
+  // Coeficientes — usa Firebase se existir (permite edição manual), senão usa base
+  if (data?.coeficientes && Object.keys(data.coeficientes).length > 40) {
+    afState.coeficientes = data.coeficientes;
+  } else {
+    const coefObj = {};
+    Object.entries(AF_COEF_BASE).forEach(([ano, coef]) => {
+      coefObj[ano] = {coef, portaria: 'Base histórica AT'};
+    });
+    afState.coeficientes = coefObj;
+    afFBSet(`${AF_TF_PATH}/coeficientes`, coefObj);
+  }
+
+  afPopulateCodDPSelect();
+}
+
+function afPopulateCodDPSelect() {
+  const sel = document.getElementById('af-f-coddp');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Selecionar da tabela fiscal —</option>';
+  Object.entries(afState.tabelaII).forEach(([cod, t]) => {
+    if (t.nao_amortizavel) return;
+    const opt = document.createElement('option');
+    opt.value = cod;
+    opt.textContent = `${cod} — ${t.desc} (${t.taxa_max}%)`;
+    opt.dataset.taxa = t.taxa_max;
+    opt.dataset.taxaMin = t.taxa_min || t.taxa_max / 2;
+    opt.dataset.degressivas = t.degressivas ? '1' : '0';
+    sel.appendChild(opt);
+  });
+  // Tabela I
+  Object.entries(afState.tabelaI || {}).forEach(([cod, t]) => {
+    if (!t || t.nao_amortizavel) return;
+    const opt = document.createElement('option');
+    opt.value = `I_${cod}`;
+    opt.textContent = `[Tab.I] ${cod} — ${t.desc} (${t.taxa_max}%)`;
+    opt.dataset.taxa = t.taxa_max;
+    opt.dataset.taxaMin = t.taxa_min || t.taxa_max / 2;
+    opt.dataset.degressivas = t.degressivas ? '1' : '0';
+    sel.appendChild(opt);
+  });
+}
+
+function afRenderTabelaFiscal() {
+  afRenderTabII();
+  afRenderTabI();
+  afRenderCoeficientes();
+}
+
+function afRenderTabII() {
+  const body = document.getElementById('af-tf-tab2-body');
+  body.innerHTML = '';
+  const isAdmin = afState.userRole === 'admin';
+
+  Object.entries(afState.tabelaII).sort(([a],[b]) => a.localeCompare(b)).forEach(([cod, t]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:10px;font-weight:700">${cod}</td>
+      <td>${t.desc || '—'}</td>
+      <td style="font-size:10px">${t.grupo || '—'}</td>
+      <td class="num" style="font-weight:700;color:var(--blue)">${t.taxa_max}%</td>
+      <td class="num" style="color:var(--text3)">${(t.taxa_min || t.taxa_max/2).toFixed(2)}%</td>
+      <td class="center" style="font-size:10px">${afCalcVidaUtil(t.taxa_max, t)}</td>
+      <td class="center">${t.degressivas ? '<span class="badge green">Sim</span>' : '<span class="badge grey">Não</span>'}</td>
+      <td style="font-size:10px;color:var(--text3)">${t.diploma || 'DR 25/2009'}</td>
+      ${isAdmin ? `<td><button class="btn btn-secondary btn-xs" onclick="afEditTaxa('${cod}','tab2')">✏️</button> <button class="btn btn-danger btn-xs" onclick="afDeleteTaxa('${cod}','tab2')">🗑</button></td>` : ''}`;
+    body.appendChild(tr);
+  });
+
+  // Meta info
+  const updateEl = document.getElementById('af-tf-update-label');
+  if (updateEl) updateEl.textContent = 'DR 25/2009 + DR 4/2015 de 22/04/2015 — Em vigor desde 01/01/2010';
+}
+
+function afRenderTabI() {
+  const body = document.getElementById('af-tf-tab1-body');
+  body.innerHTML = '';
+
+  const data = Object.entries(afState.tabelaI || {});
+  if (data.length === 0) {
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:20px"><p>Nenhuma taxa específica carregada ainda.</p><p style="margin-top:4px">As taxas da Tabela I aplicam-se a setores específicos. Adicione apenas as relevantes para as suas empresas.</p></div></td></tr>`;
+    return;
+  }
+
+  data.sort(([a],[b]) => a.localeCompare(b)).forEach(([cod, t]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:10px;font-weight:700">${cod}</td>
+      <td style="font-size:10px">${t.grupo || '—'}</td>
+      <td>${t.desc || '—'}</td>
+      <td class="num" style="font-weight:700;color:var(--blue)">${t.taxa_max}%</td>
+      <td class="num" style="color:var(--text3)">${(t.taxa_min || t.taxa_max/2).toFixed(2)}%</td>
+      <td style="font-size:10px;color:var(--text3)">${t.diploma || 'DR 25/2009'}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function afRenderCoeficientes() {
+  const body = document.getElementById('af-coef-body');
+  body.innerHTML = '';
+  const isAdmin = afState.userRole === 'admin';
+
+  const coefs = Object.entries(afState.coeficientes || {}).sort(([a],[b]) => parseInt(b) - parseInt(a));
+  coefs.forEach(([ano, c]) => {
+    const coef = typeof c === 'object' ? c.coef : c;
+    const portaria = typeof c === 'object' ? c.portaria : '—';
+    const tr = document.createElement('tr');
+    const anoAtual = new Date().getFullYear();
+    tr.innerHTML = `
+      <td style="font-weight:${ano == anoAtual ? '700' : '400'}">${ano}${ano == anoAtual ? ' <span style="font-size:10px;color:var(--blue)">(atual)</span>' : ''}</td>
+      <td class="num" style="font-weight:700;font-size:14px;color:${coef > 1.5 ? 'var(--amber)' : 'var(--text)'}">${parseFloat(coef).toFixed(2)}</td>
+      <td style="font-size:10px;color:var(--text3)">${portaria}</td>
+      ${isAdmin ? `<td><button class="btn btn-secondary btn-xs" onclick="afEditCoef('${ano}')">✏️</button> <button class="btn btn-danger btn-xs" onclick="afDeleteCoef('${ano}')">🗑</button></td>` : ''}`;
+    body.appendChild(tr);
+  });
+
+  const updateEl = document.getElementById('af-coef-update');
+  if (updateEl) updateEl.textContent = `${coefs.length} anos carregados`;
+}
+
+function afCalcVidaUtil(taxa, obj) {
+  if (!taxa || taxa <= 0) return '—';
+  if (taxa >= 100) return '1 ano (amortização imediata)';
+  if (obj && obj.vida_util_fixa) return `${obj.vida_util_fixa} ano${obj.vida_util_fixa > 1 ? 's' : ''}`;
+  if (obj && obj.nota_vida_util) return obj.nota_vida_util;
+  const anos = 1 / (taxa / 100);
+  return `${Math.round(anos)} anos (min ${Math.round(anos*2)})`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL NOVA FICHA
+// ═══════════════════════════════════════════════════════════════
+
+function openModalNovaFicha() {
+  afState.fichaEditId = null;
+  document.getElementById('af-modal-ficha-title').textContent = '➕ Nova Ficha de Ativo';
+  afClearFichaForm();
+  openModal('af-modal-ficha');
+}
+
+function afClearFichaForm() {
+  ['af-f-descricao','af-f-ref','af-f-forn-nif','af-f-forn-nome','af-f-fatura-num','af-f-obs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('af-f-snc').value = '';
+  document.getElementById('af-f-categoria').value = 'Equipamento Básico';
+  document.getElementById('af-f-data').value = '';
+  document.getElementById('af-f-valor').value = '';
+  document.getElementById('af-f-afetacao').value = '100';
+  document.getElementById('af-f-coddp').value = '';
+  document.getElementById('af-f-metodo').value = 'QC';
+  document.getElementById('af-f-taxa').value = '';
+  document.getElementById('af-f-taxa-max').value = '';
+  document.getElementById('af-f-vidautil').value = '';
+  document.getElementById('af-f-usado').value = '0';
+  document.getElementById('af-f-migrado').value = '0';
+  document.getElementById('af-f-dep-acum').value = '';
+  document.getElementById('af-f-dep-acum-nota').value = '';
+  document.getElementById('af-f-upload-name').textContent = '';
+  document.getElementById('af-f-dep-acum-wrap').style.display = 'none';
+  document.getElementById('af-f-dep-acum-nota-wrap').style.display = 'none';
+  afState.fichaFileB64 = null;
+  afClearCalc();
+}
+
+function afOnCodDPChange() {
+  const sel = document.getElementById('af-f-coddp');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  const taxaMax = parseFloat(opt.dataset.taxa) || 0;
+  document.getElementById('af-f-taxa-max').value = taxaMax;
+  document.getElementById('af-f-taxa').value = taxaMax;
+  const vidaUtil = taxaMax > 0 ? Math.round(1 / (taxaMax / 100)) : '';
+  document.getElementById('af-f-vidautil').value = vidaUtil;
+  const degressivas = opt.dataset.degressivas === '1';
+  if (!degressivas) document.getElementById('af-f-metodo').value = 'QC';
+  afCalcDepreciacoes();
+}
+
+function afCalcTaxaMin() {
+  const taxaMax = parseFloat(document.getElementById('af-tx-taxa-max')?.value) || 0;
+  const minEl = document.getElementById('af-tx-taxa-min');
+  if (minEl) minEl.value = (taxaMax / 2).toFixed(2);
+}
+
+function afToggleMigrado() {
+  const isMig = document.getElementById('af-f-migrado')?.value === '1';
+  document.getElementById('af-f-dep-acum-wrap').style.display = isMig ? '' : 'none';
+  document.getElementById('af-f-dep-acum-nota-wrap').style.display = isMig ? '' : 'none';
+  afCalcDepreciacoes();
+}
+
+function afCalcDepreciacoes() {
+  const valor = parseFloat(document.getElementById('af-f-valor')?.value) || 0;
+  const taxa = parseFloat(document.getElementById('af-f-taxa')?.value) || 0;
+  const data = document.getElementById('af-f-data')?.value || '';
+  const isMig = document.getElementById('af-f-migrado')?.value === '1';
+  const depAcumMig = parseFloat(document.getElementById('af-f-dep-acum')?.value) || 0;
+  const anoAtual = parseInt(document.getElementById('af-ano-sel')?.value || '2026');
+
+  if (!valor || !taxa || !data) { afClearCalc(); return; }
+
+  const fichaTemp = {valor, taxa, data_aquisicao: data + '-01',
+    metodo: document.getElementById('af-f-metodo')?.value || 'QC',
+    migrado: isMig ? 1 : 0,
+    dep_acum_migracao: isMig ? depAcumMig : undefined};
+
+  const dep0 = afCalcDepAno(fichaTemp, parseInt(data.split('-')[0]));
+  const depAnual = valor * (taxa / 100);
+  const vlc = afCalcVLC(fichaTemp, anoAtual);
+
+  document.getElementById('af-calc-va').textContent = afFmt(valor);
+  document.getElementById('af-calc-taxa').textContent = taxa + '%';
+  document.getElementById('af-calc-dep0').textContent = afFmt(dep0);
+  document.getElementById('af-calc-depanual').textContent = afFmt(depAnual);
+  document.getElementById('af-calc-vlc').textContent = afFmt(vlc);
+}
+
+function afClearCalc() {
+  ['af-calc-va','af-calc-taxa','af-calc-dep0','af-calc-depanual','af-calc-vlc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+}
+
+// File Upload
+function afDragOver(e) { e.preventDefault(); document.getElementById('af-f-upload-zone').classList.add('drag'); }
+function afDrop(e) {
+  e.preventDefault();
+  document.getElementById('af-f-upload-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) afProcessFile(f, 'af-f-upload-name');
+}
+function afOnFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) afProcessFile(f, 'af-f-upload-name');
+}
+function afProcessFile(file, nameElId) {
+  if (file.size > 3 * 1024 * 1024) { afMsg('Ficheiro demasiado grande (máx. 3MB)', 'red'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    afState.fichaFileB64 = e.target.result.split(',')[1];
+    document.getElementById(nameElId).textContent = `✓ ${file.name} (${(file.size/1024).toFixed(0)} KB)`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function afSaveFicha() {
+  if (!afState.empKey) { afMsg('Selecione uma empresa primeiro', 'amber'); return; }
+
+  const descricao = document.getElementById('af-f-descricao')?.value?.trim();
+  const valor = parseFloat(document.getElementById('af-f-valor')?.value);
+  const data = document.getElementById('af-f-data')?.value;
+  const taxa = parseFloat(document.getElementById('af-f-taxa')?.value);
+  const isMig = document.getElementById('af-f-migrado')?.value === '1';
+
+  if (!descricao) { afMsg('Preencha a descrição do bem', 'amber'); return; }
+  if (!valor || valor <= 0) { afMsg('Preencha o valor de aquisição', 'amber'); return; }
+  if (!data) { afMsg('Preencha a data de aquisição', 'amber'); return; }
+  if (!taxa) { afMsg('Preencha a taxa de depreciação', 'amber'); return; }
+  if (!isMig && !afState.fichaFileB64 && !afState.fichaEditId) {
+    // Aviso mas permite
+    if (!confirm('Não tem fatura anexa. Para fichas novas (2025+) recomenda-se anexar a fatura. Continuar?')) return;
+  }
+
+  const id = afState.fichaEditId || afGenId();
+  const ficha = {
+    id,
+    descricao,
+    ref: document.getElementById('af-f-ref')?.value || '',
+    snc: document.getElementById('af-f-snc')?.value || '',
+    categoria: document.getElementById('af-f-categoria')?.value || '',
+    data_aquisicao: data + '-01',
+    valor,
+    forn_nif: document.getElementById('af-f-forn-nif')?.value || '',
+    forn_nome: document.getElementById('af-f-forn-nome')?.value || '',
+    fatura_num: document.getElementById('af-f-fatura-num')?.value || '',
+    afetacao: parseFloat(document.getElementById('af-f-afetacao')?.value) || 100,
+    cod_dp: document.getElementById('af-f-coddp')?.value || '',
+    metodo: document.getElementById('af-f-metodo')?.value || 'QC',
+    taxa_max: parseFloat(document.getElementById('af-f-taxa-max')?.value) || null,
+    taxa,
+    vida_util: parseInt(document.getElementById('af-f-vidautil')?.value) || null,
+    usado: document.getElementById('af-f-usado')?.value === '1',
+    migrado: isMig ? 1 : 0,
+    dep_acum_migracao: isMig ? (parseFloat(document.getElementById('af-f-dep-acum')?.value) || 0) : null,
+    dep_acum_nota: isMig ? document.getElementById('af-f-dep-acum-nota')?.value : '',
+    estado: 'Ativo',
+    obs: document.getElementById('af-f-obs')?.value || '',
+    criado_em: afState.fichaEditId ? undefined : new Date().toISOString(),
+    atualizado_em: new Date().toISOString(),
+  };
+
+  if (afState.fichaFileB64) ficha.fatura_b64 = afState.fichaFileB64;
+
+  const ok = await afFBSet(`${AF_FB_PATH}/${afState.empKey}/fichas/${id}`, ficha);
+  if (ok) {
+    afState.fichas[id] = ficha;
+    closeModal('af-modal-ficha');
+    afMsg(`Ficha guardada com sucesso`, 'green');
+    afRenderFichas();
+    afRenderDashboard();
+  } else {
+    afMsg('Erro ao guardar. Verifique a ligação.', 'red');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DETALHE DA FICHA
+// ═══════════════════════════════════════════════════════════════
+
+function afOpenDetalhe(id) {
+  const f = afState.fichas[id];
+  if (!f) return;
+  afState.fichaDetalheId = id;
+
+  document.getElementById('af-modal-detalhe-title').textContent = `📋 ${f.descricao}`;
+
+  const ano = parseInt(document.getElementById('af-ano-sel')?.value || '2026');
+  const da = afCalcDepAcum(f, ano - 1);
+  const de = afCalcDepAno(f, ano);
+  const vlc = afCalcVLC(f, ano);
+
+  // Quadro de amortizações
+  const anoAquis = f.data_aquisicao ? parseInt(f.data_aquisicao.split('-')[0]) : null;
+  const vidaUtil = f.vida_util || (f.taxa ? Math.round(1 / (f.taxa / 100)) : 10);
+  const anoFim = anoAquis ? anoAquis + vidaUtil + 1 : ano + 5;
+
+  let quadroHTML = `
+    <div class="form-section">
+      <div class="form-section-title">Dados da Ficha</div>
+      <div class="ficha-detail">
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Descrição</span><span class="ficha-detail-val">${f.descricao}</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Categoria / SNC</span><span class="ficha-detail-val">${f.categoria || '—'} / ${f.snc || '—'}</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Data de Aquisição</span><span class="ficha-detail-val">${f.data_aquisicao ? afFmtMes(f.data_aquisicao) : '—'}</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Valor de Aquisição</span><span class="ficha-detail-val">${afFmt(f.valor)} €</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Método / Taxa</span><span class="ficha-detail-val">${f.metodo === 'QD' ? 'Quotas Degressivas' : 'Quotas Constantes'} — ${f.taxa}%</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Código DR 25/2009</span><span class="ficha-detail-val">${f.cod_dp || '—'}</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Dep. Acumuladas até ${ano-1}</span><span class="ficha-detail-val">${afFmt(da)} €</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">Dep. do Exercício ${ano}</span><span class="ficha-detail-val">${afFmt(de)} €</span></div>
+        <div class="ficha-detail-row"><span class="ficha-detail-lbl">VLC em ${ano}</span><span class="ficha-detail-val" style="color:${vlc<=0?'var(--green)':'var(--text)'};font-weight:700">${vlc <= 0.01 ? '✓ Totalmente Amortizado' : afFmt(vlc)+' €'}</span></div>
+        ${f.migrado ? '<div class="ficha-detail-row"><span class="ficha-detail-lbl">Origem</span><span class="ficha-detail-val"><span class="badge grey">Migrado do Excel 2024</span></span></div>' : ''}
+        ${f.fatura_b64 ? '<div class="ficha-detail-row"><span class="ficha-detail-lbl">Fatura</span><span class="ficha-detail-val">📎 Anexada</span></div>' : ''}
+      </div>
+    </div>`;
+
+  // Quadro projeção amortizações
+  quadroHTML += `
+    <div class="form-section">
+      <div class="form-section-title">Quadro de Amortizações (projeção)</div>
+      <div class="table-wrap" style="max-height:280px;overflow-y:auto">
+        <table class="amort-table">
+          <thead><tr><th>Ano</th><th class="num">Dep. Exerc. (€)</th><th class="num">Dep. Acum. (€)</th><th class="num">VLC (€)</th></tr></thead>
+          <tbody>`;
+
+  if (anoAquis) {
+    for (let a = anoAquis; a <= Math.max(anoFim, ano + 2); a++) {
+      const dep = afCalcDepAno(f, a);
+      const acum = afCalcDepAcum(f, a);
+      const vlcA = Math.max(0, (parseFloat(f.valor) || 0) - acum);
+      const isAtual = a === ano;
+      const isZero = vlcA <= 0.01 && a > anoAquis;
+      quadroHTML += `<tr class="${isAtual ? 'ano-atual' : ''} ${isZero && dep <= 0.01 ? 'amort-zero' : ''}">
+        <td>${a}${isAtual ? ' ◄' : ''}${isZero && dep <= 0.01 ? ' ✓' : ''}</td>
+        <td class="num">${dep > 0.01 ? afFmt(dep) : '—'}</td>
+        <td class="num">${afFmt(acum)}</td>
+        <td class="num" style="color:${vlcA<=0.01?'var(--green)':'var(--text)'}">${vlcA<=0.01 ? '0,00' : afFmt(vlcA)}</td>
+      </tr>`;
+      if (isZero && dep <= 0.01 && a > anoAquis) break;
+    }
+  }
+
+  quadroHTML += `</tbody></table></div></div>`;
+
+  document.getElementById('af-modal-detalhe-body').innerHTML = quadroHTML;
+
+  const isAlienado = f.estado === 'Alienado' || f.estado === 'Abatido';
+  document.getElementById('af-btn-alienar').style.display = isAlienado ? 'none' : '';
+  document.getElementById('af-btn-abate').style.display = isAlienado ? 'none' : '';
+
+  openModal('af-modal-detalhe');
+}
+
+function afEditFichaById(id) {
+  const f = afState.fichas[id];
+  if (!f) return;
+  afState.fichaEditId = id;
+  document.getElementById('af-modal-ficha-title').textContent = '✏️ Editar Ficha';
+  afClearFichaForm();
+
+  document.getElementById('af-f-descricao').value = f.descricao || '';
+  document.getElementById('af-f-ref').value = f.ref || '';
+  document.getElementById('af-f-snc').value = f.snc || '';
+  document.getElementById('af-f-categoria').value = f.categoria || '';
+  document.getElementById('af-f-data').value = f.data_aquisicao ? f.data_aquisicao.substr(0,7) : '';
+  document.getElementById('af-f-valor').value = f.valor || '';
+  document.getElementById('af-f-forn-nif').value = f.forn_nif || '';
+  document.getElementById('af-f-forn-nome').value = f.forn_nome || '';
+  document.getElementById('af-f-fatura-num').value = f.fatura_num || '';
+  document.getElementById('af-f-afetacao').value = f.afetacao || 100;
+  document.getElementById('af-f-coddp').value = f.cod_dp || '';
+  document.getElementById('af-f-metodo').value = f.metodo || 'QC';
+  document.getElementById('af-f-taxa-max').value = f.taxa_max || '';
+  document.getElementById('af-f-taxa').value = f.taxa || '';
+  document.getElementById('af-f-vidautil').value = f.vida_util || '';
+  document.getElementById('af-f-migrado').value = f.migrado ? '1' : '0';
+  afToggleMigrado();
+  if (f.migrado) {
+    document.getElementById('af-f-dep-acum').value = f.dep_acum_migracao || '';
+    document.getElementById('af-f-dep-acum-nota').value = f.dep_acum_nota || '';
+  }
+  document.getElementById('af-f-obs').value = f.obs || '';
+  if (f.fatura_b64) document.getElementById('af-f-upload-name').textContent = '✓ Fatura já anexada';
+
+  openModal('af-modal-ficha');
+}
+
+function afEditFicha() {
+  closeModal('af-modal-detalhe');
+  afEditFichaById(afState.fichaDetalheId);
+}
+
+function afToggleAll(cb) {
+  document.querySelectorAll('.af-sel-cb').forEach(c => c.checked = cb.checked);
+  afUpdateSeleccao();
+}
+
+function afUpdateSeleccao() {
+  const sels = document.querySelectorAll('.af-sel-cb:checked');
+  const btn = document.getElementById('af-btn-apagar-sel');
+  if (btn) btn.style.display = sels.length > 0 ? '' : 'none';
+  if (btn && sels.length > 0) btn.textContent = `🗑 Apagar ${sels.length} seleccionado(s)`;
+}
+
+async function afApagarSeleccionados() {
+  const sels = Array.from(document.querySelectorAll('.af-sel-cb:checked'));
+  if (sels.length === 0) return;
+  if (!confirm(`Apagar ${sels.length} bem(ns) permanentemente? Esta acção não pode ser revertida.`)) return;
+
+  let ok = 0;
+  for (const cb of sels) {
+    const id = cb.dataset.id;
+    const res = await afFBDelete(`${AF_FB_PATH}/${afState.empKey}/fichas/${id}`);
+    if (res) { delete afState.fichas[id]; ok++; }
+  }
+
+  afMsg(`${ok} bem(ns) apagado(s)`, 'amber');
+  afRenderFichas();
+  afRenderDashboard();
+}
+
+async function afConfirmDelete(id) {
+  if (!confirm('Apagar esta ficha permanentemente?')) return;
+  const ok = await afFBDelete(`${AF_FB_PATH}/${afState.empKey}/fichas/${id}`);
+  if (ok) {
+    delete afState.fichas[id];
+    afMsg('Ficha apagada', 'amber');
+    afRenderFichas();
+    afRenderDashboard();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ALIENAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+function afOpenAlienarModal() {
+  afState.fichaAlienarId = afState.fichaDetalheId;
+  closeModal('af-modal-detalhe');
+  document.getElementById('af-al-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('af-al-valor').value = '';
+  document.getElementById('af-al-nif').value = '';
+  document.getElementById('af-al-nome').value = '';
+  document.getElementById('af-al-reinv').value = '0';
+  document.getElementById('af-al-obs').value = '';
+  document.getElementById('af-al-reinv-valor-wrap').style.display = 'none';
+  afCalcMaisValia();
+  openModal('af-modal-alienacao');
+}
+
+function afCalcMaisValia() {
+  const id = afState.fichaAlienarId;
+  if (!id) return;
+  const f = afState.fichas[id];
+  if (!f) return;
+
+  const dataAlien = document.getElementById('af-al-data')?.value;
+  const vr = parseFloat(document.getElementById('af-al-valor')?.value) || 0;
+  if (!dataAlien || !vr) return;
+
+  const anoAlien = parseInt(dataAlien.split('-')[0]);
+  const anoAquis = f.data_aquisicao ? parseInt(f.data_aquisicao.split('-')[0]) : null;
+  const va = parseFloat(f.valor) || 0;
+  const coef = afGetCoeficiente(anoAquis, anoAlien);
+  const vac = va * coef;
+  const da = afCalcDepAcum(f, anoAlien - 1);
+  const vlcFiscal = Math.max(0, vac - da);
+  const mvFiscal = vr - vlcFiscal;
+
+  document.getElementById('af-al-c-va').textContent = afFmt(va) + ' €';
+  document.getElementById('af-al-c-coef').textContent = coef.toFixed(2);
+  document.getElementById('af-al-c-vac').textContent = afFmt(vac) + ' €';
+  document.getElementById('af-al-c-da').textContent = afFmt(da) + ' €';
+  document.getElementById('af-al-c-vlcf').textContent = afFmt(vlcFiscal) + ' €';
+  document.getElementById('af-al-c-vr').textContent = afFmt(vr) + ' €';
+
+  const mvEl = document.getElementById('af-al-c-mv');
+  const mvRow = document.getElementById('af-al-c-mv-row');
+  mvEl.textContent = (mvFiscal >= 0 ? '+' : '') + afFmt(mvFiscal) + ' €';
+  mvEl.style.color = mvFiscal >= 0 ? 'var(--green)' : 'var(--red)';
+  mvRow.className = `calc-row total ${mvFiscal >= 0 ? 'positive' : 'negative'}`;
+
+  const reinvWrap = document.getElementById('af-al-reinv-valor-wrap');
+  reinvWrap.style.display = document.getElementById('af-al-reinv')?.value === '1' ? '' : 'none';
+}
+
+async function afSaveAlienacao() {
+  const id = afState.fichaAlienarId;
+  if (!id) return;
+  const f = afState.fichas[id];
+  if (!f) return;
+
+  const dataAlien = document.getElementById('af-al-data')?.value;
+  const vr = parseFloat(document.getElementById('af-al-valor')?.value);
+
+  if (!dataAlien) { afMsg('Preencha a data de alienação', 'amber'); return; }
+  if (!vr || vr < 0) { afMsg('Preencha o valor de realização', 'amber'); return; }
+
+  const updated = {
+    ...f,
+    estado: 'Alienado',
+    data_alienacao: dataAlien,
+    valor_realizacao: vr,
+    comprador_nif: document.getElementById('af-al-nif')?.value || '',
+    comprador_nome: document.getElementById('af-al-nome')?.value || '',
+    reinvestimento: document.getElementById('af-al-reinv')?.value === '1',
+    reinvest_valor: parseFloat(document.getElementById('af-al-reinv-valor')?.value) || 0,
+    obs_alienacao: document.getElementById('af-al-obs')?.value || '',
+    atualizado_em: new Date().toISOString(),
+  };
+
+  const ok = await afFBSet(`${AF_FB_PATH}/${afState.empKey}/fichas/${id}`, updated);
+  if (ok) {
+    afState.fichas[id] = updated;
+    closeModal('af-modal-alienacao');
+    afMsg('Alienação registada com sucesso', 'green');
+    afRenderFichas();
+    afRenderDashboard();
+  } else {
+    afMsg('Erro ao guardar alienação', 'red');
+  }
+}
+
+async function afRegistarAbate() {
+  const id = afState.fichaDetalheId;
+  if (!id || !confirm('Registar este bem como abatido/inutilizado?')) return;
+  const f = afState.fichas[id];
+  const updated = {...f, estado: 'Abatido', data_abate: new Date().toISOString().split('T')[0], atualizado_em: new Date().toISOString()};
+  const ok = await afFBSet(`${AF_FB_PATH}/${afState.empKey}/fichas/${id}`, updated);
+  if (ok) {
+    afState.fichas[id] = updated;
+    closeModal('af-modal-detalhe');
+    afMsg('Bem registado como abatido', 'amber');
+    afRenderFichas();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABELA FISCAL — CRUD
+// ═══════════════════════════════════════════════════════════════
+// FERRAMENTA DE ACTUALIZAÇÃO DA TABELA FISCAL BASE
+// ═══════════════════════════════════════════════════════════════
+
+// Lista temporária de entradas manuais pendentes
+let afActEntradas = [];
+
+function openModalActualizarTabela() {
+  afActEntradas = [];
+  document.getElementById('af-act-json').value = '';
+  document.getElementById('af-act-diploma').value = '';
+  document.getElementById('af-act-json-erro').style.display = 'none';
+  document.getElementById('af-act-json-preview').style.display = 'none';
+  document.getElementById('af-act-estado').textContent = '';
+  afActShowTab('json');
+  openModal('af-modal-actualizar-tabela');
+}
+
+function afActShowTab(tab) {
+  ['json','manual','info'].forEach(t => {
+    document.getElementById(`af-act-panel-${t}`).style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById(`af-act-tab-${t}`);
+    if (btn) {
+      btn.className = t === tab ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+    }
+  });
+}
+
+function afActParseJSON() {
+  const raw = document.getElementById('af-act-json').value.trim();
+  if (!raw) return { ok: false, erro: 'Cole o JSON com as entradas a actualizar.' };
+  let data;
+  try { data = JSON.parse(raw); } catch(e) { return { ok: false, erro: 'JSON inválido: ' + e.message }; }
+  if (!Array.isArray(data)) return { ok: false, erro: 'O JSON deve ser um array [...] de entradas.' };
+  const erros = [];
+  data.forEach((e, i) => {
+    if (!e.cod) erros.push(`Entrada ${i+1}: campo "cod" em falta`);
+    if (!e.apagar) {
+      if (!e.desc) erros.push(`Entrada ${i+1} (${e.cod}): campo "desc" em falta`);
+      if (e.taxa_max === undefined) erros.push(`Entrada ${i+1} (${e.cod}): campo "taxa_max" em falta`);
+      if (!e.grupo) erros.push(`Entrada ${i+1} (${e.cod}): campo "grupo" em falta`);
+      if (!e.diploma) erros.push(`Entrada ${i+1} (${e.cod}): campo "diploma" em falta`);
+    }
+  });
+  if (erros.length) return { ok: false, erro: erros.join('\n') };
+  return { ok: true, data };
+}
+
+function afActPreview() {
+  const erroEl = document.getElementById('af-act-json-erro');
+  const previewEl = document.getElementById('af-act-json-preview');
+  erroEl.style.display = 'none';
+  previewEl.style.display = 'none';
+
+  const result = afActParseJSON();
+  if (!result.ok) {
+    erroEl.textContent = result.erro;
+    erroEl.style.display = 'block';
+    return;
+  }
+
+  const adds = result.data.filter(e => !e.apagar);
+  const dels = result.data.filter(e => e.apagar);
+  let html = `<div style="font-size:12px;color:var(--text2);margin-bottom:0.5rem">Pré-visualização da actualização:</div>`;
+  if (adds.length) {
+    html += `<div style="font-size:12px;color:#34d399;margin-bottom:0.25rem">✅ ${adds.length} entrada(s) a adicionar/substituir:</div>`;
+    html += `<div style="max-height:150px;overflow-y:auto;background:#0f172a;border-radius:6px;padding:0.5rem;margin-bottom:0.5rem">`;
+    adds.forEach(e => {
+      html += `<div style="font-size:11px;color:#cbd5e1;padding:2px 0;border-bottom:1px solid #1e293b">${e.cod} — ${e.desc} — ${e.taxa_max}% — ${e.diploma}</div>`;
+    });
+    html += `</div>`;
+  }
+  if (dels.length) {
+    html += `<div style="font-size:12px;color:#f87171;margin-bottom:0.25rem">🗑️ ${dels.length} entrada(s) a apagar:</div>`;
+    dels.forEach(e => { html += `<div style="font-size:11px;color:#fca5a5">${e.cod}</div>`; });
+  }
+  previewEl.innerHTML = html;
+  previewEl.style.display = 'block';
+}
+
+function afActAdicionarManual() {
+  const cod = document.getElementById('af-act-m-cod').value.trim();
+  const desc = document.getElementById('af-act-m-desc').value.trim();
+  const taxa = parseFloat(document.getElementById('af-act-m-taxa').value);
+  const grupo = document.getElementById('af-act-m-grupo').value.trim();
+  const diploma = document.getElementById('af-act-m-diploma').value.trim();
+  const deg = document.getElementById('af-act-m-deg').value === 'true';
+  const nota = document.getElementById('af-act-m-nota').value.trim();
+  if (!cod || !desc || isNaN(taxa) || !grupo || !diploma) {
+    afMsg('Preenche todos os campos obrigatórios', 'red'); return;
+  }
+  const entrada = { cod, desc, taxa_max: taxa, grupo, degressivas: deg, diploma };
+  if (nota) entrada.nota_vida_util = nota;
+  afActEntradas.push(entrada);
+  // Limpar campos
+  ['af-act-m-cod','af-act-m-desc','af-act-m-taxa','af-act-m-diploma','af-act-m-nota'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  // Actualizar lista visual
+  const lista = document.getElementById('af-act-manual-lista');
+  lista.innerHTML = afActEntradas.map((e, i) =>
+    `<div style="display:flex;align-items:center;gap:0.5rem;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:#fb923c;font-family:monospace;min-width:50px">${e.cod}</span>
+      <span style="flex:1;color:var(--text1)">${e.desc}</span>
+      <span style="color:#34d399">${e.taxa_max}%</span>
+      <button onclick="afActEntradas.splice(${i},1);document.getElementById('af-act-manual-lista').dispatchEvent(new Event('actualizar'))" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:14px">🗑️</button>
+    </div>`
+  ).join('');
+}
+
+async function afActAplicar() {
+  const estadoEl = document.getElementById('af-act-estado');
+  const diploma = document.getElementById('af-act-diploma').value.trim();
+
+  // Determinar fonte: JSON ou manual
+  let entradas = [];
+  const tabActiva = document.getElementById('af-act-panel-json').style.display !== 'none' ? 'json' : 'manual';
+
+  if (tabActiva === 'json') {
+    const result = afActParseJSON();
+    if (!result.ok) {
+      const erroEl = document.getElementById('af-act-json-erro');
+      erroEl.textContent = result.erro;
+      erroEl.style.display = 'block';
+      return;
+    }
+    entradas = result.data;
+  } else {
+    if (!afActEntradas.length) { afMsg('Adiciona pelo menos uma entrada', 'amber'); return; }
+    entradas = afActEntradas;
+  }
+
+  if (!entradas.length) { afMsg('Nenhuma entrada para aplicar', 'amber'); return; }
+
+  estadoEl.textContent = 'A aplicar actualização…';
+
+  // Carregar tabela actual do Firebase (ou base)
+  const dadosFB = await afFBGet('/dafilgest/tabelasFiscais/tabela2') || {};
+  // Construir objecto actual a partir do código base + Firebase
+  const tab2Actual = {};
+  AF_TABELA_II_BASE.forEach(t => { tab2Actual[t.cod] = {...t, taxa_min: t.taxa_max / 2}; });
+  Object.entries(dadosFB).forEach(([k, v]) => { tab2Actual[k] = v; });
+
+  // Aplicar entradas
+  let nadd = 0, ndel = 0;
+  entradas.forEach(e => {
+    if (e.apagar) {
+      delete tab2Actual[e.cod];
+      ndel++;
+    } else {
+      const entrada = {
+        cod: e.cod,
+        desc: e.desc,
+        taxa_max: e.taxa_max,
+        taxa_min: e.taxa_min !== undefined ? e.taxa_min : e.taxa_max / 2,
+        grupo: e.grupo,
+        degressivas: e.degressivas || false,
+        diploma: e.diploma || diploma || 'DR 25/2009',
+      };
+      if (e.nota_vida_util) entrada.nota_vida_util = e.nota_vida_util;
+      if (e.limite_viatura) entrada.limite_viatura = true;
+      if (e.nao_amortizavel) entrada.nao_amortizavel = true;
+      if (e.vida_util_fixa) entrada.vida_util_fixa = e.vida_util_fixa;
+      if (e.taxa_variavel) entrada.taxa_variavel = true;
+      tab2Actual[e.cod] = entrada;
+      nadd++;
+    }
+  });
+
+  // Gravar no Firebase
+  const ok = await afFBSet('/dafilgest/tabelasFiscais/tabela2', tab2Actual);
+  if (ok) {
+    // Actualizar estado local
+    afState.tabelaII = tab2Actual;
+    // Guardar registo da actualização
+    const registo = {
+      diploma: diploma || entradas[0]?.diploma || 'N/D',
+      data: new Date().toLocaleDateString('pt-PT'),
+      adicionadas: nadd,
+      apagadas: ndel,
+      total: Object.keys(tab2Actual).length
+    };
+    await afFBSet('/dafilgest/tabelasFiscais/historico/' + Date.now(), registo);
+    closeModal('af-modal-actualizar-tabela');
+    afRenderTabelaFiscal();
+    afMsg(`✅ Tabela actualizada: ${nadd} entrada(s) adicionadas/modificadas, ${ndel} apagadas. Total: ${registo.total} entradas.`, 'green');
+  } else {
+    estadoEl.textContent = 'Erro ao gravar no Firebase.';
+    afMsg('Erro ao gravar no Firebase. Verifique a ligação.', 'red');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+
+function openModalNovaTaxa() {
+  afState.taxaEditCod = null;
+  document.getElementById('af-modal-taxa-title').textContent = '➕ Nova Taxa Fiscal';
+  openModal('af-modal-taxa');
+}
+
+function afEditTaxa(cod, tabela) {
+  const t = tabela === 'tab2' ? afState.tabelaII[cod] : afState.tabelaI[cod];
+  if (!t) return;
+  afState.taxaEditCod = cod;
+  afState.taxaEditTabela = tabela;
+  document.getElementById('af-modal-taxa-title').textContent = '✏️ Editar Taxa Fiscal';
+  document.getElementById('af-tx-tabela').value = tabela;
+  document.getElementById('af-tx-codigo').value = cod;
+  document.getElementById('af-tx-desc').value = t.desc || '';
+  document.getElementById('af-tx-grupo').value = t.grupo || '';
+  document.getElementById('af-tx-taxa-max').value = t.taxa_max || '';
+  document.getElementById('af-tx-taxa-min').value = t.taxa_min || (t.taxa_max/2) || '';
+  document.getElementById('af-tx-degressivas').value = t.degressivas ? '1' : '0';
+  document.getElementById('af-tx-diploma').value = t.diploma || '';
+  document.getElementById('af-tx-obs').value = t.obs || '';
+  openModal('af-modal-taxa');
+}
+
+async function afSaveTaxa() {
+  const tabela = document.getElementById('af-tx-tabela')?.value;
+  const cod = document.getElementById('af-tx-codigo')?.value?.trim();
+  const desc = document.getElementById('af-tx-desc')?.value?.trim();
+  const taxaMax = parseFloat(document.getElementById('af-tx-taxa-max')?.value);
+
+  if (!cod || !desc || isNaN(taxaMax)) { afMsg('Preencha os campos obrigatórios', 'amber'); return; }
+
+  const taxa = {
+    cod, desc,
+    grupo: document.getElementById('af-tx-grupo')?.value || '',
+    taxa_max: taxaMax,
+    taxa_min: taxaMax / 2,
+    degressivas: document.getElementById('af-tx-degressivas')?.value === '1',
+    diploma: document.getElementById('af-tx-diploma')?.value || 'DR 25/2009 + DR 4/2015',
+    obs: document.getElementById('af-tx-obs')?.value || '',
+    atualizado_em: new Date().toISOString(),
+    atualizado_por: '© Rui Gonçalves',
+  };
+
+  const path = `${AF_TF_PATH}/${tabela}/${cod}`;
+  const ok = await afFBSet(path, taxa);
+  if (ok) {
+    if (tabela === 'tab2') afState.tabelaII[cod] = taxa;
+    else afState.tabelaI[cod] = taxa;
+    closeModal('af-modal-taxa');
+    afMsg('Taxa guardada com sucesso', 'green');
+    afRenderTabelaFiscal();
+    afPopulateCodDPSelect();
+  }
+}
+
+async function afDeleteTaxa(cod, tabela) {
+  if (!confirm(`Apagar a taxa ${cod}?`)) return;
+  const ok = await afFBDelete(`${AF_TF_PATH}/${tabela}/${cod}`);
+  if (ok) {
+    if (tabela === 'tab2') delete afState.tabelaII[cod];
+    else delete afState.tabelaI[cod];
+    afMsg('Taxa apagada', 'amber');
+    afRenderTabelaFiscal();
+  }
+}
+
+function openModalNovaCoef() {
+  openModal('af-modal-coef');
+  document.getElementById('af-coef-ano').value = '';
+  document.getElementById('af-coef-val').value = '';
+  document.getElementById('af-coef-portaria').value = '';
+}
+
+function afEditCoef(ano) {
+  const c = afState.coeficientes[ano];
+  document.getElementById('af-coef-ano').value = ano;
+  document.getElementById('af-coef-val').value = typeof c === 'object' ? c.coef : c;
+  document.getElementById('af-coef-portaria').value = typeof c === 'object' ? c.portaria : '';
+  openModal('af-modal-coef');
+}
+
+async function afSaveCoef() {
+  const ano = document.getElementById('af-coef-ano')?.value;
+  const coef = parseFloat(document.getElementById('af-coef-val')?.value);
+  const portaria = document.getElementById('af-coef-portaria')?.value || '';
+
+  if (!ano || isNaN(coef)) { afMsg('Preencha ano e coeficiente', 'amber'); return; }
+
+  const data = {coef, portaria, atualizado_em: new Date().toISOString()};
+  const ok = await afFBSet(`${AF_TF_PATH}/coeficientes/${ano}`, data);
+  if (ok) {
+    afState.coeficientes[ano] = data;
+    closeModal('af-modal-coef');
+    afMsg('Coeficiente guardado', 'green');
+    afRenderCoeficientes();
+  }
+}
+
+async function afDeleteCoef(ano) {
+  if (!confirm(`Apagar o coeficiente do ano ${ano}?`)) return;
+  const ok = await afFBDelete(`${AF_TF_PATH}/coeficientes/${ano}`);
+  if (ok) {
+    delete afState.coeficientes[ano];
+    afMsg('Coeficiente apagado', 'amber');
+    afRenderCoeficientes();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPARIDADES E PROVISÕES — CRUD
+// ═══════════════════════════════════════════════════════════════
+
+function openModalNovaImparidade() {
+  openModal('af-modal-impar');
+}
+
+async function afSaveImparidade() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const desc = document.getElementById('af-imp-desc')?.value?.trim();
+  if (!desc) { afMsg('Preencha a descrição', 'amber'); return; }
+  const id = afGenId();
+  const imp = {
+    id, desc,
+    snc: document.getElementById('af-imp-snc')?.value || '',
+    vb: parseFloat(document.getElementById('af-imp-vb')?.value) || 0,
+    imp_ant: parseFloat(document.getElementById('af-imp-ant')?.value) || 0,
+    imp_ex: parseFloat(document.getElementById('af-imp-ex')?.value) || 0,
+    reversao: parseFloat(document.getElementById('af-imp-rev')?.value) || 0,
+    fiscal: document.getElementById('af-imp-fiscal')?.value || '',
+    ano: parseInt(document.getElementById('af-imp-ano')?.value) || 2026,
+    just: document.getElementById('af-imp-just')?.value || '',
+    criado_em: new Date().toISOString(),
+  };
+  const ok = await afFBSet(`${AF_FB_PATH}/${afState.empKey}/imparidades/${id}`, imp);
+  if (ok) {
+    afState.imparidades[id] = imp;
+    closeModal('af-modal-impar');
+    afMsg('Imparidade guardada', 'green');
+    afRenderMod33();
+  }
+}
+
+async function afDeleteImparidade(id) {
+  if (!confirm('Apagar esta imparidade?')) return;
+  const ok = await afFBDelete(`${AF_FB_PATH}/${afState.empKey}/imparidades/${id}`);
+  if (ok) { delete afState.imparidades[id]; afRenderMod33(); }
+}
+
+function openModalNovaProvisao() {
+  openModal('af-modal-provisao');
+  document.getElementById('af-pr-calc-box').style.display = 'none';
+}
+
+function afCalcProvisao() {
+  const divida = parseFloat(document.getElementById('af-pr-divida')?.value) || 0;
+  const impar = parseFloat(document.getElementById('af-pr-impar')?.value) || 0;
+  const venc = document.getElementById('af-pr-venc')?.value;
+  if (!divida) return;
+
+  const dias = venc ? Math.floor((new Date() - new Date(venc)) / 86400000) : 0;
+  const pct = divida > 0 ? ((impar / divida) * 100).toFixed(1) : 0;
+
+  let enquad = 'Verificar condições art. 28.º-A CIRC';
+  if (dias >= 24 * 30) enquad = '✓ > 24 meses mora — imparidade total aceite (art. 28.º-A, n.º2, c)';
+  else if (dias >= 18 * 30) enquad = '✓ > 18 meses mora — 75% aceite (art. 28.º-A, n.º2, b)';
+  else if (dias >= 12 * 30) enquad = '✓ > 12 meses mora — 50% aceite (art. 28.º-A, n.º2, a)';
+  else if (dias >= 6 * 30) enquad = '✓ > 6 meses mora — 25% aceite';
+  else if (dias > 0) enquad = '⚠️ < 6 meses mora — limitar a 25%';
+
+  document.getElementById('af-pr-antiguidade').textContent = dias > 0 ? `${dias} dias em mora` : 'Não vencida';
+  document.getElementById('af-pr-pct').textContent = `${pct}%`;
+  document.getElementById('af-pr-enquad').textContent = enquad;
+  document.getElementById('af-pr-calc-box').style.display = '';
+}
+
+async function afSaveProvisao() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const nome = document.getElementById('af-pr-nome')?.value?.trim();
+  if (!nome) { afMsg('Preencha o nome do devedor', 'amber'); return; }
+  const id = afGenId();
+  const p = {
+    id, nome,
+    nif: document.getElementById('af-pr-nif')?.value || '',
+    snc: document.getElementById('af-pr-snc')?.value || '',
+    divida: parseFloat(document.getElementById('af-pr-divida')?.value) || 0,
+    venc: document.getElementById('af-pr-venc')?.value || '',
+    impar: parseFloat(document.getElementById('af-pr-impar')?.value) || 0,
+    cont: document.getElementById('af-pr-cont')?.value || 'Não',
+    fiscal: document.getElementById('af-pr-fiscal')?.value || '',
+    ano: parseInt(document.getElementById('af-pr-ano')?.value) || 2026,
+    obs: document.getElementById('af-pr-obs')?.value || '',
+    criado_em: new Date().toISOString(),
+  };
+  const ok = await afFBSet(`${AF_FB_PATH}/${afState.empKey}/provisoes/${id}`, p);
+  if (ok) {
+    afState.provisoes[id] = p;
+    closeModal('af-modal-provisao');
+    afMsg('Provisão guardada', 'green');
+    afRenderMod34();
+  }
+}
+
+async function afDeleteProvisao(id) {
+  if (!confirm('Apagar esta provisão?')) return;
+  const ok = await afFBDelete(`${AF_FB_PATH}/${afState.empKey}/provisoes/${id}`);
+  if (ok) { delete afState.provisoes[id]; afRenderMod34(); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTAÇÃO EXCEL
+// ═══════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTAÇÃO EXCEL — MODELO 32 OFICIAL (multi-ficheiro)
+// ═══════════════════════════════════════════════════════════════
+
+function afShowImportExcel() {
+  if (!afState.empKey) { afMsg('Selecione uma empresa primeiro', 'amber'); return; }
+  afState.importQueue = [];   // fila de ficheiros a importar
+  afState.importDone  = [];   // ficheiros já processados
+  document.getElementById('af-import-name').textContent = '';
+  document.getElementById('af-import-preview').style.display = 'none';
+  document.getElementById('af-import-btn').disabled = true;
+  openModal('af-modal-import');
+}
+
+function afOnImportFileSelect(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  afState.importQueue = [];
+  const nameEl = document.getElementById('af-import-name');
+  nameEl.textContent = `${files.length} ficheiro(s) seleccionado(s): ${files.map(f=>f.name).join(', ')}`;
+
+  let processed = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, {type: 'binary'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        const parsed = afParseModelo32(raw, file.name);
+        afState.importQueue.push({nome: file.name, rows: parsed});
+      } catch(err) {
+        afState.importQueue.push({nome: file.name, rows: [], erro: err.message});
+      }
+      processed++;
+      if (processed === files.length) afShowImportPreview();
+    };
+    reader.readAsBinaryString(file);
+  });
+}
+
+function afParseModelo32(raw, filename) {
+  const nome = filename.toLowerCase();
+  let categoria = 'Equipamento Básico';
+  if (nome.includes('viatur') || nome.includes('veic')) categoria = 'Viaturas';
+  else if (nome.includes('edific') || nome.includes('imovel') || nome.includes('imov') || nome.includes('terreno')) categoria = 'Imóveis';
+  else if (nome.includes('inform') || nome.includes('comput')) categoria = 'Equipamento Informático';
+  else if (nome.includes('intang') || nome.includes('softw')) categoria = 'Intangíveis';
+
+  const CABECALHOS = ['total geral','a transportar','transporte','periodo de tribut',
+    'descrição dos elem','natureza dos','activos tang','activos intang',
+    'nº de identif','modelo 32','mapa de deprec','quotas const','quotas decresc'];
+
+  const ativos = [];
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i];
+    const desc = String(row[4] || '').trim();
+    if (!desc || desc === 'nan' || desc.length < 2) continue;
+
+    // A regra principal: só importa se tiver ano E valor válidos
+    let ano = 0, valor = 0;
+    try {
+      ano   = parseInt(String(row[20]).replace(',','.'));
+      valor = parseFloat(String(row[22] || '0').replace(/[€\s]/g,'').replace(',','.'));
+    } catch(e) {}
+    if (!(ano > 1900 && valor > 0)) continue;
+
+    // Segurança: ignorar linhas de controlo conhecidas
+    const dl = desc.toLowerCase();
+    if (CABECALHOS.some(c => dl.includes(c))) continue;
+
+    const codRaw  = String(row[5] || '');
+    const sncM    = codRaw.match(/\b(4[3-4][0-9]|44[0-9])\b/);
+    const snc     = sncM ? sncM[0] : '433';
+    const taxa    = parseFloat(String(row[32] || '0').replace(',','.')) || 0;
+    const depAcum = parseFloat(String(row[38] || '0').replace(/[€\s]/g,'').replace(',','.')) || 0;
+    const dep2024 = parseFloat(String(row[46] || '0').replace(/[€\s]/g,'').replace(',','.')) || 0;
+
+    ativos.push({
+      descricao: desc, snc, categoria,
+      data_aquisicao: `${ano}-01-01`,
+      valor, taxa, taxa_max: taxa,
+      dep_acum_migracao: depAcum + dep2024,
+      metodo: 'QC', migrado: 1, estado: 'Ativo',
+      obs: `Importado de ${filename} — Mapa 2024 (Ano 0)`,
+    });
+  }
+  return ativos;
+}
+
+function afShowImportPreview() {
+  const preview = document.getElementById('af-import-preview');
+  const count   = document.getElementById('af-import-count');
+
+  let total = 0;
+  let html  = '';
+  afState.importQueue.forEach(f => {
+    if (f.erro) {
+      html += `<div style="color:var(--red);font-size:11px;padding:4px 0">❌ ${f.nome}: ${f.erro}</div>`;
+    } else {
+      html += `<div style="font-size:11px;padding:3px 0">✓ <strong>${f.nome}</strong> — ${f.rows.length} ativo(s)</div>`;
+      total += f.rows.length;
+    }
+  });
+
+  preview.innerHTML = `<div style="font-size:11px;font-weight:700;margin-bottom:6px">Resumo:</div>${html}`;
+  preview.style.display = '';
+  count.textContent = `Total a importar: ${total} ativos`;
+  document.getElementById('af-import-btn').disabled = total === 0;
+}
+
+async function afDoImport() {
+  if (!afState.empKey || !afState.importQueue?.length) return;
+
+  const total = afState.importQueue.reduce((s, f) => s + f.rows.length, 0);
+  if (!confirm(`Importar ${total} ativos de ${afState.importQueue.length} ficheiro(s) como saldo de migração (31/12/2024)?`)) return;
+
+  const updates = {};
+  afState.importQueue.forEach(f => {
+    f.rows.forEach(row => {
+      const id = afGenId();
+      updates[id] = { ...row, id, criado_em: new Date().toISOString() };
+    });
+  });
+
+  const ok = await afFBPatch(`${AF_FB_PATH}/${afState.empKey}/fichas`, updates);
+  if (ok) {
+    Object.assign(afState.fichas, updates);
+    closeModal('af-modal-import');
+    afMsg(`✅ ${total} ativos importados com sucesso`, 'green');
+    afRenderFichas();
+    afRenderDashboard();
+  } else {
+    afMsg('Erro na importação. Verifique a ligação.', 'red');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTAÇÃO PDF — MOD. 32
+// ═══════════════════════════════════════════════════════════════
+
+function afExportMod32PDF() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const ano = document.getElementById('af-mod32-ano')?.value || '2026';
+  const emp = afState.empNome;
+  const nif = afState.empNif;
+  const today = new Date().toLocaleDateString('pt-PT');
+  const W = doc.internal.pageSize.getWidth();
+
+  // Cabeçalho
+  doc.setFillColor(30, 40, 60);
+  doc.rect(0, 0, W, 18, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('MAPA DE DEPRECIAÇÕES E AMORTIZAÇÕES — MODELO 32', W/2, 8, {align:'center'});
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`${emp}${nif ? ' · NIF: ' + nif : ''} · Exercício ${ano}`, W/2, 14, {align:'center'});
+
+  // Dados
+  const fichas = Object.values(afState.fichas).filter(f => f.estado !== 'Alienado' && f.estado !== 'Abatido');
+  const body = [];
+  let totalVB=0, totalDA=0, totalDE=0, totalDAt=0, totalVLC=0;
+
+  fichas.forEach(f => {
+    const va = parseFloat(f.valor)||0;
+    const da = afCalcDepAcum(f, parseInt(ano)-1);
+    const de = afCalcDepAno(f, parseInt(ano));
+    const dat = da+de;
+    const vlc = Math.max(0,va-dat);
+    totalVB+=va; totalDA+=da; totalDE+=de; totalDAt+=dat; totalVLC+=vlc;
+    body.push([
+      f.cod_dp||'—', f.descricao||'—', f.snc||'—',
+      f.data_aquisicao?afFmtMes(f.data_aquisicao):'—',
+      afFmt(va), f.metodo==='QD'?'QD':'QC',
+      f.taxa_max?f.taxa_max+'%':'—', f.taxa?f.taxa+'%':'—',
+      afFmt(da), afFmt(de), afFmt(dat), afFmt(vlc)
+    ]);
+  });
+
+  body.push(['','','','','TOTAL','','','',afFmt(totalDA),afFmt(totalDE),afFmt(totalDAt),afFmt(totalVLC)]);
+
+  doc.autoTable({
+    startY: 22,
+    head: [['Cód.','Descrição do Bem','SNC','Data Início','V.Aquis. €','Mét.','Taxa Máx.','Taxa Prat.','Dep.Acum.Ant. €','Dep.Exercício €','Dep.Acum.Total €','VLC €']],
+    body,
+    theme: 'grid',
+    styles: {fontSize: 7, cellPadding: 1.5, halign: 'left'},
+    headStyles: {fillColor:[30,40,60], textColor:255, fontStyle:'bold', fontSize:6.5},
+    columnStyles: {
+      0:{cellWidth:14}, 1:{cellWidth:52}, 2:{cellWidth:12}, 3:{cellWidth:16},
+      4:{cellWidth:20,halign:'right'}, 5:{cellWidth:8}, 6:{cellWidth:14,halign:'right'},
+      7:{cellWidth:14,halign:'right'}, 8:{cellWidth:22,halign:'right'},
+      9:{cellWidth:22,halign:'right'}, 10:{cellWidth:24,halign:'right'}, 11:{cellWidth:22,halign:'right'}
+    },
+    didParseCell: d => {
+      if (d.row.index === body.length - 1) {
+        d.cell.styles.fontStyle = 'bold';
+        d.cell.styles.fillColor = [220,225,235];
+      }
+    },
+    margin: {top:22, left:8, right:8},
+  });
+
+  // Rodapé
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(30,40,60);
+    doc.rect(0, doc.internal.pageSize.getHeight()-10, W, 10, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('Contabilista Certificado — Inscrito na OCC 46003', 10, doc.internal.pageSize.getHeight()-4);
+    doc.text(`Emitido em ${today} · Página ${i}/${pages}`, W-10, doc.internal.pageSize.getHeight()-4, {align:'right'});
+    doc.text('© Rui Gonçalves', W/2, doc.internal.pageSize.getHeight()-4, {align:'center'});
+  }
+
+  doc.save(`Mod32_${afFBKey(emp)}_${ano}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTAÇÃO PDF — MOD. 31
+// ═══════════════════════════════════════════════════════════════
+
+function afExportMod31PDF() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const ano = parseInt(document.getElementById('af-mod31-ano')?.value || '2026');
+  const emp = afState.empNome;
+  const nif = afState.empNif;
+  const today = new Date().toLocaleDateString('pt-PT');
+  const W = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(30, 40, 60);
+  doc.rect(0, 0, W, 18, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('MAPA DE MAIS-VALIAS E MENOS-VALIAS FISCAIS — MODELO 31', W/2, 8, {align:'center'});
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`${emp}${nif ? ' · NIF: ' + nif : ''} · Exercício ${ano}`, W/2, 14, {align:'center'});
+
+  const alienacoes = Object.values(afState.fichas).filter(f => {
+    if (!f.data_alienacao) return false;
+    return parseInt(f.data_alienacao.split('-')[0]) === ano;
+  });
+
+  let totalMV=0, totalMMV=0;
+  const body = alienacoes.map(f => {
+    const anoAquis = f.data_aquisicao ? parseInt(f.data_aquisicao.split('-')[0]) : null;
+    const anoAlien = parseInt(f.data_alienacao.split('-')[0]);
+    const va = parseFloat(f.valor)||0;
+    const vr = parseFloat(f.valor_realizacao)||0;
+    const coef = afGetCoeficiente(anoAquis, anoAlien);
+    const vac = va*coef;
+    const da = afCalcDepAcum(f, anoAlien-1);
+    const vlcF = Math.max(0, vac-da);
+    const mvF = vr-vlcF;
+    if (mvF>=0) totalMV+=mvF; else totalMMV+=Math.abs(mvF);
+    return [
+      f.descricao||'—', f.snc||'—',
+      anoAquis||'—', f.data_alienacao||'—',
+      afFmt(va), coef.toFixed(2), afFmt(vac),
+      afFmt(da), afFmt(vlcF), afFmt(vr),
+      (mvF>=0?'+':'')+afFmt(mvF),
+      f.reinvestimento?'Sim':'—'
+    ];
+  });
+
+  body.push(['','','','','','','','','','MAIS-VALIAS',afFmt(totalMV),'']);
+  body.push(['','','','','','','','','','MENOS-VALIAS','-'+afFmt(totalMMV),'']);
+  body.push(['','','','','','','','','','SALDO FISCAL LÍQUIDO',(totalMV-totalMMV>=0?'+':'')+afFmt(totalMV-totalMMV),'']);
+
+  doc.autoTable({
+    startY: 22,
+    head: [['Descrição','SNC','Ano Aq.','Data Alien.','V.Aquis. €','Coef.','V.Aquis.Corr. €','Dep.Acum. €','VLC Fiscal €','V.Real. €','MV/mMV Fiscal €','Reinvest.']],
+    body,
+    theme: 'grid',
+    styles: {fontSize: 7, cellPadding: 1.5},
+    headStyles: {fillColor:[30,40,60], textColor:255, fontStyle:'bold', fontSize:6.5},
+    columnStyles: {
+      0:{cellWidth:45}, 1:{cellWidth:12}, 2:{cellWidth:12}, 3:{cellWidth:18},
+      4:{cellWidth:20,halign:'right'}, 5:{cellWidth:12,halign:'right'},
+      6:{cellWidth:22,halign:'right'}, 7:{cellWidth:22,halign:'right'},
+      8:{cellWidth:20,halign:'right'}, 9:{cellWidth:20,halign:'right'},
+      10:{cellWidth:22,halign:'right'}, 11:{cellWidth:16,halign:'center'}
+    },
+    didParseCell: d => {
+      const last3 = body.length - 3;
+      if (d.row.index >= last3) {
+        d.cell.styles.fontStyle = 'bold';
+        d.cell.styles.fillColor = d.row.index === body.length-1 ? [30,40,60] : [240,245,255];
+        if (d.row.index === body.length-1) d.cell.styles.textColor = 255;
+      }
+    },
+    margin: {top:22, left:6, right:6},
+  });
+
+  // Rodapé
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(30,40,60);
+    doc.rect(0, doc.internal.pageSize.getHeight()-10, W, 10, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(7);
+    doc.text('Contabilista Certificado — Inscrito na OCC 46003', 10, doc.internal.pageSize.getHeight()-4);
+    doc.text(`Emitido em ${today} · Página ${i}/${pages}`, W-10, doc.internal.pageSize.getHeight()-4, {align:'right'});
+    doc.text('© Rui Gonçalves', W/2, doc.internal.pageSize.getHeight()-4, {align:'center'});
+  }
+
+  doc.save(`Mod31_${afFBKey(emp)}_${ano}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTAÇÃO PDF — MOD. 33
+// ═══════════════════════════════════════════════════════════════
+
+function afExportMod33PDF() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const today = new Date().toLocaleDateString('pt-PT');
+  const emp = afState.empNome;
+
+  doc.setFillColor(30,40,60);
+  doc.rect(0,0,W,18,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('MAPA DE IMPARIDADES EM ATIVOS — MODELO 33', W/2, 8, {align:'center'});
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`${emp}${afState.empNif ? ' · NIF: '+afState.empNif : ''}`, W/2, 14, {align:'center'});
+
+  const body = Object.values(afState.imparidades).map(imp => {
+    const acum = (parseFloat(imp.imp_ant)||0) + (parseFloat(imp.imp_ex)||0) - (parseFloat(imp.reversao)||0);
+    const vliq = (parseFloat(imp.vb)||0) - acum;
+    return [imp.snc||'—', imp.desc||'—', afFmt(imp.vb), afFmt(imp.imp_ant), afFmt(imp.imp_ex), afFmt(imp.reversao), afFmt(acum), afFmt(vliq), imp.fiscal||'—'];
+  });
+
+  doc.autoTable({
+    startY: 22,
+    head: [['Cód. SNC','Descrição','V.Bruto €','Impar.Acum.Ant. €','Impar.Exercício €','Reversão €','Impar.Acum.Total €','V.Líquido €','Aceite Fiscal']],
+    body: body.length ? body : [['—','Sem registos','—','—','—','—','—','—','—']],
+    theme: 'grid',
+    styles: {fontSize: 8, cellPadding: 2},
+    headStyles: {fillColor:[30,40,60], textColor:255, fontStyle:'bold', fontSize:7},
+    margin: {top:22, left:8, right:8},
+  });
+
+  const pages = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pages;i++) {
+    doc.setPage(i);
+    doc.setFillColor(30,40,60);
+    doc.rect(0,doc.internal.pageSize.getHeight()-10,W,10,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(7);
+    doc.text('Contabilista Certificado — Inscrito na OCC 46003', 10, doc.internal.pageSize.getHeight()-4);
+    doc.text(`Emitido em ${today} · Página ${i}/${pages}`, W-10, doc.internal.pageSize.getHeight()-4, {align:'right'});
+    doc.text('© Rui Gonçalves', W/2, doc.internal.pageSize.getHeight()-4, {align:'center'});
+  }
+  doc.save(`Mod33_${afFBKey(emp)}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTAÇÃO PDF — MOD. 34
+// ═══════════════════════════════════════════════════════════════
+
+function afExportMod34PDF() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const today = new Date().toLocaleDateString('pt-PT');
+  const emp = afState.empNome;
+
+  doc.setFillColor(30,40,60);
+  doc.rect(0,0,W,18,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('MAPA DE PROVISÕES E IMPARIDADES EM CRÉDITOS — MODELO 34', W/2, 8, {align:'center'});
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`${emp}${afState.empNif ? ' · NIF: '+afState.empNif : ''}`, W/2, 14, {align:'center'});
+
+  const body = Object.values(afState.provisoes).map(p => {
+    const divida = parseFloat(p.divida)||0;
+    const impar = parseFloat(p.impar)||0;
+    const pct = divida>0 ? ((impar/divida)*100).toFixed(1)+'%' : '—';
+    return [p.nif||'—', p.nome||'—', p.snc||'—', afFmt(divida), p.venc||'—', afFmt(impar), pct, p.cont||'Não', p.fiscal||'—'];
+  });
+
+  doc.autoTable({
+    startY: 22,
+    head: [['NIF','Nome Devedor','SNC','V.Dívida €','Data Venc.','Imparidade €','%','Contencioso','Aceite Fiscal']],
+    body: body.length ? body : [['—','Sem registos','—','—','—','—','—','—','—']],
+    theme: 'grid',
+    styles: {fontSize: 8, cellPadding: 2},
+    headStyles: {fillColor:[30,40,60], textColor:255, fontStyle:'bold', fontSize:7},
+    margin: {top:22, left:8, right:8},
+  });
+
+  const pages = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pages;i++) {
+    doc.setPage(i);
+    doc.setFillColor(30,40,60);
+    doc.rect(0,doc.internal.pageSize.getHeight()-10,W,10,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(7);
+    doc.text('Contabilista Certificado — Inscrito na OCC 46003', 10, doc.internal.pageSize.getHeight()-4);
+    doc.text(`Emitido em ${today} · Página ${i}/${pages}`, W-10, doc.internal.pageSize.getHeight()-4, {align:'right'});
+    doc.text('© Rui Gonçalves', W/2, doc.internal.pageSize.getHeight()-4, {align:'center'});
+  }
+  doc.save(`Mod34_${afFBKey(emp)}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTAÇÃO EXCEL — MOD. 32
+// ═══════════════════════════════════════════════════════════════
+
+function afExportMod32Excel() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const ano = parseInt(document.getElementById('af-mod32-ano')?.value || '2026');
+  const emp = afState.empNome;
+  const fichas = Object.values(afState.fichas).filter(f => f.estado !== 'Alienado' && f.estado !== 'Abatido');
+
+  const wb = XLSX.utils.book_new();
+
+  // Cabeçalho
+  const rows = [
+    [`MAPA DE DEPRECIAÇÕES E AMORTIZAÇÕES — MODELO 32`],
+    [`Empresa: ${emp}${afState.empNif ? ' · NIF: '+afState.empNif : ''}  ·  Exercício: ${ano}`],
+    [],
+    ['Cód. DR25', 'Descrição', 'SNC', 'Data Início', 'Método', 'Taxa Máx %', 'Taxa Prat %', 'V.Aquisição €', 'Dep.Acum.Ant €', 'Dep.Exercício €', 'Dep.Acum.Total €', 'VLC €', 'Observações']
+  ];
+
+  let tVB=0,tDA=0,tDE=0,tDAt=0,tVLC=0;
+  fichas.forEach(f => {
+    const va = parseFloat(f.valor)||0;
+    const da = afCalcDepAcum(f, ano-1);
+    const de = afCalcDepAno(f, ano);
+    const dat = da+de;
+    const vlc = Math.max(0,va-dat);
+    tVB+=va; tDA+=da; tDE+=de; tDAt+=dat; tVLC+=vlc;
+    rows.push([f.cod_dp||'', f.descricao||'', f.snc||'', f.data_aquisicao?afFmtMes(f.data_aquisicao):'', f.metodo==='QD'?'Degressivas':'Constantes', f.taxa_max||'', f.taxa||'', va, da, de, dat, vlc, f.migrado?'[Migrado]':'']);
+  });
+  rows.push([]);
+  rows.push(['', '', '', '', '', '', 'TOTAIS', tVB, tDA, tDE, tDAt, tVLC, '']);
+  rows.push([]);
+  rows.push([`Contabilista Certificado — Inscrito na OCC 46003`]);
+  rows.push([`Emitido em: ${new Date().toLocaleDateString('pt-PT')}`]);
+  rows.push([`© Rui Gonçalves`]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Larguras colunas
+  ws['!cols'] = [{wch:12},{wch:50},{wch:10},{wch:14},{wch:14},{wch:10},{wch:10},{wch:16},{wch:18},{wch:18},{wch:18},{wch:16},{wch:16}];
+
+  XLSX.utils.book_append_sheet(wb, ws, `Mod32_${ano}`);
+  XLSX.writeFile(wb, `Mod32_${afFBKey(emp)}_${ano}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTAÇÃO EXCEL — MOD. 31
+// ═══════════════════════════════════════════════════════════════
+
+function afExportMod31Excel() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const ano = parseInt(document.getElementById('af-mod31-ano')?.value || '2026');
+  const emp = afState.empNome;
+  const alienacoes = Object.values(afState.fichas).filter(f => f.data_alienacao && parseInt(f.data_alienacao.split('-')[0]) === ano);
+
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    [`MAPA DE MAIS-VALIAS E MENOS-VALIAS FISCAIS — MODELO 31`],
+    [`Empresa: ${emp}  ·  Exercício: ${ano}`],
+    [],
+    ['Descrição','SNC','Ano Aq.','Data Alien.','V.Aquisição €','Coef.','V.Aquis.Corrigido €','Dep.Acum.Aceites €','VLC Fiscal €','V.Realização €','MV/mMV Contab €','MV/mMV Fiscal €','Reinvest.']
+  ];
+
+  let tMV=0, tMMV=0;
+  alienacoes.forEach(f => {
+    const anoAquis = f.data_aquisicao ? parseInt(f.data_aquisicao.split('-')[0]) : null;
+    const anoAlien = parseInt(f.data_alienacao.split('-')[0]);
+    const va = parseFloat(f.valor)||0;
+    const vr = parseFloat(f.valor_realizacao)||0;
+    const coef = afGetCoeficiente(anoAquis, anoAlien);
+    const vac = va*coef;
+    const da = afCalcDepAcum(f, anoAlien-1);
+    const vlcF = Math.max(0,vac-da);
+    const mvF = vr-vlcF;
+    const mvC = vr - Math.max(0,va-da);
+    if (mvF>=0) tMV+=mvF; else tMMV+=Math.abs(mvF);
+    rows.push([f.descricao||'', f.snc||'', anoAquis||'', f.data_alienacao||'', va, coef, vac, da, vlcF, vr, mvC, mvF, f.reinvestimento?'Sim':'Não']);
+  });
+  rows.push([]);
+  rows.push(['','','','','','','','','','Mais-Valias Fiscais','',tMV,'']);
+  rows.push(['','','','','','','','','','Menos-Valias Fiscais','','-'+tMMV,'']);
+  rows.push(['','','','','','','','','','SALDO FISCAL LÍQUIDO','',tMV-tMMV,'']);
+  rows.push([]);
+  rows.push([`Contabilista Certificado — Inscrito na OCC 46003`]);
+  rows.push([`© Rui Gonçalves · Emitido em ${new Date().toLocaleDateString('pt-PT')}`]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:50},{wch:10},{wch:10},{wch:14},{wch:16},{wch:8},{wch:20},{wch:20},{wch:18},{wch:18},{wch:18},{wch:18},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, `Mod31_${ano}`);
+  XLSX.writeFile(wb, `Mod31_${afFBKey(emp)}_${ano}.xlsx`);
+}
+
+function afExportMod33Excel() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const emp = afState.empNome;
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ['MAPA DE IMPARIDADES EM ATIVOS — MODELO 33'],
+    [`Empresa: ${emp}`],[],
+    ['Cód. SNC','Descrição','V.Bruto €','Impar.Acum.Ant €','Impar.Exercício €','Reversão €','Impar.Acum.Total €','V.Líquido €','Aceite Fiscal']
+  ];
+  Object.values(afState.imparidades).forEach(imp => {
+    const acum=(parseFloat(imp.imp_ant)||0)+(parseFloat(imp.imp_ex)||0)-(parseFloat(imp.reversao)||0);
+    const vliq=(parseFloat(imp.vb)||0)-acum;
+    rows.push([imp.snc||'',imp.desc||'',parseFloat(imp.vb)||0,parseFloat(imp.imp_ant)||0,parseFloat(imp.imp_ex)||0,parseFloat(imp.reversao)||0,acum,vliq,imp.fiscal||'']);
+  });
+  rows.push([],[`Contabilista Certificado — Inscrito na OCC 46003`],[`© Rui Gonçalves · ${new Date().toLocaleDateString('pt-PT')}`]);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Mod33');
+  XLSX.writeFile(wb, `Mod33_${afFBKey(emp)}.xlsx`);
+}
+
+function afExportMod34Excel() {
+  if (!afState.empKey) { afMsg('Selecione empresa', 'amber'); return; }
+  const emp = afState.empNome;
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ['MAPA DE PROVISÕES E IMPARIDADES EM CRÉDITOS — MODELO 34'],
+    [`Empresa: ${emp}`],[],
+    ['NIF Devedor','Nome Devedor','SNC','V.Dívida €','Data Vencim.','Imparidade €','% Impar.','Contencioso','Aceite Fiscal']
+  ];
+  Object.values(afState.provisoes).forEach(p => {
+    const d=parseFloat(p.divida)||0; const i=parseFloat(p.impar)||0;
+    const pct=d>0?((i/d)*100).toFixed(1)+'%':'—';
+    rows.push([p.nif||'',p.nome||'',p.snc||'',d,p.venc||'',i,pct,p.cont||'Não',p.fiscal||'']);
+  });
+  rows.push([],[`Contabilista Certificado — Inscrito na OCC 46003`],[`© Rui Gonçalves · ${new Date().toLocaleDateString('pt-PT')}`]);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Mod34');
+  XLSX.writeFile(wb, `Mod34_${afFBKey(emp)}.xlsx`);
+}
+
+function afExportTabelaFiscalExcel() {
+  const wb = XLSX.utils.book_new();
+  // Tabela II
+  const rows2 = [['Código','Descrição','Grupo SNC','Taxa Máx %','Taxa Mín %','Degressivas','Diploma']];
+  Object.entries(afState.tabelaII).forEach(([cod,t]) => {
+    rows2.push([cod,t.desc||'',t.grupo||'',t.taxa_max||0,(t.taxa_min||t.taxa_max/2),t.degressivas?'Sim':'Não',t.diploma||'']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows2), 'Tabela II Genérica');
+
+  // Coeficientes
+  const rowsC = [['Ano','Coeficiente','Portaria']];
+  Object.entries(afState.coeficientes).sort(([a],[b])=>parseInt(b)-parseInt(a)).forEach(([ano,c]) => {
+    rowsC.push([ano, typeof c==='object'?c.coef:c, typeof c==='object'?c.portaria:'']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsC), 'Coeficientes Mod31');
+
+  XLSX.writeFile(wb, `TabelaFiscal_DR25_2009.xlsx`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS GERAIS
+// ═══════════════════════════════════════════════════════════════
+
+function afFmt(val) {
+  const n = parseFloat(val) || 0;
+  return n.toLocaleString('pt-PT', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function afFmtMes(str) {
+  if (!str) return '—';
+  const parts = str.split('-');
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const m = parseInt(parts[1]) - 1;
+  return `${meses[m] || parts[1]}/${parts[0]}`;
+}
+
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('open');
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+}
+
+function afMsg(msg, type) {
+  // Reutiliza sistema de notificações do Dafilgest se existir
+  if (typeof showToast === 'function') { showToast(msg, type); return; }
+  if (typeof afToast === 'function') { afToast(msg, type); return; }
+  // Fallback simples
+  const colors = {green:'#16a34a', red:'#dc2626', amber:'#d97706', blue:'#1a6fc4'};
+  const div = document.createElement('div');
+  div.style.cssText = `position:fixed;bottom:20px;right:20px;background:${colors[type]||'#333'};color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.2);max-width:300px;`;
+  div.textContent = msg;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTEGRAÇÃO COM O SISTEMA PRINCIPAL
+// ═══════════════════════════════════════════════════════════════
+// Chamar afInit(listaEmpresas, role) após o login do sistema principal.
+// Exemplo de integração no index.html do Dafilgest:
+//
+//   // Após loadFirebase():
+//   afInit(EMP_IVA_INIT.map(e => ({nome: e.nome, nif: e.nif || ''})), userRole);
+//
+// O módulo é auto-contido e não interfere com nenhuma variável existente.
+// ═══════════════════════════════════════════════════════════════
+
+</script>
+
+</body>
+</html>

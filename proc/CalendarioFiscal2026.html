@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<script src="procdb.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calendário Fiscal 2026 — Dafilgest</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef0f3;--bg2:#f7f8fa;--bg3:#fff;
+  --border:#d4d8de;--border2:#e8eaed;
+  --text:#1a1f2e;--text2:#3d4a5c;--text3:#6b7585;
+  --blue:#1a6fc4;--blue2:#1560ad;--blue-light:#e8f1fb;
+  --slate:#3d4a5c;--slate2:#2e3848;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-bd:#86efac;
+  --red:#dc2626;--red-bg:#fef2f2;
+  --amber:#d97706;--amber-bg:#fffbeb;
+  --r:5px;--r-lg:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;min-height:100vh;}
+
+/* LOGIN */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1a2a3d 0%,#1a6fc4 100%);}
+.lc{background:#fff;border-radius:12px;padding:36px 32px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.lc-logo{text-align:center;margin-bottom:16px;font-size:22px;font-weight:700;color:var(--blue);}
+.lc-logo span{color:var(--slate);}
+.lc-sub{font-size:11px;color:var(--text3);text-align:center;margin-bottom:24px;}
+.lc label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.lc input{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--r);font-size:13px;outline:none;transition:border .15s;}
+.lc input:focus{border-color:var(--blue);}
+.lc-btn{width:100%;margin-top:14px;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;}
+.lc-btn:hover{background:var(--blue2);}
+.lc-err{color:var(--red);font-size:11px;margin-top:8px;text-align:center;min-height:15px;}
+.user-btns{display:flex;gap:8px;margin-bottom:16px;}
+.user-btn{flex:1;padding:8px;border:2px solid var(--border);border-radius:var(--r);background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;}
+.user-btn.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue);}
+
+/* APP */
+#app{display:none;flex-direction:column;min-height:100vh;}
+.topbar{height:48px;background:var(--slate);display:flex;align-items:center;padding:0 16px;gap:10px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.tb-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.4px;}
+.tb-user{background:var(--amber);color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.tb-fb{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.45);margin-left:auto;}
+.fb-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.2);}
+.fb-dot.ok{background:#4ade80;}
+.tb-out{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.65);padding:3px 10px;border-radius:var(--r);cursor:pointer;font-size:11px;margin-left:8px;}
+.tb-out:hover{background:rgba(255,255,255,.15);color:#fff;}
+
+/* PROGRESSO */
+.prog-bar{background:var(--bg3);border-bottom:1px solid var(--border2);padding:10px 16px;display:flex;align-items:center;gap:12px;}
+.prog-label{font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap;}
+.prog-track{flex:1;height:8px;background:var(--border2);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;background:var(--green);border-radius:4px;transition:width .4s;}
+.prog-pct{font-size:11px;font-weight:700;color:var(--green);white-space:nowrap;}
+
+/* CONTEÚDO */
+.content{padding:16px;}
+.mes-bloco{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden;}
+.mes-header{background:var(--slate);color:#fff;padding:10px 14px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.mes-header:hover{background:var(--slate2);}
+.mes-arrow{transition:transform .2s;}
+.mes-header.collapsed .mes-arrow{transform:rotate(-90deg);}
+.mes-count{background:rgba(255,255,255,.15);padding:1px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.mes-count.done{background:#4ade80;color:#1a2a1a;}
+.mes-body{border-top:1px solid var(--border2);}
+.mes-body.hidden{display:none;}
+.obrigacao{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border2);transition:background .15s;}
+.obrigacao:last-child{border-bottom:none;}
+.obrigacao:hover{background:var(--bg2);}
+.obrigacao.done{background:var(--green-bg);}
+.ob-check{width:18px;height:18px;border:2px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.ob-check.checked{background:var(--green);border-color:var(--green);}
+.ob-check.checked::after{content:'✓';color:#fff;font-size:11px;font-weight:700;}
+.ob-info{flex:1;min-width:0;}
+.ob-nome{font-size:12px;font-weight:600;color:var(--text);}
+.obrigacao.done .ob-nome{text-decoration:line-through;color:var(--text3);}
+.ob-desc{font-size:11px;color:var(--text3);margin-top:2px;}
+.ob-prazo{font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.ob-prazo.urgente{color:var(--red);}
+.ob-prazo.hoje{color:var(--amber);}
+.ob-prazo.ok{color:var(--text3);}
+.ob-prazo.done-prazo{color:var(--green);}
+
+/* TIPO BADGES */
+.ob-tipo{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.4px;margin-right:4px;}
+.tipo-pag{background:#fef3c7;color:#92400e;}
+.tipo-dec{background:#dbeafe;color:#1e40af;}
+.tipo-outro{background:#f3f4f6;color:#374151;}
+
+/* STATS */
+.stats-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.stat{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 12px;flex:1;min-width:100px;}
+.stat-n{font-size:20px;font-weight:700;color:var(--blue);}
+.stat-l{font-size:10px;color:var(--text3);font-weight:500;}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--text3);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="lc">
+    <div class="lc-logo">Dafilgest <span>·</span> Fiscal</div>
+    <div class="lc-sub">Calendário Fiscal 2026</div>
+    <div class="user-btns">
+      <button class="user-btn active" onclick="selUser('Rui')" id="btn-Rui">Rui</button>
+      <button class="user-btn" onclick="selUser('Filipa')" id="btn-Filipa">Filipa</button>
+      <button class="user-btn" onclick="selUser('Beatriz')" id="btn-Beatriz">Beatriz</button>
+    </div>
+    <input type="hidden" id="loginPass" value="">
+    <button class="lc-btn" onclick="doLogin()">Entrar</button>
+    <div class="lc-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="tb-title">📅 Calendário Fiscal 2026</div>
+    <div class="tb-user" id="tbUser"></div>
+    <div class="tb-fb"><div class="fb-dot" id="fbDot"></div><span id="fbLabel">Firebase…</span></div>
+    <button class="tb-out" onclick="doLogout()">Sair</button>
+  </div>
+  <div class="prog-bar">
+    <div class="prog-label">Progresso anual</div>
+    <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="prog-pct" id="progPct">0%</div>
+  </div>
+  <div class="content">
+    <div class="stats-bar" id="statsBar"></div>
+    <div id="calendarioBody"><div class="loading">A carregar…</div></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const FB_URL = 'https://dafilgest-interno-default-rtdb.europe-west1.firebasedatabase.app';
+const PASS_ADMIN  = null;
+const PASS_EQUIPA = null;
+
+// ── ESTADO ──────────────────────────────────────────────────────────────────
+let currentUser = 'Rui';
+let checkState  = {}; // { "key": true/false }
+
+function selUser(u){
+  currentUser = u;
+  document.querySelectorAll('.user-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+u).classList.add('active');
+}
+
+function doLogin(){
+  const p = document.getElementById('loginPass').value;
+  if(!(window.PROCDB && PROCDB.ligado())){
+    document.getElementById('loginErr').textContent = 'Palavra-passe incorrecta.';
+    return;
+  }
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('tbUser').textContent = currentUser;
+  loadFromFirebase();
+}
+
+function doLogout(){
+  checkState = {};
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('calendarioBody').innerHTML = '<div class="loading">A carregar…</div>';
+}
+
+// ── FIREBASE ─────────────────────────────────────────────────────────────────
+function fbPath(){ return `${FB_URL}/calendario2026/${currentUser}.json`; }
+
+async function loadFromFirebase(){
+  setFbStatus(false, 'A ligar…');
+  try{
+    const r = await fetch(fbPath());
+    const data = await r.json();
+    checkState = data || {};
+    setFbStatus(true, 'Firebase OK');
+    renderCalendario();
+  }catch(e){
+    setFbStatus(false, 'Sem ligação');
+    renderCalendario();
+  }
+}
+
+async function saveCheck(key, val){
+  checkState[key] = val;
+  updateProgress();
+  try{
+    await fetch(`${FB_URL}/calendario2026/${currentUser}/${key}.json`, {
+      method:'PUT',
+      body: JSON.stringify(val)
+    });
+  }catch(e){ /* silencioso */ }
+}
+
+function setFbStatus(ok, txt){
+  document.getElementById('fbDot').className = 'fb-dot' + (ok?' ok':'');
+  document.getElementById('fbLabel').textContent = txt;
+}
+
+// ── DADOS DO CALENDÁRIO ──────────────────────────────────────────────────────
+const HOJE = new Date();
+HOJE.setHours(0,0,0,0);
+
+function diasAte(dataStr){
+  const d = new Date(dataStr);
+  d.setHours(0,0,0,0);
+  return Math.round((d-HOJE)/(1000*60*60*24));
+}
+
+function prazoClass(dataStr, feito){
+  if(feito) return 'done-prazo';
+  const d = diasAte(dataStr);
+  if(d < 0) return 'urgente';
+  if(d === 0) return 'hoje';
+  if(d <= 7) return 'urgente';
+  return 'ok';
+}
+
+function prazoLabel(dataStr, feito){
+  if(feito) return '✓ Concluído';
+  const d = diasAte(dataStr);
+  const dt = new Date(dataStr);
+  const label = dt.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
+  if(d < 0) return `⚠ ${label} (${Math.abs(d)}d atraso)`;
+  if(d === 0) return `⚡ Hoje ${label}`;
+  if(d === 1) return `⚡ Amanhã ${label}`;
+  return label;
+}
+
+// Obrigações mensais: [nome, prazo, tipo, descricao]
+// tipo: 'pag'=Pagamento 'dec'=Declaração 'outro'
+const MESES = [
+  {
+    mes:'Janeiro 2026', id:'jan',
+    obs:[
+      ['DMR / Retenções na Fonte', '2026-01-12', 'dec', 'Declaração Mensal de Remunerações – dezembro 2025'],
+      ['Segurança Social DRI', '2026-01-20', 'dec', 'Declaração Remunerações Individuais – dezembro 2025'],
+      ['IVA Mensal (nov)', '2026-01-20', 'dec', 'IVA mensal – novembro 2025'],
+      ['Pagamento IVA Mensal', '2026-01-25', 'pag', 'Pagamento IVA mensal – novembro 2025'],
+      ['SAFT Comunicação Faturas', '2026-01-05', 'dec', 'Comunicação de faturas à AT – dezembro 2025'],
+      ['IVA Mensal (dez)', '2026-02-20', 'dec', 'IVA mensal – dezembro 2025 (prazo fev)'],
+    ]
+  },
+  {
+    mes:'Fevereiro 2026', id:'fev',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-02-05', 'dec', 'Comunicação de faturas – janeiro 2026'],
+      ['DMR / Retenções na Fonte', '2026-02-10', 'dec', 'Declaração Mensal de Remunerações – janeiro 2026'],
+      ['Segurança Social DRI', '2026-02-10', 'dec', 'Declaração Remunerações Individuais – janeiro 2026'],
+      ['IVA Mensal (dez)', '2026-02-20', 'dec', 'IVA mensal – dezembro 2025'],
+      ['Pagamento IVA Mensal', '2026-02-25', 'pag', 'Pagamento IVA mensal – dezembro 2025'],
+      ['IVA Trimestral 4.º T 2025', '2026-02-16', 'dec', 'IVA trimestral – 4.º trimestre 2025'],
+      ['Pagamento IVA Trimestral T4', '2026-02-25', 'pag', 'Pagamento IVA trimestral – 4.º trimestre 2025'],
+    ]
+  },
+  {
+    mes:'Março 2026', id:'mar',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-03-05', 'dec', 'Comunicação de faturas – fevereiro 2026'],
+      ['DMR / Retenções na Fonte', '2026-03-10', 'dec', 'Declaração Mensal de Remunerações – fevereiro 2026'],
+      ['Segurança Social DRI', '2026-03-10', 'dec', 'Declaração Remunerações Individuais – fevereiro 2026'],
+      ['IVA Mensal (jan)', '2026-03-20', 'dec', 'IVA mensal – janeiro 2026'],
+      ['Pagamento IVA Mensal', '2026-03-25', 'pag', 'Pagamento IVA mensal – janeiro 2026'],
+      ['IMI (1.ª prestação)', '2026-03-31', 'pag', 'IMI – 1.ª prestação (coleta > 500 €)'],
+    ]
+  },
+  {
+    mes:'Abril 2026', id:'abr',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-04-05', 'dec', 'Comunicação de faturas – março 2026'],
+      ['DMR / Retenções na Fonte', '2026-04-14', 'dec', 'Declaração Mensal de Remunerações – março 2026 (Sexta-feira Santa: prorrogado)'],
+      ['Segurança Social DRI', '2026-04-10', 'dec', 'Declaração Remunerações Individuais – março 2026'],
+      ['IVA Mensal (fev)', '2026-04-20', 'dec', 'IVA mensal – fevereiro 2026'],
+      ['Pagamento IVA Mensal', '2026-04-27', 'pag', 'Pagamento IVA mensal – fevereiro 2026 (25 abr feriado → 27)'],
+      ['IVA Trimestral 1.º T 2026', '2026-05-15', 'dec', 'IVA trimestral – 1.º trimestre 2026 (prazo maio)'],
+      ['IRS Modelo 3 (início)', '2026-04-01', 'dec', 'Início da campanha IRS – 1 abril a 30 junho'],
+    ]
+  },
+  {
+    mes:'Maio 2026', id:'mai',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-05-05', 'dec', 'Comunicação de faturas – abril 2026'],
+      ['DMR / Retenções na Fonte', '2026-05-11', 'dec', 'Declaração Mensal de Remunerações – abril 2026'],
+      ['Segurança Social DRI', '2026-05-11', 'dec', 'Declaração Remunerações Individuais – abril 2026'],
+      ['IVA Mensal (mar)', '2026-05-20', 'dec', 'IVA mensal – março 2026'],
+      ['Pagamento IVA Mensal', '2026-05-25', 'pag', 'Pagamento IVA mensal – março 2026'],
+      ['IVA Trimestral 1.º T 2026', '2026-05-15', 'dec', 'IVA trimestral – 1.º trimestre 2026'],
+      ['Pagamento IVA Trimestral T1', '2026-05-25', 'pag', 'Pagamento IVA trimestral – 1.º trimestre 2026'],
+      ['IRC Modelo 22', '2026-05-31', 'dec', 'Entrega Modelo 22 – exercício 2025'],
+      ['Pagamento IRC / Derrama', '2026-05-31', 'pag', 'Pagamento IRC e derrama municipal – exercício 2025'],
+    ]
+  },
+  {
+    mes:'Junho 2026', id:'jun',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-06-05', 'dec', 'Comunicação de faturas – maio 2026'],
+      ['DMR / Retenções na Fonte', '2026-06-10', 'dec', 'Declaração Mensal de Remunerações – maio 2026'],
+      ['Segurança Social DRI', '2026-06-10', 'dec', 'Declaração Remunerações Individuais – maio 2026'],
+      ['IVA Mensal (abr)', '2026-06-22', 'dec', 'IVA mensal – abril 2026 (Corpo de Deus 4 jun → prorrogado)'],
+      ['Pagamento IVA Mensal', '2026-06-25', 'pag', 'Pagamento IVA mensal – abril 2026'],
+      ['IRS Modelo 3 (fim)', '2026-06-30', 'dec', 'Fim da campanha IRS – prazo 30 junho'],
+      ['IMI (2.ª prestação)', '2026-06-30', 'pag', 'IMI – 2.ª prestação (coleta entre 500€ e 1.000€)'],
+    ]
+  },
+  {
+    mes:'Julho 2026', id:'jul',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-07-05', 'dec', 'Comunicação de faturas – junho 2026'],
+      ['DMR / Retenções na Fonte', '2026-07-10', 'dec', 'Declaração Mensal de Remunerações – junho 2026'],
+      ['Segurança Social DRI', '2026-07-10', 'dec', 'Declaração Remunerações Individuais – junho 2026'],
+      ['IVA Mensal (mai)', '2026-07-20', 'dec', 'IVA mensal – maio 2026'],
+      ['Pagamento IVA Mensal', '2026-07-27', 'pag', 'Pagamento IVA mensal – maio 2026 (25 jul sáb → 27)'],
+      ['IES / DA', '2026-07-15', 'dec', 'Informação Empresarial Simplificada – exercício 2025'],
+      ['IVA Trimestral 2.º T 2026', '2026-08-14', 'dec', 'IVA trimestral – 2.º trimestre 2026 (prorrogado agosto)'],
+    ]
+  },
+  {
+    mes:'Agosto 2026', id:'ago',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-08-31', 'dec', 'Comunicação de faturas – julho 2026 (prazo prorrogado)'],
+      ['DMR / Retenções na Fonte', '2026-08-31', 'dec', 'Declaração Mensal de Remunerações – julho 2026 (agosto alargado)'],
+      ['Segurança Social DRI', '2026-08-31', 'dec', 'Declaração Remunerações Individuais – julho 2026'],
+      ['IVA Mensal (jun)', '2026-08-31', 'dec', 'IVA mensal – junho 2026 (prazo alargado agosto)'],
+      ['Pagamento IVA Mensal', '2026-08-31', 'pag', 'Pagamento IVA mensal – junho 2026'],
+      ['IVA Trimestral 2.º T 2026', '2026-08-14', 'dec', 'IVA trimestral – 2.º trimestre 2026'],
+      ['Pagamento IVA Trimestral T2', '2026-09-21', 'pag', 'Pagamento IVA trimestral – 2.º trimestre 2026'],
+      ['PPC / PPA (1.º Pagamento)', '2026-07-31', 'pag', 'Pagamento por Conta / Pagamento Adicional – 1.ª prestação'],
+    ]
+  },
+  {
+    mes:'Setembro 2026', id:'set',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-09-07', 'dec', 'Comunicação de faturas – agosto 2026 (prorrogado de ago)'],
+      ['DMR / Retenções na Fonte', '2026-09-10', 'dec', 'Declaração Mensal de Remunerações – agosto 2026'],
+      ['Segurança Social DRI', '2026-09-10', 'dec', 'Declaração Remunerações Individuais – agosto 2026'],
+      ['IVA Mensal (jul)', '2026-09-21', 'dec', 'IVA mensal – julho 2026 (prorrogado de agosto)'],
+      ['Pagamento IVA Mensal', '2026-09-25', 'pag', 'Pagamento IVA mensal – julho 2026'],
+      ['AIMI', '2026-09-30', 'pag', 'Pagamento AIMI – setembro'],
+      ['IMI (3.ª prestação)', '2026-09-30', 'pag', 'IMI – 3.ª prestação (coleta > 1.000 €)'],
+      ['PPC / PPA (2.º Pagamento)', '2026-09-30', 'pag', 'Pagamento por Conta – 2.ª prestação'],
+    ]
+  },
+  {
+    mes:'Outubro 2026', id:'out',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-10-05', 'dec', 'Comunicação de faturas – setembro 2026'],
+      ['DMR / Retenções na Fonte', '2026-10-12', 'dec', 'Declaração Mensal de Remunerações – setembro 2026'],
+      ['Segurança Social DRI', '2026-10-12', 'dec', 'Declaração Remunerações Individuais – setembro 2026'],
+      ['IVA Mensal (ago)', '2026-10-20', 'dec', 'IVA mensal – agosto 2026'],
+      ['Pagamento IVA Mensal', '2026-10-26', 'pag', 'Pagamento IVA mensal – agosto 2026 (25 out dom → 26)'],
+      ['IVA Trimestral 3.º T 2026', '2026-11-16', 'dec', 'IVA trimestral – 3.º trimestre 2026'],
+    ]
+  },
+  {
+    mes:'Novembro 2026', id:'nov',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-11-05', 'dec', 'Comunicação de faturas – outubro 2026'],
+      ['DMR / Retenções na Fonte', '2026-11-10', 'dec', 'Declaração Mensal de Remunerações – outubro 2026'],
+      ['Segurança Social DRI', '2026-11-10', 'dec', 'Declaração Remunerações Individuais – outubro 2026'],
+      ['IVA Mensal (set)', '2026-11-20', 'dec', 'IVA mensal – setembro 2026'],
+      ['Pagamento IVA Mensal', '2026-11-25', 'pag', 'Pagamento IVA mensal – setembro 2026'],
+      ['IVA Trimestral 3.º T 2026', '2026-11-16', 'dec', 'IVA trimestral – 3.º trimestre 2026'],
+      ['Pagamento IVA Trimestral T3', '2026-11-25', 'pag', 'Pagamento IVA trimestral – 3.º trimestre 2026'],
+      ['IMI (4.ª prestação)', '2026-11-30', 'pag', 'IMI – 4.ª prestação (coleta > 1.000 €)'],
+      ['PPC (3.º Pagamento)', '2026-11-30', 'pag', 'Pagamento por Conta – 3.ª prestação'],
+    ]
+  },
+  {
+    mes:'Dezembro 2026', id:'dez',
+    obs:[
+      ['SAFT Comunicação Faturas', '2026-12-07', 'dec', 'Comunicação de faturas – novembro 2026'],
+      ['DMR / Retenções na Fonte', '2026-12-10', 'dec', 'Declaração Mensal de Remunerações – novembro 2026'],
+      ['Segurança Social DRI', '2026-12-10', 'dec', 'Declaração Remunerações Individuais – novembro 2026'],
+      ['IVA Mensal (out)', '2026-12-21', 'dec', 'IVA mensal – outubro 2026'],
+      ['Pagamento IVA Mensal', '2026-12-25', 'pag', 'Pagamento IVA mensal – outubro 2026'],
+      ['Encerramento Contas Provisório', '2026-12-31', 'outro', 'Preparação para encerramento do exercício 2026'],
+    ]
+  },
+];
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function obKey(mesId, idx){ return `${mesId}_${idx}`; }
+
+function renderCalendario(){
+  let totalObs = 0, totalFeito = 0;
+  const urgentes = [], proximos = [];
+
+  let html = '';
+  MESES.forEach(m => {
+    const mesFeito = m.obs.filter((_,i) => checkState[obKey(m.id,i)]).length;
+    const mesTotal = m.obs.length;
+    totalObs += mesTotal;
+    totalFeito += mesFeito;
+    const allDone = mesFeito === mesTotal;
+
+    // Verificar se alguma obrigação deste mês é urgente (≤7 dias) ou passada
+    const temUrgente = m.obs.some((ob,i) => {
+      if(checkState[obKey(m.id,i)]) return false;
+      const d = diasAte(ob[1]);
+      return d <= 7;
+    });
+
+    // Colapsar meses passados que estão 100% feitos
+    const mesData = new Date(m.obs[0][1]);
+    const mesPassado = mesData < HOJE && allDone;
+    const collapsed = mesPassado && !temUrgente;
+
+    html += `<div class="mes-bloco">
+      <div class="mes-header${collapsed?' collapsed':''}" onclick="toggleMes('${m.id}')">
+        <span>${m.mes}</span>
+        <span style="display:flex;gap:8px;align-items:center;">
+          <span class="mes-count${allDone?' done':''}">${mesFeito}/${mesTotal}</span>
+          <span class="mes-arrow">▼</span>
+        </span>
+      </div>
+      <div class="mes-body${collapsed?' hidden':''}" id="body-${m.id}">`;
+
+    m.obs.forEach((ob, i) => {
+      const key = obKey(m.id, i);
+      const feito = !!checkState[key];
+      const [nome, prazo, tipo, desc] = ob;
+      const pClass = prazoClass(prazo, feito);
+      const pLabel = prazoLabel(prazo, feito);
+      const tipoClass = tipo === 'pag' ? 'tipo-pag' : tipo === 'dec' ? 'tipo-dec' : 'tipo-outro';
+      const tipoLabel = tipo === 'pag' ? 'Pagamento' : tipo === 'dec' ? 'Declaração' : 'Outro';
+
+      if(!feito){
+        const d = diasAte(prazo);
+        if(d < 0) urgentes.push({nome, prazo: pLabel, mes: m.mes});
+        else if(d <= 14) proximos.push({nome, prazo: pLabel, mes: m.mes, d});
+      }
+
+      html += `<div class="obrigacao${feito?' done':''}" id="ob-${key}">
+        <div class="ob-check${feito?' checked':''}" onclick="toggleOb('${key}')"></div>
+        <div class="ob-info">
+          <div class="ob-nome"><span class="ob-tipo ${tipoClass}">${tipoLabel}</span>${nome}</div>
+          <div class="ob-desc">${desc}</div>
+        </div>
+        <div class="ob-prazo ${pClass}">${pLabel}</div>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('calendarioBody').innerHTML = html;
+
+  // Stats
+  const pendentes = totalObs - totalFeito;
+  const vencidos = urgentes.length;
+  let statsHtml = `
+    <div class="stat"><div class="stat-n" style="color:var(--blue)">${totalObs}</div><div class="stat-l">Total obrigações</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--green)">${totalFeito}</div><div class="stat-l">Concluídas</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--amber)">${pendentes}</div><div class="stat-l">Pendentes</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--red)">${vencidos}</div><div class="stat-l">Em atraso</div></div>`;
+  document.getElementById('statsBar').innerHTML = statsHtml;
+
+  updateProgress(totalFeito, totalObs);
+}
+
+function updateProgress(feito, total){
+  // Recalcular se não passados
+  if(feito === undefined){
+    feito = 0; total = 0;
+    MESES.forEach(m => {
+      m.obs.forEach((_,i) => {
+        total++;
+        if(checkState[obKey(m.id,i)]) feito++;
+      });
+    });
+  }
+  const pct = total > 0 ? Math.round(feito/total*100) : 0;
+  document.getElementById('progFill').style.width = pct+'%';
+  document.getElementById('progPct').textContent = pct+'%';
+}
+
+function toggleMes(id){
+  const body = document.getElementById('body-'+id);
+  const header = body.previousElementSibling;
+  body.classList.toggle('hidden');
+  header.classList.toggle('collapsed');
+}
+
+function toggleOb(key){
+  const novoVal = !checkState[key];
+  checkState[key] = novoVal;
+  saveCheck(key, novoVal);
+
+  // Atualizar UI sem re-render completo
+  const el = document.getElementById('ob-'+key);
+  if(!el) return;
+  const check = el.querySelector('.ob-check');
+  const [mesId, idxStr] = key.split('_');
+  const idx = parseInt(idxStr);
+  const mes = MESES.find(m=>m.id===mesId);
+  if(!mes) return;
+  const ob = mes.obs[idx];
+  const feito = novoVal;
+
+  el.classList.toggle('done', feito);
+  check.classList.toggle('checked', feito);
+  const prazoEl = el.querySelector('.ob-prazo');
+  prazoEl.className = 'ob-prazo ' + prazoClass(ob[1], feito);
+  prazoEl.textContent = prazoLabel(ob[1], feito);
+  const nomeEl = el.querySelector('.ob-nome');
+  // manter badge, atualizar apenas texto
+  const badge = nomeEl.querySelector('.ob-tipo');
+  nomeEl.innerHTML = '';
+  nomeEl.appendChild(badge);
+  nomeEl.appendChild(document.createTextNode(ob[0]));
+
+  // Atualizar contador do mês
+  const body = document.getElementById('body-'+mesId);
+  const header = body.previousElementSibling;
+  const count = header.querySelector('.mes-count');
+  const total = mes.obs.length;
+  const feitos = mes.obs.filter((_,i)=>checkState[obKey(mesId,i)]).length;
+  count.textContent = `${feitos}/${total}`;
+  count.className = 'mes-count' + (feitos===total?' done':'');
+
+  updateProgress();
+}
+
+// Auto-colapsar meses já passados e completos ao render
+document.addEventListener('DOMContentLoaded',()=>{});
+</script>
+</body>
+</html>

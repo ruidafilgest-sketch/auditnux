@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<script src="procdb.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dafilgest · Recebimentos</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#eef0f3;--bg2:#f7f8fa;--bg3:#fff;
+  --border:#d4d8de;--border2:#e8eaed;
+  --text:#1a1f2e;--text2:#3d4a5c;--text3:#6b7585;--text4:#a0aab8;
+  --blue:#1a6fc4;--blue2:#1560ad;--blue-light:#e8f1fb;--blue-mid:#c5d9f1;
+  --slate:#3d4a5c;--slate2:#2e3848;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-bd:#86efac;
+  --red:#dc2626;--red-bg:#fef2f2;--red-bd:#fca5a5;
+  --amber:#d97706;--amber-bg:#fffbeb;--amber-bd:#fcd34d;
+  --purple:#7c3aed;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.06);
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08);
+  --r:5px;--r-lg:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.45;min-height:100vh;}
+input,select,button,textarea{font-family:'Inter',sans-serif;}
+
+/* LOGIN */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1a2a3d 0%,#1a6fc4 100%);}
+.lc{background:#fff;border-radius:12px;padding:36px 32px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.lc-logo{display:flex;justify-content:center;margin-bottom:20px;}
+.lc-logo img{height:44px;object-fit:contain;}
+.lc-title{font-size:15px;font-weight:600;color:var(--text);text-align:center;margin-bottom:4px;}
+.lc-sub{font-size:11px;color:var(--text3);text-align:center;margin-bottom:24px;}
+.lc label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.lc input{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--r);font-size:13px;color:var(--text);outline:none;transition:border .15s,box-shadow .15s;}
+.lc input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,111,196,.12);}
+.lc-btn{width:100%;margin-top:14px;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;}
+.lc-btn:hover{background:var(--blue2);}
+.lc-err{color:var(--red);font-size:11px;margin-top:8px;text-align:center;min-height:15px;}
+.lc-footer{margin-top:20px;text-align:center;font-size:10px;color:var(--text4);}
+
+/* APP */
+#app{display:none;flex-direction:column;min-height:100vh;}
+
+/* TOPBAR */
+.topbar{height:50px;background:var(--slate);display:flex;align-items:center;padding:0 16px;gap:12px;position:sticky;top:0;z-index:300;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.tb-logo{height:26px;object-fit:contain;filter:brightness(0) invert(1);opacity:.92;}
+.tb-divider{width:1px;height:22px;background:rgba(255,255,255,.15);}
+.tb-appname{font-size:12px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.8px;text-transform:uppercase;}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.tb-fb{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.45);}
+.fb-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .3s;}
+.fb-dot.ok{background:#4ade80;}
+.fb-dot.err{background:#f87171;}
+.badge-admin{background:var(--amber);color:#fff;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;}
+.badge-equipa{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:2px 8px;border-radius:20px;font-size:10px;}
+.tb-logout{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.65);padding:4px 10px;border-radius:var(--r);cursor:pointer;font-size:11px;transition:all .15s;}
+.tb-logout:hover{background:rgba(255,255,255,.15);color:#fff;}
+
+/* LAYOUT */
+.layout{display:flex;flex:1;}
+.sidebar{width:192px;background:var(--bg3);border-right:1px solid var(--border2);padding:10px 0;position:sticky;top:50px;height:calc(100vh - 50px);overflow-y:auto;flex-shrink:0;}
+.sb-group-label{font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.8px;padding:10px 14px 4px;}
+.sb-item{display:flex;align-items:center;gap:9px;padding:7px 14px;cursor:pointer;color:var(--text3);font-size:12px;font-weight:500;border-left:2px solid transparent;transition:all .12s;margin:1px 0;}
+.sb-item:hover{background:var(--blue-light);color:var(--blue);border-left-color:var(--blue-mid);}
+.sb-item.active{background:var(--blue-light);color:var(--blue);border-left-color:var(--blue);font-weight:600;}
+.sb-icon{font-size:14px;width:16px;text-align:center;flex-shrink:0;}
+.sb-count{margin-left:auto;font-size:10px;background:var(--border2);color:var(--text3);padding:1px 6px;border-radius:10px;font-weight:600;}
+.sb-item.active .sb-count{background:var(--blue-mid);color:var(--blue2);}
+
+/* CONTENT */
+.content{flex:1;padding:18px 20px;overflow-x:auto;min-width:0;}
+.section{display:none;}
+.section.active{display:block;}
+
+/* PAGE HEADER */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+.ph-left h1{font-size:15px;font-weight:700;color:var(--text);}
+.ph-left p{font-size:11px;color:var(--text3);margin-top:2px;}
+.ph-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+
+/* ALERTAS */
+.alert-bar{border-radius:var(--r-lg);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;border:1px solid;}
+.alert-bar.amber{background:var(--amber-bg);border-color:var(--amber-bd);}
+.alert-bar.red{background:var(--red-bg);border-color:var(--red-bd);}
+.alert-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.alert-title{font-size:12px;font-weight:700;margin-bottom:3px;}
+.alert-bar.amber .alert-title{color:var(--amber);}
+.alert-bar.red .alert-title{color:var(--red);}
+.alert-body{font-size:11px;color:var(--text2);line-height:1.7;}
+
+/* STAT CARDS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:14px;}
+.stat-card{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);padding:13px 15px;box-shadow:var(--shadow-sm);}
+.stat-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.stat-value{font-size:21px;font-weight:700;color:var(--text);line-height:1;}
+.stat-sub{font-size:11px;color:var(--text4);margin-top:4px;}
+.stat-card.green .stat-value{color:var(--green);}
+.stat-card.red .stat-value{color:var(--red);}
+.stat-card.blue .stat-value{color:var(--blue);}
+.stat-card.amber .stat-value{color:var(--amber);}
+
+/* TOOLBAR */
+.table-wrap{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:16px;}
+.toolbar{background:var(--bg3);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border2);}
+.toolbar-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px;}
+.toolbar-count{font-size:11px;color:var(--text3);font-weight:400;}
+.toolbar-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+.ctrl-sel{padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--text2);outline:none;cursor:pointer;}
+.ctrl-sel:focus{border-color:var(--blue);}
+.ctrl-inp{padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--text2);outline:none;min-width:175px;}
+.ctrl-inp:focus{border-color:var(--blue);}
+.btn-primary{padding:6px 13px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;}
+.btn-primary:hover{background:var(--blue2);}
+.btn-secondary{padding:6px 13px;background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;cursor:pointer;}
+.btn-secondary:hover{border-color:var(--blue);color:var(--blue);}
+.btn-danger{padding:5px 10px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd);border-radius:var(--r);font-size:11px;cursor:pointer;}
+.btn-danger:hover{background:#fee2e2;}
+.btn-gestao{padding:6px 12px;background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-mid);border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;}
+.btn-gestao:hover{background:var(--blue-mid);}
+
+/* TABLE */
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--bg2);color:var(--text2);font-weight:600;padding:7px 9px;text-align:left;white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+thead th.center{text-align:center;}
+tbody tr{border-bottom:1px solid var(--border2);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--bg2);}
+tbody td{padding:5px 9px;vertical-align:middle;color:var(--text2);}
+tbody td.center{text-align:center;}
+.td-nome{max-width:210px;font-weight:500;color:var(--text);font-size:12px;}
+.td-num{color:var(--text4);font-size:11px;font-family:'JetBrains Mono',monospace;}
+
+/* PRAZO BADGE */
+.prazo-ok{font-size:10px;color:var(--text4);white-space:nowrap;}
+.prazo-alert{font-size:10px;color:var(--amber);font-weight:600;white-space:nowrap;}
+.prazo-late{font-size:10px;color:var(--red);font-weight:600;white-space:nowrap;}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:opacity .12s;white-space:nowrap;min-width:42px;border:1px solid transparent;}
+.badge:hover{opacity:.75;}
+.b-sim{background:var(--green-bg);color:var(--green);border-color:var(--green-bd);}
+.b-nao{background:var(--red-bg);color:var(--red);border-color:var(--red-bd);}
+.b-na{background:var(--bg2);color:var(--text3);border-color:var(--border);}
+.b-empty{background:transparent;color:var(--text4);border-color:var(--border2);border-style:dashed;}
+.b-s{background:var(--green-bg);color:var(--green);border-color:var(--green-bd);}
+.mes-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;transition:all .12s;user-select:none;border:1px solid transparent;}
+.mes-badge:hover{opacity:.75;}
+.mes-vazio{background:var(--border2);color:var(--text4);}
+.mes-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-bd);}
+.mes-nao{background:var(--red-bg);color:var(--red);border-color:var(--red-bd);}
+.b-n{background:var(--red-bg);color:var(--red);border-color:var(--red-bd);}
+.b-nav{background:var(--bg2);color:var(--text3);border-color:var(--border);}
+.b-v{background:var(--blue-light);color:var(--blue);border-color:var(--blue-mid);}
+.b-c{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-bd);}
+
+/* DATE INPUT */
+.date-inp{background:var(--bg2);border:1px solid var(--border);color:var(--text2);padding:2px 5px;border-radius:var(--r);font-size:11px;cursor:pointer;outline:none;width:108px;}
+.date-inp:focus{border-color:var(--blue);}
+.date-inp.filled{background:var(--green-bg);border-color:var(--green-bd);color:var(--green);font-weight:600;}
+
+/* INLINE SELECT */
+.inline-sel{background:var(--bg2);border:1px solid var(--border);color:var(--text2);padding:3px 5px;border-radius:var(--r);font-size:11px;cursor:pointer;max-width:110px;outline:none;}
+.inline-sel:focus{border-color:var(--blue);}
+.rec-t{display:inline-block;padding:2px 5px;margin:1px;border-radius:3px;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--text4);font-size:10px;user-select:none;white-space:nowrap;}
+.rec-t:hover{background:var(--bg3);color:var(--text2);border-color:var(--border);}
+.rec-t.sel{background:var(--blue);color:#fff;border-color:var(--blue);}
+.rec-t.sel.m{background:var(--purple);border-color:var(--purple);}
+.rec-t.sel.n{background:var(--amber);border-color:var(--amber);}
+.rec-t.sel.c{background:var(--slate);border-color:var(--slate);}
+.rec-t.sel.d{background:var(--green);border-color:var(--green);}
+
+/* OBS */
+.obs-inp{background:transparent;border:none;color:var(--text3);font-size:11px;width:100%;min-width:55px;outline:none;font-family:'Inter',sans-serif;}
+.obs-inp:focus{background:var(--bg2);padding:2px 4px;border-radius:3px;}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;gap:4px;padding:9px 14px;border-top:1px solid var(--border2);justify-content:flex-end;}
+.pg-info{font-size:11px;color:var(--text3);margin-right:8px;}
+.pg-btn{padding:3px 8px;background:var(--bg2);border:1px solid var(--border);color:var(--text3);border-radius:4px;cursor:pointer;font-size:11px;font-family:'Inter',sans-serif;}
+.pg-btn:hover,.pg-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+/* TOTAIS */
+.totais-bar{background:var(--bg2);border-top:2px solid var(--blue);padding:8px 14px;display:flex;gap:20px;flex-wrap:wrap;}
+.total-item{font-size:12px;color:var(--text3);}
+.total-item strong{color:var(--text);margin-left:4px;}
+.total-item strong.green{color:var(--green);}
+.total-item strong.red{color:var(--red);}
+
+/* LEGENDA */
+.legenda{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text3);padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--border2);}
+.legenda strong{color:var(--text2);margin-right:2px;}
+
+/* LOCKED */
+.locked-box{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;}
+.locked-icon{font-size:40px;opacity:.3;}
+.locked-box p{font-size:13px;color:var(--text3);}
+.locked-box input{padding:9px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-size:13px;color:var(--text);outline:none;width:240px;text-align:center;}
+.locked-box input:focus{border-color:var(--blue);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:var(--r-lg);padding:26px;width:520px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-md);}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.modal-title{font-size:14px;font-weight:700;color:var(--text);}
+.modal-close{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px;}
+.modal-close:hover{background:var(--red-bg);color:var(--red);}
+.form-row{display:flex;gap:10px;margin-bottom:12px;align-items:flex-end;}
+.form-group{flex:1;}
+.form-group label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.form-group input,.form-group select{width:100%;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--text);outline:none;}
+.form-group input:focus,.form-group select:focus{border-color:var(--blue);}
+.form-err{color:var(--red);font-size:11px;margin-bottom:8px;min-height:14px;}
+.tag-novo{background:var(--green-bg);color:var(--green);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;white-space:nowrap;}
+.tag-visto{background:var(--border2);color:var(--text3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;white-space:nowrap;}
+.mgmt-search{width:100%;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--text);outline:none;margin-bottom:8px;}
+.mgmt-search:focus{border-color:var(--blue);}
+.mgmt-list{max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--r);}
+.mgmt-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border2);font-size:12px;}
+.mgmt-item:last-child{border-bottom:none;}
+.mgmt-item:hover{background:var(--bg2);}
+.mgmt-nome{flex:1;color:var(--text);font-weight:500;}
+.mgmt-meta{color:var(--text3);font-size:11px;}
+.mgmt-ativa.sim{color:var(--green);font-size:11px;font-weight:600;}
+.mgmt-ativa.nao{color:var(--red);font-size:11px;font-weight:600;}
+.confirm-msg{font-size:12px;color:var(--text3);line-height:1.6;margin:12px 0 22px;}
+.confirm-btns{display:flex;gap:10px;justify-content:center;}
+
+/* PRAZOS DASHBOARD */
+.prazos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:8px;}
+.prazo-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:11px 14px;border-left:3px solid var(--blue);}
+.prazo-card-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+.prazo-card-date{font-size:13px;font-weight:700;color:var(--blue);margin:3px 0;}
+.prazo-card-desc{font-size:11px;color:var(--text4);}
+.prazo-card.urgent{border-left-color:var(--red);}
+.prazo-card.urgent .prazo-card-date{color:var(--red);}
+.prazo-card.soon{border-left-color:var(--amber);}
+.prazo-card.soon .prazo-card-date{color:var(--amber);}
+/* ── ATIVOS FIXOS ── */
+
+/* ── REUTILIZA DESIGN SYSTEM DO DAFILGEST ── */
+:root{
+  --bg:#eef0f3;--bg2:#f7f8fa;--bg3:#fff;
+  --border:#d4d8de;--border2:#e8eaed;
+  --text:#1a1f2e;--text2:#3d4a5c;--text3:#6b7585;--text4:#a0aab8;
+  --blue:#1a6fc4;--blue2:#1560ad;--blue-light:#e8f1fb;--blue-mid:#c5d9f1;
+  --slate:#3d4a5c;--slate2:#2e3848;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-bd:#86efac;
+  --red:#dc2626;--red-bg:#fef2f2;--red-bd:#fca5a5;
+  --amber:#d97706;--amber-bg:#fffbeb;--amber-bd:#fcd34d;
+  --purple:#7c3aed;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.06);
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08);
+  --r:5px;--r-lg:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.45;}
+input,select,button,textarea{font-family:'Inter',sans-serif;font-size:13px;}
+
+/* ── ATIVOS: SUB-NAV ── */
+.af-subnav{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;}
+.af-tab{padding:5px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg3);color:var(--text3);cursor:pointer;font-size:11px;font-weight:500;transition:all .12s;}
+.af-tab:hover{background:var(--blue-light);color:var(--blue);border-color:var(--blue-mid);}
+.af-tab.active{background:var(--blue);color:#fff;border-color:var(--blue2);font-weight:600;}
+.af-panel{display:none;}
+.af-panel.active{display:block;}
+
+/* ── EMPRESA SELECTOR ── */
+.emp-sel-wrap{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.emp-sel-wrap label{font-size:11px;font-weight:600;color:var(--text2);}
+.emp-sel-wrap select{padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--r);min-width:280px;outline:none;}
+.emp-sel-wrap select:focus{border-color:var(--blue);}
+
+/* ── STATS ROW ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:14px;}
+.stat-card{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);padding:13px 15px;box-shadow:var(--shadow-sm);}
+.stat-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.stat-value{font-size:20px;font-weight:700;color:var(--text);line-height:1;}
+.stat-sub{font-size:11px;color:var(--text4);margin-top:4px;}
+.stat-card.blue .stat-value{color:var(--blue);}
+.stat-card.green .stat-value{color:var(--green);}
+.stat-card.amber .stat-value{color:var(--amber);}
+.stat-card.red .stat-value{color:var(--red);}
+
+/* ── TABLE WRAP ── */
+.table-wrap{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:16px;}
+.tw-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border2);flex-wrap:wrap;gap:8px;}
+.tw-title{font-size:12px;font-weight:700;color:var(--text2);}
+.tw-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--bg2);padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--border2);}
+td{padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--text2);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--blue-light);}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+td.center{text-align:center;}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+.badge.green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);}
+.badge.red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd);}
+.badge.amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd);}
+.badge.blue{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-mid);}
+.badge.grey{background:var(--bg2);color:var(--text3);border:1px solid var(--border2);}
+
+/* ── BUTTONS ── */
+.btn{padding:5px 12px;border-radius:var(--r);border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .12s;display:inline-flex;align-items:center;gap:5px;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:var(--blue2);}
+.btn-secondary{background:var(--bg2);color:var(--text2);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--border2);}
+.btn-success{background:var(--green);color:#fff;}
+.btn-success:hover{background:#15803d;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#b91c1c;}
+.btn-amber{background:var(--amber);color:#fff;}
+.btn-amber:hover{background:#b45309;}
+.btn-sm{padding:3px 8px;font-size:11px;}
+.btn-xs{padding:2px 6px;font-size:10px;}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:10px;width:100%;max-width:780px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal-lg{max-width:1000px;}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
+.modal-header h3{font-size:14px;font-weight:700;color:var(--text);}
+.modal-close{background:none;border:none;cursor:pointer;font-size:18px;color:var(--text3);padding:2px 6px;border-radius:var(--r);}
+.modal-close:hover{background:var(--bg2);}
+.modal-body{padding:20px;}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border2);display:flex;justify-content:flex-end;gap:8px;}
+
+/* ── FORM ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.form-full{grid-column:1/-1;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
+.form-group input,.form-group select,.form-group textarea{padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;transition:border .15s,box-shadow .15s;background:#fff;color:var(--text);}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,111,196,.1);}
+.form-group textarea{resize:vertical;min-height:60px;}
+.form-hint{font-size:10px;color:var(--text4);margin-top:2px;}
+.form-section{margin-bottom:16px;}
+.form-section-title{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid var(--blue-mid);}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--r-lg);padding:20px;text-align:center;cursor:pointer;transition:all .15s;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:var(--blue-light);}
+.upload-zone .upload-icon{font-size:24px;margin-bottom:6px;}
+.upload-zone p{font-size:12px;color:var(--text3);}
+.upload-zone .upload-name{font-size:11px;color:var(--green);font-weight:600;margin-top:4px;}
+.upload-zone input[type=file]{display:none;}
+
+/* ── CALC BOX ── */
+.calc-box{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:var(--r-lg);padding:12px 14px;margin-top:10px;}
+.calc-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;}
+.calc-row.total{font-weight:700;border-top:1px solid var(--blue-mid);margin-top:5px;padding-top:8px;font-size:13px;}
+.calc-row .lbl{color:var(--text3);}
+.calc-row .val{color:var(--text);font-variant-numeric:tabular-nums;}
+.calc-row.positive .val{color:var(--green);font-weight:700;}
+.calc-row.negative .val{color:var(--red);font-weight:700;}
+
+/* ── ALERT ── */
+.alert{border-radius:var(--r-lg);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;border:1px solid;}
+.alert.info{background:var(--blue-light);border-color:var(--blue-mid);}
+.alert.warning{background:var(--amber-bg);border-color:var(--amber-bd);}
+.alert.success{background:var(--green-bg);border-color:var(--green-bd);}
+.alert-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.alert-text{font-size:11px;color:var(--text2);line-height:1.6;}
+
+/* ── TABELA FISCAL ── */
+.tf-row-header{background:var(--slate);color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;}
+.tf-row-subheader{background:var(--bg2);font-size:10px;font-weight:700;color:var(--text3);padding:4px 10px;border-bottom:1px solid var(--border2);}
+
+/* ── MAIS/MENOS VALIAS ── */
+.mv-positiva td{background:#f0fdf4 !important;}
+.mv-negativa td{background:#fef2f2 !important;}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty-state .es-icon{font-size:32px;margin-bottom:10px;}
+.empty-state p{font-size:12px;}
+.empty-state .es-action{margin-top:12px;}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;gap:8px;padding:20px;color:var(--text3);font-size:12px;}
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+.ph-left h1{font-size:15px;font-weight:700;color:var(--text);}
+.ph-left p{font-size:11px;color:var(--text3);margin-top:2px;}
+.ph-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+
+/* ── SEARCH BAR ── */
+.search-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.search-input{padding:6px 10px 6px 30px;border:1.5px solid var(--border);border-radius:var(--r);outline:none;width:220px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7585' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 8px center;}
+.search-input:focus{border-color:var(--blue);}
+
+/* ── TABS FISCAIS ── */
+.mod-tabs{display:flex;gap:3px;margin-bottom:12px;flex-wrap:wrap;}
+.mod-tab{padding:4px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg2);color:var(--text3);cursor:pointer;font-size:11px;font-weight:500;}
+.mod-tab:hover{background:var(--blue-light);color:var(--blue);}
+.mod-tab.active{background:var(--blue);color:#fff;border-color:var(--blue2);}
+
+/* ── FICHA DETALHE ── */
+.ficha-detail{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-lg);padding:14px;}
+.ficha-detail-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border2);font-size:12px;}
+.ficha-detail-row:last-child{border-bottom:none;}
+.ficha-detail-lbl{color:var(--text3);font-weight:500;}
+.ficha-detail-val{color:var(--text);font-weight:600;text-align:right;}
+
+/* ── AMORT TABLE ── */
+.amort-table{font-size:11px;}
+.amort-table th{font-size:9px;}
+.amort-table td{padding:4px 8px;}
+.amort-table .ano-atual td{background:#fffbeb;font-weight:600;}
+.amort-table .amort-zero td{background:#f0fdf4;color:var(--green);}
+
+/* ── PRINT STYLES (PDF via jsPDF) ── */
+@media print{
+  .af-subnav,.tw-actions,.btn,.modal-footer{display:none!important;}
+  .modal{box-shadow:none;}
+}
+
+
+/* ── ECRÃ DE LOGIN (próprio deste ficheiro) ── */
+#loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.lc-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:36px 32px;width:340px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.06);}
+.lc-logo{font-family:'Inter',sans-serif;font-weight:700;font-size:20px;color:var(--text);margin-bottom:2px;}
+.lc-sub{font-size:11px;color:var(--text4);margin-bottom:22px;letter-spacing:.03em;}
+.lc-box input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;margin-bottom:12px;text-align:center;}
+.lc-btn{width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;}
+.lc-btn:hover{background:var(--blue-dark,#1560ad);}
+.lc-err{color:var(--red);font-size:11px;margin-top:10px;min-height:14px;}
+#app{display:none;min-height:100vh;background:var(--bg);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.topbar-title{font-family:'Inter',sans-serif;font-weight:700;font-size:15px;color:var(--text);}
+.topbar-sub{font-size:11px;color:var(--text4);}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.fb-dot{width:7px;height:7px;border-radius:50%;background:#999;display:inline-block;margin-right:5px;}
+.fb-dot.ok{background:#3ecf7a;}
+.fb-dot.err{background:#e05555;}
+.logout-btn{font-size:11px;color:var(--text4);background:none;border:none;cursor:pointer;text-decoration:underline;}
+main{padding:20px 22px;max-width:1400px;margin:0 auto;}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="lc-box">
+    <div class="lc-logo">Dafil<span style="color:var(--blue)">gest</span></div>
+    <div class="lc-sub">RECEBIMENTOS · ACESSO RESTRITO</div>
+    <input type="password" id="loginPass" placeholder="Senha" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="lc-btn" onclick="doLogin()">Entrar</button>
+    <div class="lc-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">💶 Recebimentos</div>
+      <div class="topbar-sub"><span class="fb-dot" id="fbDot"></span><span id="fbLabel">A ligar…</span></div>
+    </div>
+    <div class="topbar-right">
+      <button class="logout-btn" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+  <main>
+    <div class="section active" id="sec-rec"></div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalPagamentoManual"><div class="modal">
+  <div class="modal-header"><div class="modal-title">+ Registar Pagamento Manual</div><button class="modal-close" onclick="closeModal('modalPagamentoManual')">✕</button></div>
+  <div class="form-row">
+    <div class="form-group" style="flex:2"><label>Cliente</label><select id="pmCliente"></select></div>
+    <div class="form-group"><label>Data</label><input type="date" id="pmData"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Valor (€)</label><input type="number" id="pmValor" step="0.01" min="0"></div>
+    <div class="form-group"><label>Tipo</label><select id="pmTipo">
+      <option>Numerário</option><option>Cheque</option><option>Transferência</option><option>MBWay</option><option>Débito Direto</option><option>Outro</option>
+    </select></div>
+  </div>
+  <div class="form-err" id="pmErr"></div>
+  <div class="row" style="margin-top:10px"><button class="btn-primary" onclick="gravarPagamentoManual()">Gravar</button></div>
+</div></div>
+
+<div class="modal-overlay" id="modalREC"><div class="modal">
+  <div class="modal-header"><div class="modal-title">⚙️ Gerir Clientes — Recebimentos</div><button class="modal-close" onclick="closeModal('modalREC')">✕</button></div>
+  <div class="form-row">
+    <div class="form-group" style="flex:2"><label>Nome</label><input type="text" id="recNewNome" placeholder="Nome completo..."></div>
+    <div class="form-group"><label>Avença/mês (€)</label><input type="number" id="recNewAvenca" placeholder="0" min="0"></div>
+    <div><button class="btn-primary" onclick="addClienteREC()" style="margin-top:18px">+ Adicionar</button></div>
+  </div>
+  <div class="form-err" id="recAddErr"></div>
+  <input class="mgmt-search" id="recMgmtSearch" placeholder="🔍 Filtrar..." oninput="renderRECMgmt()">
+  <div class="mgmt-list" id="recMgmtList"></div>
+</div></div>
+
+<!-- MODAL IMPORTAR EXTRATO -->
+<div class="modal-overlay" id="modalImportExtrato"><div class="modal" style="width:760px;max-width:96vw">
+  <div class="modal-header"><div class="modal-title">📥 Importar Extrato</div><button class="modal-close" onclick="closeModal('modalImportExtrato')">✕</button></div>
+  <div style="font-size:12px;color:var(--text4);margin-bottom:12px">
+    Carregue o extrato do banco (.xls/.xlsx com Data valor, Descrição da Conta, Montante). Transferências já incluídas num relatório anterior não voltam a aparecer.
+  </div>
+  <div class="form-row">
+    <div class="form-group" style="flex:2"><label>Ficheiro do extrato</label><input type="file" id="impExtFile" accept=".xls,.xlsx"></div>
+    <div><button class="btn-primary" onclick="gerarRelatorioExtrato()" style="margin-top:18px">Carregar</button></div>
+  </div>
+  <div class="form-err" id="impExtStatus"></div>
+
+  <div id="impExtFiltroWrap" style="display:none;margin-top:12px">
+    <div class="form-row" style="align-items:center">
+      <div class="form-group" style="flex:1">
+        <label>Ver / imprimir</label>
+        <select id="impExtFiltro" onchange="onExtFiltroChange(this.value)" style="width:100%"></select>
+      </div>
+      <div><button class="btn-primary" onclick="extImprimir()" style="margin-top:18px">🖨️ Imprimir / PDF</button></div>
+    </div>
+    <div id="impExtRevisao" style="max-height:380px;overflow:auto;margin-top:10px"></div>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="modalConfirm"><div class="modal" style="width:380px;text-align:center">
+  <div class="modal-header" style="justify-content:center"><div class="modal-title" id="confirmTitle"></div></div>
+  <div class="confirm-msg" id="confirmMsg"></div>
+  <div class="confirm-btns"><button class="btn-secondary" onclick="closeModal('modalConfirm')">Cancelar</button><button class="btn-danger" id="confirmBtn" style="padding:6px 16px">Remover</button></div>
+</div></div>
+
+<script>
+// ── FIREBASE (mesma base do dafilgest-interno) ──
+const FIREBASE_URL = 'https://dafilgest-interno-default-rtdb.europe-west1.firebasedatabase.app';
+const FB = '/dafilgest';
+const FB_SECRET='';
+const ANOS  = ['2024','2025','2026','2027','2028','2029','2030'];
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+// ⚠️ Senha própria deste ficheiro — só o Rui a conhece. Mude-a à vontade.
+const PASS_RUI = null;
+const userRole = 'admin'; // este ficheiro é sempre admin — não há conta de equipa aqui
+
+let state = { clientes: [], rec: {} };
+let recAno='2026', recBusca='', recPag=1;
+let ledgerCliente='', ledgerDataIni='', ledgerDataFim='';
+const REC_PP=35;
+
+function safeKey(nome){
+  if(!nome) return nome;
+  return nome.replace(/\.|\//g,'_').replace(/#/g,'_').replace(/\$/g,'_').replace(/\[/g,'_').replace(/\]/g,'_');
+}
+
+async function fbGet(p){
+  try{ const r=await fetch(FIREBASE_URL+FB+p+'.json?auth='+FB_SECRET,{cache:'no-store'}); if(!r.ok)throw 0; return await r.json(); }catch{ return null; }
+}
+async function fbSet(p,data){
+  try{
+    const r=await fetch(FIREBASE_URL+FB+p+'.json?auth='+FB_SECRET,{method:'PUT',body:JSON.stringify(data),headers:{'Content-Type':'application/json'}});
+    if(!r.ok)throw 0; setFB(true);
+  }catch{ setFB(false); }
+}
+function setFB(ok){
+  document.getElementById('fbDot').className='fb-dot '+(ok?'ok':'err');
+  document.getElementById('fbLabel').textContent=ok?'Online':'Sem ligação';
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
+function confirmAction(t,m,fn){
+  document.getElementById('confirmTitle').textContent=t;
+  document.getElementById('confirmMsg').textContent=m;
+  document.getElementById('confirmBtn').onclick=()=>{fn();closeModal('modalConfirm');};
+  openModal('modalConfirm');
+}
+
+function saveMeta(){
+  fbSet('/meta/clientes', state.clientes);
+}
+
+function doLogin(){
+  if(window.PROCDB&&PROCDB.ligado()&&PROCDB.role()==='admin'){ startApp(); return; }
+  const p=document.getElementById('loginPass').value;
+  if(p===PASS_RUI){ startApp(); }
+  else document.getElementById('loginErr').textContent='Senha incorreta.';
+}
+function doLogout(){
+  stopPolling();
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginErr').textContent='';
+}
+
+// ── RECEBIMENTOS ──
+function getTransacoesLedger(){
+  return Object.keys(honExtProcessed).map(id=>({id, ...honExtProcessed[id]}));
+}
+
+function filtrarTransacoesLedger(){
+  let t = getTransacoesLedger();
+  if(ledgerCliente) t = t.filter(x=>x.cliente===ledgerCliente);
+  if(ledgerDataIni){ const di=new Date(ledgerDataIni); t = t.filter(x=>extParseDateBR(x.data) >= di); }
+  if(ledgerDataFim){ const df=new Date(ledgerDataFim); df.setHours(23,59,59,999); t = t.filter(x=>extParseDateBR(x.data) <= df); }
+  return t.sort((a,b)=>extParseDateBR(b.data)-extParseDateBR(a.data));
+}
+
+function renderREC(){
+  const el=document.getElementById('sec-rec');
+  const transacoes = filtrarTransacoesLedger();
+  const semCliente = transacoes.filter(t=>!t.cliente).length;
+  const total = transacoes.reduce((s,t)=>s+t.montante,0);
+
+  let h=`<div class="ph">
+    <div class="ph-left"><h1>Recebimentos de Clientes</h1><p>Consulta de transferências — qualquer período, qualquer cliente</p></div>
+    <div class="ph-right">
+      ${userRole==='admin'?`<button class="btn-gestao" onclick="openImportExtrato()">📥 Importar Extrato</button>`:''}
+      ${userRole==='admin'?`<button class="btn-gestao" onclick="openGestaoREC()">⚙️ Gerir Clientes</button>`:''}
+    </div>
+  </div>
+  <div class="table-wrap" style="margin-bottom:14px">
+    <div class="toolbar"><div class="toolbar-title">Filtros</div></div>
+    <div style="padding:12px 14px" class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Cliente</label>
+        <select id="ledgerClienteSel" onchange="ledgerCliente=this.value;renderREC()">
+          <option value="">— Todos —</option>
+          ${state.clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(c=>`<option value="${c.nome.replace(/"/g,'&quot;')}"${ledgerCliente===c.nome?' selected':''}>${c.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>De</label><input type="date" id="ledgerIniSel" value="${ledgerDataIni}" onchange="ledgerDataIni=this.value;renderREC()"></div>
+      <div class="form-group"><label>Até</label><input type="date" id="ledgerFimSel" value="${ledgerDataFim}" onchange="ledgerDataFim=this.value;renderREC()"></div>
+      <div><button class="btn-secondary" onclick="ledgerCliente='';ledgerDataIni='';ledgerDataFim='';renderREC()" style="margin-top:18px">Limpar filtros</button></div>
+      <div><button class="btn-gestao" onclick="abrirPagamentoManual()" style="margin-top:18px">+ Pagamento manual</button></div>
+      ${ledgerCliente?`<div><button class="btn-primary" onclick="exportarListagemCliente()" style="margin-top:18px">🖨️ Extrair listagem</button></div>`:''}
+    </div>
+  </div>`;
+
+  if(ledgerCliente){
+    const cliente = state.clientes.find(c=>c.nome===ledgerCliente);
+    const avenca = cliente ? Number(cliente.avenca)||0 : 0;
+    let mesesEsperados=null, estimativa=null;
+    if(avenca>0 && ledgerDataIni && ledgerDataFim){
+      const di=new Date(ledgerDataIni), df=new Date(ledgerDataFim);
+      mesesEsperados=(df.getFullYear()-di.getFullYear())*12+(df.getMonth()-di.getMonth())+1;
+      if(mesesEsperados<0) mesesEsperados=0;
+      estimativa=(mesesEsperados*avenca)-total;
+    }
+    h+=`<div class="stats">
+      <div class="stat-card green"><div class="stat-label">Total no período</div><div class="stat-value">€${total.toLocaleString('pt-PT',{minimumFractionDigits:2})}</div></div>
+      <div class="stat-card"><div class="stat-label">Transferências</div><div class="stat-value">${transacoes.length}</div></div>
+      <div class="stat-card blue"><div class="stat-label">Avença mensal</div><div class="stat-value">€${avenca.toLocaleString('pt-PT')}</div></div>
+      ${estimativa!==null?`<div class="stat-card ${estimativa>0.5?'red':'green'}"><div class="stat-label">${estimativa>0.5?'Estimativa em falta':'Em dia (estimativa)'}</div><div class="stat-value">€${Math.abs(estimativa).toLocaleString('pt-PT',{minimumFractionDigits:2})}</div><div class="stat-sub">${mesesEsperados} mês(es) no período, a €${avenca}/mês</div></div>`:''}
+    </div>`;
+  } else {
+    const porCliente={};
+    transacoes.forEach(t=>{ if(t.cliente){ if(!porCliente[t.cliente]) porCliente[t.cliente]=[]; porCliente[t.cliente].push(t); } });
+    const nomes=Object.keys(porCliente).sort((a,b)=>a.localeCompare(b));
+    h+=`<div class="stats">
+      <div class="stat-card green"><div class="stat-label">Total no período</div><div class="stat-value">€${total.toLocaleString('pt-PT',{minimumFractionDigits:2})}</div></div>
+      <div class="stat-card"><div class="stat-label">Transferências</div><div class="stat-value">${transacoes.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Clientes com movimento</div><div class="stat-value">${nomes.length}</div></div>
+      ${semCliente?`<div class="stat-card amber"><div class="stat-label">Sem cliente identificado</div><div class="stat-value">${semCliente}</div></div>`:''}
+    </div>
+    <div class="table-wrap">
+      <div class="toolbar"><div class="toolbar-title">Por cliente <span class="toolbar-count">(clique para ver detalhe)</span></div></div>
+      <table><thead><tr><th>Cliente</th><th style="text-align:center">Transferências</th><th style="text-align:right">Total</th></tr></thead><tbody>`;
+    nomes.forEach(n=>{
+      const itens=porCliente[n];
+      const tot=itens.reduce((s,i)=>s+i.montante,0);
+      h+=`<tr style="cursor:pointer" onclick="ledgerCliente='${n.replace(/'/g,"\\'")}';renderREC()"><td style="color:var(--blue)">${n}</td><td style="text-align:center">${itens.length}</td><td style="text-align:right">€${tot.toLocaleString('pt-PT',{minimumFractionDigits:2})}</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+
+  h+=`<div class="table-wrap" style="margin-top:14px">
+    <div class="toolbar"><div class="toolbar-title">Transferências ${ledgerCliente?('de '+ledgerCliente):'(todos os clientes)'} <span class="toolbar-count">(${transacoes.length})</span></div></div>
+    <div class="tbl-scroll"><table><thead><tr><th>Data</th><th>Descrição</th><th>Cliente</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>`;
+  if(transacoes.length===0){
+    h+=`<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text4)">Sem transferências para este filtro.</td></tr>`;
+  }
+  transacoes.forEach(t=>{
+    const selId='cor_'+t.id;
+    h+=`<tr>
+      <td>${t.data}</td>
+      <td style="max-width:240px">${t.desc}${t.manual?' <span class="tag-visto">manual</span>':''}</td>
+      <td>
+        <select id="${selId}" style="min-width:160px;font-size:11px">
+          <option value="">— sem cliente —</option>
+          ${state.clientes.map(c=>`<option value="${c.nome.replace(/"/g,'&quot;')}"${t.cliente===c.nome?' selected':''}>${c.nome}</option>`).join('')}
+        </select>
+        <button class="btn-secondary" style="font-size:10px;padding:2px 6px" onclick="corrigirClienteLedger('${t.id}', document.getElementById('${selId}').value)">✓</button>
+      </td>
+      <td style="text-align:right">€${t.montante.toFixed(2)}</td>
+      <td><button class="btn-danger" style="font-size:11px;padding:3px 7px" onclick="removerTransacaoLedger('${t.id}')">🗑️</button></td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+
+  el.innerHTML=h;
+}
+
+function corrigirClienteLedger(id, novoCliente){
+  if(!honExtProcessed[id]) return;
+  honExtProcessed[id].cliente = novoCliente || null;
+  fbSet('/honExtProcessed/'+id, honExtProcessed[id]);
+  if(novoCliente){
+    const key=safeKey(novoCliente);
+    if(!honExtAliases[key]) honExtAliases[key]=[];
+    const clean=extLimparDesc(honExtProcessed[id].desc);
+    if(clean && extNormalize(clean)!==extNormalize(novoCliente) && !honExtAliases[key].includes(clean)){
+      honExtAliases[key].push(clean);
+      fbSet('/honExtAliases/'+key, honExtAliases[key]);
+    }
+  }
+  renderREC();
+}
+
+function removerTransacaoLedger(id){
+  if(!confirm('Remover esta transferência do registo?')) return;
+  delete honExtProcessed[id];
+  fbSet('/honExtProcessed/'+id, null);
+  renderREC();
+}
+
+function abrirPagamentoManual(){
+  const sel=document.getElementById('pmCliente');
+  sel.innerHTML='<option value="">— escolher —</option>'+state.clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(c=>`<option value="${c.nome.replace(/"/g,'&quot;')}"${ledgerCliente===c.nome?' selected':''}>${c.nome}</option>`).join('');
+  document.getElementById('pmData').value=new Date().toISOString().slice(0,10);
+  document.getElementById('pmValor').value='';
+  document.getElementById('pmErr').textContent='';
+  openModal('modalPagamentoManual');
+}
+
+function gravarPagamentoManual(){
+  const cliente=document.getElementById('pmCliente').value;
+  const dataIso=document.getElementById('pmData').value;
+  const valor=parseFloat(document.getElementById('pmValor').value);
+  const tipo=document.getElementById('pmTipo').value;
+  const err=document.getElementById('pmErr');
+  err.textContent='';
+  if(!cliente){ err.textContent='Escolha o cliente.'; return; }
+  if(!dataIso){ err.textContent='Indique a data.'; return; }
+  if(!valor || valor<=0){ err.textContent='Indique um valor válido.'; return; }
+  const [y,m,d]=dataIso.split('-');
+  const dataBR=`${d}-${m}-${y}`;
+  const id='man_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  const desc=`Pagamento manual — ${tipo}`;
+  honExtProcessed[id]={data:dataBR, desc, montante:valor, cliente, manual:true, tipo};
+  fbSet('/honExtProcessed/'+id, honExtProcessed[id]);
+  closeModal('modalPagamentoManual');
+  renderREC();
+}
+
+function exportarListagemCliente(){
+  if(!ledgerCliente) return;
+  const transacoes=filtrarTransacoesLedger().slice().sort((a,b)=>extParseDateBR(a.data)-extParseDateBR(b.data));
+  const total=transacoes.reduce((s,t)=>s+t.montante,0);
+  const hoje=new Date().toLocaleDateString('pt-PT');
+  const periodo=(ledgerDataIni?new Date(ledgerDataIni).toLocaleDateString('pt-PT'):'início')+' a '+(ledgerDataFim?new Date(ledgerDataFim).toLocaleDateString('pt-PT'):'hoje');
+  const linhas=transacoes.map(t=>`<tr><td>${t.data}</td><td>${t.desc}</td><td style="text-align:right">€ ${t.montante.toFixed(2)}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Transferências — ${ledgerCliente}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;font-size:12px;color:#1a1f2e;padding:20px 24px;}
+  h1{font-size:16px;margin-bottom:4px;}
+  .sub{font-size:11px;color:#6b7585;margin-bottom:16px;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#eef1f6;padding:6px 10px;text-align:left;font-size:10px;}
+  td{padding:6px 10px;border-bottom:1px solid #e8eaed;}
+  .total{margin-top:14px;font-size:13px;font-weight:700;text-align:right;}
+  .no-print button{padding:8px 16px;background:#1a6fc4;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:16px;}
+  @media print{.no-print{display:none;}}
+</style></head><body>
+<div class="no-print"><button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
+<h1>Dafilgest · Listagem de Transferências</h1>
+<div class="sub">${ledgerCliente} · Período: ${periodo} · Impresso em ${hoje}</div>
+<table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead><tbody>${linhas}</tbody></table>
+<div class="total">Total: € ${total.toFixed(2)} (${transacoes.length} transferências)</div>
+</body></html>`;
+  const w=window.open('','_blank','width=800,height=700');
+  w.document.write(html);
+  w.document.close();
+}
+
+
+
+function createDateInput(nome,mi,dataRec,ano){
+  const inp=document.createElement('input');
+  inp.type='date';
+  if(dataRec) inp.value=dataRec;
+  inp.style.cssText='font-size:9px;width:90px;border:none;background:transparent;color:var(--text4);cursor:pointer;display:block;margin:0 auto';
+  inp.addEventListener('change',function(){
+    _saveRecDataImpl(nome,mi,this.value,ano);
+  });
+  return inp;
+}
+
+
+function preencherCelulasRec(el){
+  const TIPOS=[null,'Transferência','MBWay','Numerário','Cheque','Débito Direto','Outro'];
+  const ABREV={null:'—','Transferência':'Transf.','MBWay':'MBWay','Numerário':'Num.','Cheque':'Cheque','Débito Direto':'Déb.Dir.','Outro':'Outro'};
+  const EXTRA={null:'','Transferência':'','MBWay':'m','Numerário':'n','Cheque':'c','Débito Direto':'d','Outro':''};
+  el.querySelectorAll('.rec-cel').forEach(function(td){
+    const nomeCod=td.dataset.nome;
+    const mi=parseInt(td.dataset.mi);
+    const ano=td.dataset.ano;
+    const nome=decodeURIComponent(nomeCod);
+    if(!state.rec[ano]) state.rec[ano]={};
+    if(!state.rec[ano][safeKey(nome)]) state.rec[ano][safeKey(nome)]={avenca:state.clientes.find(c=>c.nome===nome)?.avenca||0,meses:Array(12).fill(null),datas:{}};
+    const mesesRaw=state.rec[ano][safeKey(nome)].meses||[];
+    const cur=Array.isArray(mesesRaw)?(mesesRaw[mi]||null):(mesesRaw[String(mi)]||null);
+    const datas=state.rec[ano][safeKey(nome)].datas||{};
+    const dataRec=datas[mi]||datas[String(mi)]||'';
+    // Criar spans para cada tipo
+    TIPOS.forEach(function(t){
+      const span=document.createElement('span');
+      const isSel=cur===t;
+      span.className='rec-t'+(isSel?' sel'+(EXTRA[t]?' '+EXTRA[t]:''):'');
+      span.textContent=ABREV[t]||'—';
+      span.addEventListener('click',function(){
+        if(!state.rec[ano]) state.rec[ano]={};
+        if(!state.rec[ano][safeKey(nome)]) state.rec[ano][safeKey(nome)]={avenca:state.clientes.find(c=>c.nome===nome)?.avenca||0,meses:Array(12).fill(null),datas:{}};
+        const mArr=state.rec[ano][safeKey(nome)].meses;
+        if(Array.isArray(mArr)) mArr[mi]=t;
+        else state.rec[ano][safeKey(nome)].meses=Object.assign(Array(12).fill(null),mArr,{[mi]:t});
+        saveRec(nome,mi,t,ano);
+        // Actualizar spans desta célula
+        td.querySelectorAll('.rec-t').forEach(function(s,si){
+          const tt=TIPOS[si];
+          s.className='rec-t'+(tt===t?' sel'+(EXTRA[tt]?' '+EXTRA[tt]:''):'');
+        });
+      });
+      td.appendChild(span);
+    });
+    // Input de data — sempre visível quando tem tipo seleccionado
+    const br2=document.createElement('br');
+    const inp=document.createElement('input');
+    inp.type='date';
+    inp.style.cssText='font-size:9px;width:88px;border:1px solid var(--border);border-radius:3px;padding:1px 3px;margin-top:2px';
+    if(dataRec) inp.value=dataRec;
+    inp.addEventListener('change',function(){
+      if(!state.rec[ano]) state.rec[ano]={};
+      if(!state.rec[ano][safeKey(nome)]) state.rec[ano][safeKey(nome)]={avenca:state.clientes.find(c=>c.nome===nome)?.avenca||0,meses:Array(12).fill(null),datas:{}};
+      if(!state.rec[ano][safeKey(nome)].datas) state.rec[ano][safeKey(nome)].datas={};
+      state.rec[ano][safeKey(nome)].datas[mi]=this.value||null;
+      fbSet('/rec/'+ano+'/'+encodeURIComponent(safeKey(nome))+'/datas/'+mi, this.value||null);
+    });
+    td.appendChild(br2);
+    td.appendChild(inp);
+  });
+}
+
+const REC_TIPOS=[null,'Transferência','MBWay','Numerário','Cheque','Débito Direto','Outro'];
+const REC_CLS={null:'','Transferência':'t','MBWay':'m','Numerário':'n','Cheque':'c','Débito Direto':'d','Outro':'o'};
+const REC_LBL={null:'—','Transferência':'Transf.','MBWay':'MBWay','Numerário':'Num.','Cheque':'Cheque','Débito Direto':'Déb.Dir.','Outro':'Outro'};
+
+function recBtnCell(nome,mi,val,dataRec,ano){
+  const cls=REC_CLS[val]||'';
+  const lbl=REC_LBL[val]||'—';
+  const ni=encodeURIComponent(nome);
+  let h='<td class="center" style="border-left:1px solid var(--border2);padding:2px">';
+  h+='<button class="'+('rec-btn '+cls).trim()+'" data-ni="'+ni+'" data-mi="'+mi+'" data-ano="'+ano+'">'+lbl+'</button>';
+  if(val&&dataRec){
+    const dl=new Date(dataRec+'T00:00:00').toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit'});
+    h+='<br><small style="color:var(--text4)">'+dl+'</small>';
+  } else if(val){
+    h+='<br><input type="date" data-ni="'+ni+'" data-mi="'+mi+'" data-ano="'+ano+'" style="font-size:9px;width:72px;border:1px solid var(--border);border-radius:3px;padding:1px 2px" onchange="saveRecDataEnc(this.dataset.ni,this.dataset.mi,this.value,this.dataset.ano)">';
+  }
+  h+='</td>';
+  return h;
+}
+
+function ciclarRec(btn,ni,mi,ano){
+  const nome=decodeURIComponent(ni);
+  // Garantir que a entrada existe no state
+  if(!state.rec[ano]) state.rec[ano]={};
+  if(!state.rec[ano][safeKey(nome)]) state.rec[ano][safeKey(nome)]={
+    avenca:state.clientes.find(c=>c.nome===nome)?.avenca||0,
+    meses:Array(12).fill(null),
+    datas:{}
+  };
+  const mesesRaw=state.rec[ano][safeKey(nome)].meses||[];
+  const cur=Array.isArray(mesesRaw)?(mesesRaw[mi]||null):(mesesRaw[String(mi)]||null);
+  const idx=REC_TIPOS.indexOf(cur);
+  const next=REC_TIPOS[((idx<=0?0:idx)+1)%REC_TIPOS.length];
+  // Actualizar state imediatamente antes de gravar
+  state.rec[ano][safeKey(nome)].meses[mi]=next;
+  saveRec(nome,mi,next,ano);
+  btn.className=('rec-btn '+(REC_CLS[next]||'')).trim();
+  btn.textContent=REC_LBL[next]||'—';
+  // mostrar/esconder input data
+  const td=btn.parentElement;
+  const existingInput=td.querySelector('input[type=date]');
+  const existingSmall=td.querySelector('small');
+  if(existingInput) existingInput.remove();
+  if(existingSmall) existingSmall.remove();
+  if(next){
+    const br=document.createElement('br');
+    const inp=document.createElement('input');
+    inp.type='date'; inp.style.cssText='font-size:9px;width:72px;border:1px solid var(--border);border-radius:3px;padding:1px 2px';
+    inp.addEventListener('change',function(){saveRecDataEnc(ni,mi,this.value,ano);});
+    td.appendChild(br); td.appendChild(inp);
+  }
+}
+
+function saveRecDataEnc(ni,mi,val,ano){
+  const nome=decodeURIComponent(ni);
+  _saveRecDataImpl(nome,mi,val,ano);
+}
+
+
+
+function recColor(v){if(!v)return'var(--red)';if(v==='Transferência')return'var(--blue)';if(v==='MBWay')return'var(--purple)';if(v==='Numerário')return'var(--amber)';if(v==='Débito Direto')return'var(--green)';return'var(--text3)';}
+function saveRec(nome,mi,val,ano){
+  if(!state.rec[ano])state.rec[ano]={};
+  if(!state.rec[ano][safeKey(nome)])state.rec[ano][safeKey(nome)]={avenca:state.clientes.find(c=>c.nome===nome)?.avenca||0,meses:Array(12).fill(null),datas:{}};
+  state.rec[ano][safeKey(nome)].meses[mi]=val||null;
+  fbSet(`/rec/${ano}/${safeKey(nome)}/meses/${mi}`,val||null);
+}
+function promptRecData(nome,mi,ano,atual){
+  // mantido para compatibilidade
+}
+function saveRecData(nomeOrB64,mi,val,ano,isB64){
+  const nome=isB64?decodeURIComponent(escape(atob(nomeOrB64))):nomeOrB64;
+  _saveRecDataImpl(nome,mi,val,ano);
+}
+function _saveRecDataImpl(nome,mi,val,ano){
+  if(!state.rec[ano])state.rec[ano]={};
+  if(!state.rec[ano][safeKey(nome)])state.rec[ano][safeKey(nome)]={avenca:state.clientes.find(c=>c.nome===nome)?.avenca||0,meses:Array(12).fill(null),datas:{}};
+  if(!state.rec[ano][safeKey(nome)].datas)state.rec[ano][safeKey(nome)].datas={};
+  state.rec[ano][safeKey(nome)].datas[mi]=val||null;
+  fbSet(`/rec/${ano}/${safeKey(nome)}/datas/${mi}`,val||null);
+}
+
+// ── GESTÃO IVA ──
+
+// ── GESTÃO REC ──
+function openGestaoREC(){document.getElementById('recNewNome').value='';document.getElementById('recNewAvenca').value='';document.getElementById('recAddErr').textContent='';openModal('modalREC');renderRECMgmt();}
+function renderRECMgmt(){
+  const q=(document.getElementById('recMgmtSearch').value||''). toLowerCase();
+  const lista=state.clientes.filter(c=>!q||c.nome.toLowerCase().includes(q));
+  document.getElementById('recMgmtList').innerHTML=lista.map(c=>`
+    <div class="mgmt-item">
+      <span class="mgmt-nome">${c.nome}</span>
+      <span class="mgmt-meta">€${(c.avenca||0).toLocaleString('pt-PT')}/mês</span>
+      <button class="btn-danger" onclick="removeClienteREC('${c.nome.replace(/'/g,"\\'")}');">✕</button>
+    </div>`).join('')||'<div style="padding:12px;color:var(--text4);font-size:12px">Sem resultados.</div>';
+}
+function addClienteREC(){
+  const nome=document.getElementById('recNewNome').value.trim();
+  const avenca=parseFloat(document.getElementById('recNewAvenca').value)||0;
+  const err=document.getElementById('recAddErr');
+  if(!nome){err.textContent='Introduza o nome.';return;}
+  if(state.clientes.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){err.textContent='Cliente já existe.';return;}
+  if(avenca<=0){err.textContent='Introduza um valor de avença válido.';return;}
+  state.clientes.push({nome,avenca});
+  ANOS.forEach(a=>{if(!state.rec[a])state.rec[a]={};state.rec[a][nome]={avenca,meses:Array(12).fill(null),datas:{}};});
+  err.textContent='';document.getElementById('recNewNome').value='';document.getElementById('recNewAvenca').value='';
+  saveMeta();fbSet('/rec',state.rec);renderRECMgmt();renderREC();
+}
+function removeClienteREC(nome){confirmAction('Remover Cliente',`Confirma a remoção de "${nome}"?`,()=>{state.clientes=state.clientes.filter(c=>c.nome!==nome);ANOS.forEach(a=>{if(state.rec[a])delete state.rec[a][nome];});saveMeta();fbSet('/rec',state.rec);renderRECMgmt();renderREC();});}
+
+// ── IMPORTAR EXTRATO (relatório por cliente para registo manual) ──
+let honExtProcessed=null; // {txId: {data,desc,montante,cliente}} — carregado sob pedido
+let honExtAliases=null;   // {clienteKey: [texto,...]} — aprendido ao atribuir manualmente
+let extResultado=null;    // {porCliente:{nome:[{id,data,desc,montante}]}, semIdentificar:[...], novas, jaRegistadas, intervaloTxt}
+let extFiltro='TODOS';
+
+function extStripAccents(s){return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function extNormalize(s){return extStripAccents((s||'').toUpperCase()).replace(/[.,\-\/]/g,' ').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
+const EXT_PREFIXES=[
+  /^TRF\s*CRED\s*INTRABANC\s*DE\s*/i,
+  /^TRF\s*CRED\s*SEPA\+?\s*DE\s*/i,
+  /^TRF\.?\s*IMED\.?\s*DE\s*/i,
+  /^TRF\.?\s*A\s*CRED\.?\s*SEPA\+?\s*DE?\s*/i,
+  /^TRF\s*DE\s*/i,
+  /^PAGAMENTO\s*FATURA\s*/i,
+  /^PAG\s*FT\s*/i,
+  /^PAG\s+/i,
+];
+function extLimparDesc(desc){
+  let stripped=(desc||'').trim();
+  for(const p of EXT_PREFIXES){ if(p.test(stripped)){ stripped=stripped.replace(p,''); break; } }
+  stripped=stripped.replace(/-\s*R?\d{5,}\s*$/i,'').replace(/\s{2,}/g,' ').trim();
+  return stripped;
+}
+// Identifica em que coluna está a Data, a Descrição e o Montante, lendo os NOMES
+// do cabeçalho (1ª linha do ficheiro) — robusto a colunas extra (Tipo, Saldo, Moeda...)
+// ou a ordens diferentes consoante o extrato exportado pelo banco.
+function detectarColunasExtrato(headerRow){
+  let colData=-1, colDesc=-1, colMontante=-1;
+  (headerRow||[]).forEach((h,i)=>{
+    const n=extNormalize(String(h||''));
+    if(/DATA\s*(DA\s*)?OPERACAO/.test(n)) colData=i; // apanha "Data Operação" e "Data da Operação"
+    else if(colData===-1 && n.includes('DATA VALOR')) colData=i;
+    else if(colData===-1 && n==='DATA') colData=i;
+    if(n.includes('DESCRICAO')) colDesc=i;
+    if(n.includes('MONTANTE')) colMontante=i;
+  });
+  return {colData, colDesc, colMontante};
+}
+function extWordSet(s){return new Set(extNormalize(s).split(' ').filter(w=>w.length>1));}
+function extDice(a,b){const A=extWordSet(a),B=extWordSet(b);if(!A.size||!B.size)return 0;let i=0;for(const w of A)if(B.has(w))i++;return (2*i)/(A.size+B.size);}
+function extSub(a,b){const na=extNormalize(a),nb=extNormalize(b);if(!na||!nb)return 0;return (na.includes(nb)||nb.includes(na))?0.25:0;}
+function extBestMatch(cleanDesc){
+  let best=null,bestScore=0;
+  for(const c of state.clientes){
+    const nomes=[c.nome, ...((honExtAliases&&honExtAliases[safeKey(c.nome)])||[])];
+    for(const n of nomes){
+      const s=extDice(cleanDesc,n)+extSub(cleanDesc,n);
+      if(s>bestScore){bestScore=s;best=c;}
+    }
+  }
+  return {client:best, score:bestScore};
+}
+function extTxId(d,desc,m){
+  const s=d+'|'+desc+'|'+m;
+  let h1=0xdeadbeef^s.length, h2=0x41c6ce57^s.length;
+  for(let i=0;i<s.length;i++){
+    const ch=s.charCodeAt(i);
+    h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677);
+  }
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return 'tx_'+(4294967296*(2097151&h2)+(h1>>>0)).toString(36);
+}
+function extParseDateBR(d){ if(/^\d{2}-\d{2}-\d{4}$/.test(d)){const [dd,mm,yy]=d.split('-');return new Date(+yy,+mm-1,+dd);} return new Date(d); }
+
+function computeIntervaloTxt(){
+  const todasDatas=Object.values(honExtProcessed).map(t=>extParseDateBR(t.data)).filter(d=>!isNaN(d));
+  if(!todasDatas.length) return '';
+  const min=new Date(Math.min(...todasDatas)), max=new Date(Math.max(...todasDatas));
+  return `Período coberto (todas as importações): ${min.toLocaleDateString('pt-PT')} a ${max.toLocaleDateString('pt-PT')}.`;
+}
+
+// Reconstrói a lista agrupada por cliente diretamente do registo persistente (honExtProcessed).
+// recentIds (opcional): Set de ids importados agora mesmo, só para destacar "novo" no visual.
+function buildResultadoFromProcessed(recentIds){
+  const porCliente={}, semIdentificar=[];
+  Object.keys(honExtProcessed).forEach(id=>{
+    const t=honExtProcessed[id];
+    const item={id, data:t.data, desc:t.desc, montante:t.montante, novo: !!(recentIds && recentIds.has(id))};
+    if(t.cliente){ if(!porCliente[t.cliente]) porCliente[t.cliente]=[]; porCliente[t.cliente].push(item); }
+    else semIdentificar.push(item);
+  });
+  return {porCliente, semIdentificar};
+}
+
+async function openImportExtrato(){
+  document.getElementById('impExtFile').value='';
+  document.getElementById('impExtStatus').textContent='A carregar registos guardados…';
+  openModal('modalImportExtrato');
+  if(honExtProcessed===null) honExtProcessed = await fbGet('/honExtProcessed') || {};
+  if(honExtAliases===null) honExtAliases = await fbGet('/honExtAliases') || {};
+
+  const total=Object.keys(honExtProcessed).length;
+  if(total===0){
+    document.getElementById('impExtStatus').textContent='Ainda não há nenhum registo — importe um extrato para começar.';
+    document.getElementById('impExtFiltroWrap').style.display='none';
+    extResultado=null;
+    return;
+  }
+  const built=buildResultadoFromProcessed(null);
+  extResultado={...built, novas:0, jaRegistadas:total, intervaloTxt:computeIntervaloTxt()};
+  extFiltro='TODOS';
+  document.getElementById('impExtStatus').textContent=
+    `${total} transferência(s) no registo, de importações anteriores. ${extResultado.intervaloTxt} Pode consultar, filtrar, imprimir ou atribuir cliente sem precisar de importar de novo.`;
+  document.getElementById('impExtFiltroWrap').style.display='block';
+  renderFiltroExtrato();
+  renderRevisaoExtrato();
+}
+
+async function gerarRelatorioExtrato(){
+  const f=document.getElementById('impExtFile').files[0];
+  if(!f){ document.getElementById('impExtStatus').textContent='Escolha um ficheiro primeiro.'; return; }
+  if(honExtProcessed===null) honExtProcessed = await fbGet('/honExtProcessed') || {};
+  if(honExtAliases===null) honExtAliases = await fbGet('/honExtAliases') || {};
+
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
+
+      // Procura o cabeçalho nas primeiras linhas (alguns extratos têm título/linha
+      // em branco antes das colunas — ex: "Listagem de Movimentos" + linha vazia),
+      // em vez de assumir sempre que está na 1ª linha.
+      let cab=null;
+      for(let i=0;i<Math.min(10,rows.length);i++){
+        const c=detectarColunasExtrato(rows[i]||[]);
+        if(c.colData!==-1 && c.colDesc!==-1 && c.colMontante!==-1){ cab={linha:i, ...c}; break; }
+      }
+      if(!cab){
+        document.getElementById('impExtStatus').textContent=
+          'Não consegui identificar as colunas Data/Descrição/Montante nas primeiras linhas deste ficheiro. Confirme que os cabeçalhos têm esses nomes (ex: "Data valor", "Descrição", "Montante").';
+        return;
+      }
+      const {colData, colDesc, colMontante}=cab;
+
+      const novosProcessados={};
+      let novas=0, jaRegistadas=0, ignoradas=0;
+
+      for(let i=cab.linha+1;i<rows.length;i++){
+        const r=rows[i]; if(!r) continue;
+        const dataStr=String(r[colData]||'').trim();
+        const desc=String(r[colDesc]||'').trim();
+        const montante=parseFloat(String(r[colMontante]||'0').replace(',','.'));
+        if(!dataStr||!desc||isNaN(montante)||montante<=0){ ignoradas++; continue; }
+        const id=extTxId(dataStr,desc,montante);
+        if(honExtProcessed[id]){ jaRegistadas++; continue; } // já está no registo — nada a fazer
+
+        novas++;
+        const clean=extLimparDesc(desc);
+        const match=extBestMatch(clean);
+        const clienteNome=(match.client && match.score>=0.5) ? match.client.nome : null;
+        novosProcessados[id]={data:dataStr, desc, montante, cliente:clienteNome};
+      }
+
+      if(Object.keys(novosProcessados).length){
+        Object.assign(honExtProcessed, novosProcessados);
+        fbSet('/honExtProcessed', honExtProcessed);
+      }
+
+      const intervaloTxt=computeIntervaloTxt();
+      document.getElementById('impExtStatus').textContent=
+        `${novas} nova(s) · ${jaRegistadas} já constavam do registo. ${intervaloTxt}`;
+
+      const recentIds=new Set(Object.keys(novosProcessados));
+      const built=buildResultadoFromProcessed(recentIds);
+      extResultado={...built, novas, jaRegistadas, intervaloTxt};
+      extFiltro='TODOS';
+      document.getElementById('impExtFiltroWrap').style.display='block';
+      renderFiltroExtrato();
+      renderRevisaoExtrato();
+    }catch(err){ document.getElementById('impExtStatus').textContent='Erro ao ler ficheiro: '+err.message; }
+  };
+  reader.readAsBinaryString(f);
+}
+
+function renderFiltroExtrato(){
+  const sel=document.getElementById('impExtFiltro');
+  const nomes=Object.keys(extResultado.porCliente).sort((a,b)=>a.localeCompare(b));
+  let h=`<option value="TODOS">— Relatório completo (${nomes.length} clientes) —</option>`;
+  nomes.forEach(n=>{ h+=`<option value="${n.replace(/"/g,'&quot;')}"${extFiltro===n?' selected':''}>${n} (${extResultado.porCliente[n].length})</option>`; });
+  if(extResultado.semIdentificar.length) h+=`<option value="SEMIDENT"${extFiltro==='SEMIDENT'?' selected':''}>⚠️ Sem cliente identificado (${extResultado.semIdentificar.length})</option>`;
+  sel.innerHTML=h;
+  sel.value=extFiltro;
+}
+
+function onExtFiltroChange(val){ extFiltro=val; renderRevisaoExtrato(); }
+
+function renderRevisaoExtrato(){
+  const el=document.getElementById('impExtRevisao');
+  if(!extResultado){ el.innerHTML=''; return; }
+
+  function opcoesClientes(atual){
+    return state.clientes.map(c=>`<option value="${c.nome.replace(/"/g,'&quot;')}"${c.nome===atual?' selected':''}>${c.nome}</option>`).join('');
+  }
+  function linhaControlos(it, atual){
+    return `<select id="mv_${it.id}" style="min-width:180px"><option value="">— sem cliente —</option>${opcoesClientes(atual)}</select>
+      <button class="btn-primary" style="font-size:11px;padding:4px 8px;margin-left:4px" onclick="extMoverCliente('${it.id}', document.getElementById('mv_${it.id}').value)">${atual?'Corrigir':'Gravar'}</button>
+      <button class="btn-danger" style="font-size:11px;padding:4px 8px;margin-left:4px" onclick="extRemoverItem('${it.id}')" title="Remover do registo (ex: não é honorário)">🗑️</button>`;
+  }
+
+  if(extFiltro==='SEMIDENT'){
+    const itens=extResultado.semIdentificar;
+    if(itens.length===0){ el.innerHTML='<div style="padding:14px;color:var(--text4)">Sem transferências por identificar.</div>'; return; }
+    let h='<table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th><th colspan="2">Atribuir / remover</th></tr></thead><tbody>';
+    itens.forEach(it=>{
+      h+=`<tr>
+        <td>${it.data}</td>
+        <td style="max-width:220px">${it.desc}</td>
+        <td style="text-align:right">€ ${it.montante.toFixed(2)}</td>
+        <td>${it.novo?'<span class="tag-novo">novo</span>':'<span class="tag-visto">já visto</span>'}</td>
+        <td colspan="2">${linhaControlos(it,'')}</td>
+      </tr>`;
+    });
+    h+='</tbody></table>';
+    el.innerHTML=h;
+    return;
+  }
+
+  if(extFiltro==='TODOS'){
+    const nomes=Object.keys(extResultado.porCliente).sort((a,b)=>a.localeCompare(b));
+    let h='<table><thead><tr><th>Cliente</th><th style="text-align:center">Transferências</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    nomes.forEach(n=>{
+      const itens=extResultado.porCliente[n];
+      const total=itens.reduce((s,i)=>s+i.montante,0);
+      h+=`<tr><td style="cursor:pointer;color:var(--blue)" onclick="onExtFiltroChange('${n.replace(/'/g,"\\'")}');document.getElementById('impExtFiltro').value='${n.replace(/'/g,"\\'")}'">${n}</td><td style="text-align:center">${itens.length}</td><td style="text-align:right">€ ${total.toFixed(2)}</td></tr>`;
+    });
+    h+='</tbody></table><div style="font-size:11px;color:var(--text4);margin-top:6px">Clique no nome de um cliente para ver, corrigir ou imprimir só as transferências dele.</div>';
+    el.innerHTML=h;
+    return;
+  }
+
+  // cliente específico — permite corrigir se estiver mal atribuído, ou remover
+  const itens=extResultado.porCliente[extFiltro]||[];
+  if(itens.length===0){ el.innerHTML='<div style="padding:14px;color:var(--text4)">Sem transferências para este cliente.</div>'; return; }
+  let h='<table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th><th colspan="2">Corrigir cliente / remover</th></tr></thead><tbody>';
+  itens.slice().sort((a,b)=>extParseDateBR(a.data)-extParseDateBR(b.data)).forEach(it=>{
+    h+=`<tr>
+      <td>${it.data}</td>
+      <td style="max-width:220px">${it.desc}</td>
+      <td style="text-align:right">€ ${it.montante.toFixed(2)}</td>
+      <td>${it.novo?'<span class="tag-novo">novo</span>':'<span class="tag-visto">já visto</span>'}</td>
+      <td colspan="2">${linhaControlos(it, extFiltro)}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+
+// Move uma transferência (id) para outro cliente (ou para "sem identificar" se novoCliente for vazio),
+// onde quer que ela esteja neste momento — corrige atribuições erradas em qualquer vista.
+function extMoverCliente(itemId, novoCliente){
+  let item=null;
+  for(const nome of Object.keys(extResultado.porCliente)){
+    const arr=extResultado.porCliente[nome];
+    const idx=arr.findIndex(i=>i.id===itemId);
+    if(idx>=0){ item=arr.splice(idx,1)[0]; if(arr.length===0) delete extResultado.porCliente[nome]; break; }
+  }
+  if(!item){
+    const idx=extResultado.semIdentificar.findIndex(i=>i.id===itemId);
+    if(idx>=0) item=extResultado.semIdentificar.splice(idx,1)[0];
+  }
+  if(!item) return;
+
+  if(novoCliente){
+    if(!extResultado.porCliente[novoCliente]) extResultado.porCliente[novoCliente]=[];
+    extResultado.porCliente[novoCliente].push(item);
+  } else {
+    extResultado.semIdentificar.push(item);
+  }
+
+  if(honExtProcessed[itemId]){
+    honExtProcessed[itemId].cliente=novoCliente||null;
+    fbSet('/honExtProcessed/'+itemId, honExtProcessed[itemId]);
+  }
+  if(novoCliente){
+    const key=safeKey(novoCliente);
+    if(!honExtAliases[key]) honExtAliases[key]=[];
+    const clean=extLimparDesc(item.desc);
+    if(clean && extNormalize(clean)!==extNormalize(novoCliente) && !honExtAliases[key].includes(clean)){
+      honExtAliases[key].push(clean);
+      fbSet('/honExtAliases/'+key, honExtAliases[key]);
+    }
+  }
+
+  document.getElementById('impExtStatus').textContent=novoCliente?`Corrigido: agora atribuído a ${novoCliente}.`:'Transferência voltou para "sem identificar".';
+  renderFiltroExtrato();
+  renderRevisaoExtrato();
+}
+
+// Remove definitivamente uma transferência do registo (ex: não é um recebimento de honorários)
+function extRemoverItem(itemId){
+  if(!confirm('Remover esta transferência do registo? Deixa de aparecer em qualquer relatório.')) return;
+  for(const nome of Object.keys(extResultado.porCliente)){
+    const arr=extResultado.porCliente[nome];
+    const idx=arr.findIndex(i=>i.id===itemId);
+    if(idx>=0){ arr.splice(idx,1); if(arr.length===0) delete extResultado.porCliente[nome]; break; }
+  }
+  const idx2=extResultado.semIdentificar.findIndex(i=>i.id===itemId);
+  if(idx2>=0) extResultado.semIdentificar.splice(idx2,1);
+
+  delete honExtProcessed[itemId];
+  fbSet('/honExtProcessed/'+itemId, null);
+
+  document.getElementById('impExtStatus').textContent='Transferência removida do registo.';
+  renderFiltroExtrato();
+  renderRevisaoExtrato();
+}
+
+function extImprimir(){
+  if(!extResultado) return;
+  if(extFiltro==='TODOS'){
+    abrirJanelaRelatorioExtrato(extResultado.porCliente, extResultado.semIdentificar, extResultado.novas, extResultado.jaRegistadas, extResultado.intervaloTxt);
+  } else if(extFiltro==='SEMIDENT'){
+    abrirJanelaRelatorioExtrato({}, extResultado.semIdentificar, extResultado.novas, extResultado.jaRegistadas, extResultado.intervaloTxt);
+  } else {
+    abrirJanelaRelatorioExtrato({[extFiltro]: extResultado.porCliente[extFiltro]||[]}, [], extResultado.novas, extResultado.jaRegistadas, extResultado.intervaloTxt);
+  }
+}
+
+function abrirJanelaRelatorioExtrato(porCliente, semIdentificar, novas, jaRegistadas, intervaloTxt){
+  const hoje=new Date();
+  const dataHoje=hoje.toLocaleDateString('pt-PT');
+  const nomesClientes=Object.keys(porCliente).sort((a,b)=>a.localeCompare(b));
+
+  function secaoCliente(nome, itens, semCliente){
+    itens.sort((a,b)=>extParseDateBR(a.data)-extParseDateBR(b.data));
+    const total=itens.reduce((s,i)=>s+i.montante,0);
+    let linhas=itens.map(i=>`<tr><td>${i.data}</td><td>${i.desc}</td><td class="col-v">€ ${i.montante.toFixed(2)}</td><td class="col-tag">${i.novo?'<span class="pt-novo">novo</span>':'<span class="pt-visto">já visto</span>'}</td><td class="col-ck">☐</td></tr>`).join('');
+    return `<div class="cli-bloco${semCliente?' sem-cliente':''}">
+      <div class="cli-header">${semCliente?'⚠️ Sem cliente identificado':nome} <span class="cli-total">${itens.length} transf. · € ${total.toFixed(2)}</span></div>
+      <table><thead><tr><th>Data</th><th>Descrição (extrato)</th><th class="col-v">Valor</th><th class="col-tag"></th><th class="col-ck">Registado</th></tr></thead>
+      <tbody>${linhas}</tbody></table>
+    </div>`;
+  }
+
+  let corpo='';
+  nomesClientes.forEach(nome=>{ corpo+=secaoCliente(nome, porCliente[nome], false); });
+  if(semIdentificar.length) corpo+=secaoCliente(null, semIdentificar, true);
+
+  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+<title>Relatório de Transferências por Cliente · ${dataHoje}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Arial',sans-serif;font-size:11px;color:#1a1f2e;background:#fff;padding:16px 20px;}
+  .rel-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;border-bottom:2px solid #1a6fc4;padding-bottom:10px;}
+  .rel-title{font-size:15px;font-weight:700;}
+  .rel-sub{font-size:11px;color:#6b7585;margin-top:3px;}
+  .rel-meta{text-align:right;font-size:10px;color:#6b7585;}
+  .rel-stats{display:flex;gap:16px;margin-bottom:14px;}
+  .stat-box{background:#f7f8fa;border:1px solid #d4d8de;border-radius:4px;padding:6px 12px;font-size:11px;}
+  .stat-box strong{font-size:14px;display:block;color:#1a6fc4;}
+  .cli-bloco{margin-bottom:16px;break-inside:avoid;}
+  .cli-header{background:#1a6fc4;color:#fff;padding:6px 10px;font-weight:700;font-size:12px;display:flex;justify-content:space-between;border-radius:4px 4px 0 0;}
+  .cli-bloco.sem-cliente .cli-header{background:#d97706;}
+  .cli-total{font-weight:400;font-size:10.5px;}
+  table{width:100%;border-collapse:collapse;font-size:10.5px;}
+  th{background:#eef1f6;padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:#3d4a5c;}
+  td{padding:5px 8px;border-bottom:1px solid #e8eaed;}
+  .col-v{text-align:right;width:90px;}
+  .col-tag{width:64px;text-align:center;}
+  .pt-novo{background:#e7f6ee;color:#16a34a;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:700;}
+  .pt-visto{background:#eef1f6;color:#6b7585;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:600;}
+  .col-ck{text-align:center;width:70px;font-size:13px;}
+  .rel-footer{margin-top:18px;font-size:9px;color:#a0aab8;border-top:1px solid #e8eaed;padding-top:8px;display:flex;justify-content:space-between;}
+  @media print{body{padding:8px 12px;} .no-print{display:none;} .cli-bloco{page-break-inside:avoid;}}
+</style></head><body>
+<div class="no-print" style="margin-bottom:12px">
+  <button onclick="window.print()" style="padding:7px 16px;background:#1a6fc4;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">🖨️ Imprimir / Guardar PDF</button>
+  <button onclick="window.close()" style="margin-left:8px;padding:7px 16px;background:#f7f8fa;border:1px solid #d4d8de;border-radius:4px;cursor:pointer;font-size:12px">✕ Fechar</button>
+</div>
+<div class="rel-header">
+  <div>
+    <div class="rel-title">Dafilgest · Transferências por Cliente — extrato bancário</div>
+    <div class="rel-sub">Para registo manual no mapa de avenças</div>
+  </div>
+  <div class="rel-meta">Impresso em ${dataHoje}<br>${intervaloTxt}</div>
+</div>
+<div class="rel-stats">
+  <div class="stat-box"><strong>${nomesClientes.length}</strong>Clientes com transferências</div>
+  <div class="stat-box"><strong style="color:#16a34a">${novas}</strong>Novas neste relatório</div>
+  <div class="stat-box"><strong style="color:#6b7585">${jaRegistadas}</strong>Já incluídas antes (ignoradas)</div>
+  ${semIdentificar.length?`<div class="stat-box"><strong style="color:#d97706">${semIdentificar.length}</strong>Sem cliente identificado</div>`:''}
+</div>
+${corpo}
+<div class="rel-footer">
+  <span>Dafilgest Gab. de Contabilidade Unipessoal Lda · NIF 505403447</span>
+  <span>Contabilista Certificado — Inscrito na OCC 46003</span>
+</div>
+</body></html>`;
+
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(html);
+  w.document.close();
+}
+
+
+// ── ARRANQUE / POLLING ──
+let pollingTimer=null;
+let lastHash='';
+
+async function startApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  const [meta, rec, honExtP, honExtA] = await Promise.all([
+    fbGet('/meta'), fbGet('/rec'), fbGet('/honExtProcessed'), fbGet('/honExtAliases')
+  ]);
+  setFB(meta!==null || rec!==null);
+  if(meta && meta.clientes) state.clientes = Array.isArray(meta.clientes)?meta.clientes:Object.values(meta.clientes);
+  state.rec = rec || {};
+  honExtProcessed = honExtP || {};
+  honExtAliases = honExtA || {};
+  renderREC();
+  lastHash = JSON.stringify({meta,rec,honExtP,honExtA});
+  startPolling();
+}
+
+function startPolling(){
+  stopPolling();
+  pollingTimer = setInterval(pollFirebase, 8000);
+}
+function stopPolling(){
+  if(pollingTimer){ clearInterval(pollingTimer); pollingTimer=null; }
+}
+
+async function pollFirebase(){
+  try{
+    const [meta, rec, honExtP, honExtA] = await Promise.all([
+      fbGet('/meta'), fbGet('/rec'), fbGet('/honExtProcessed'), fbGet('/honExtAliases')
+    ]);
+    const newHash = JSON.stringify({meta,rec,honExtP,honExtA});
+    if(newHash !== lastHash && lastHash !== ''){
+      if(meta && meta.clientes) state.clientes = Array.isArray(meta.clientes)?meta.clientes:Object.values(meta.clientes);
+      if(rec) state.rec = rec;
+      if(honExtP) honExtProcessed = honExtP;
+      if(honExtA) honExtAliases = honExtA;
+      // não re-renderiza por cima de um modal aberto, para não interromper edição
+      if(!document.querySelector('.modal-overlay.open')) renderREC();
+      setFB(true);
+    }
+    lastHash = newHash;
+  }catch{ setFB(false); }
+}
+
+document.getElementById('loginPass').focus();
+</script>
+<script>window.addEventListener('load',()=>{ if(window.PROCDB&&PROCDB.ligado()) doLogin(); });</script>
+</body>
+</html>

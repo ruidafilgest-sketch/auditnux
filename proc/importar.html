@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<script src="procdb.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Importar Mapas 2024 — Dafilgest</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#eef0f3;color:#1a1f2e;font-size:13px;}
+
+/* ── TOPBAR ── */
+.topbar{background:#1a2a3d;color:#fff;padding:0 16px;height:44px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:13px;font-weight:700;}
+.topbar a{color:rgba(255,255,255,.6);font-size:11px;text-decoration:none;}
+.topbar a:hover{color:#fff;}
+
+/* ── LAYOUT ── */
+.main{max-width:1100px;margin:0 auto;padding:16px;}
+.steps{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.step{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;background:#fff;border:1px solid #d4d8de;color:#6b7585;}
+.step.active{background:#1a6fc4;color:#fff;border-color:#1a6fc4;}
+.step.done{background:#f0fdf4;color:#16a34a;border-color:#86efac;}
+.step-num{width:18px;height:18px;border-radius:50%;background:currentColor;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+.step.active .step-num{background:#fff;color:#1a6fc4;}
+.step.done .step-num{background:#16a34a;color:#fff;}
+
+/* ── CARD ── */
+.card{background:#fff;border-radius:10px;border:1px solid #e8eaed;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;margin-bottom:4px;}
+.card-sub{font-size:11px;color:#6b7585;margin-bottom:16px;}
+
+/* ── EMPRESA / ANO SELECT ── */
+.config-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:11px;font-weight:600;color:#3d4a5c;text-transform:uppercase;letter-spacing:.5px;}
+.fg select,.fg input{padding:7px 10px;border:1.5px solid #d4d8de;border-radius:5px;outline:none;font-size:13px;min-width:200px;}
+.fg select:focus,.fg input:focus{border-color:#1a6fc4;}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{border:2px dashed #d4d8de;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all .15s;background:#f7f8fa;}
+.upload-zone:hover,.upload-zone.drag{border-color:#1a6fc4;background:#e8f1fb;}
+.upload-zone input{display:none;}
+.uz-icon{font-size:32px;margin-bottom:8px;}
+.uz-title{font-size:14px;font-weight:600;color:#1a2a3d;margin-bottom:4px;}
+.uz-sub{font-size:11px;color:#6b7585;}
+.uz-files{margin-top:12px;display:flex;flex-direction:column;gap:4px;}
+.uz-file{font-size:11px;background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:4px;padding:3px 8px;display:inline-flex;align-items:center;gap:6px;}
+
+/* ── TABELA DE REVISÃO ── */
+.rev-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.rev-stats{display:flex;gap:10px;flex-wrap:wrap;}
+.stat-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;}
+.sp-total{background:#e8f1fb;color:#1a6fc4;}
+.sp-ok{background:#f0fdf4;color:#16a34a;}
+.sp-warn{background:#fffbeb;color:#d97706;}
+.sp-skip{background:#f7f8fa;color:#6b7585;}
+
+.tbl-wrap{overflow-x:auto;border:1px solid #e8eaed;border-radius:8px;max-height:500px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:#1a2a3d;color:#fff;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;position:sticky;top:0;z-index:1;}
+td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
+tr:hover td{background:#f7f9fc;}
+tr.row-skip td{background:#fafafa;color:#a0aab8;}
+tr.row-warn td{background:#fffbeb;}
+tr.row-ok td{background:#fafffe;}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+td input[type=text],td input[type=number]{border:1px solid #d4d8de;border-radius:4px;padding:3px 6px;font-size:11px;width:100%;outline:none;}
+td input:focus{border-color:#1a6fc4;}
+td select{border:1px solid #d4d8de;border-radius:4px;padding:3px 4px;font-size:11px;outline:none;}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;}
+.b-ok{background:#f0fdf4;color:#16a34a;border:1px solid #86efac;}
+.b-warn{background:#fffbeb;color:#d97706;border:1px solid #fcd34d;}
+.b-skip{background:#f7f8fa;color:#6b7585;border:1px solid #d4d8de;}
+.b-dep{background:#e8f1fb;color:#1a6fc4;border:1px solid #c5d9f1;}
+
+/* ── BOTÕES ── */
+.btn{padding:8px 16px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all .12s;}
+.btn-primary{background:#1a6fc4;color:#fff;}
+.btn-primary:hover{background:#1560ad;}
+.btn-success{background:#16a34a;color:#fff;}
+.btn-success:hover{background:#15803d;}
+.btn-secondary{background:#f7f8fa;color:#3d4a5c;border:1px solid #d4d8de;}
+.btn-secondary:hover{background:#e8eaed;}
+.btn-danger{background:#dc2626;color:#fff;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+
+/* ── ACÇÕES DE LINHA ── */
+.row-actions{display:flex;gap:4px;}
+
+/* ── PROGRESSO ── */
+.progress-bar{background:#e8eaed;border-radius:4px;height:6px;overflow:hidden;margin:8px 0;}
+.progress-fill{background:#1a6fc4;height:100%;border-radius:4px;transition:width .3s;}
+
+/* ── RESULTADO FINAL ── */
+.result-box{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:20px;text-align:center;}
+.result-box h2{font-size:18px;font-weight:700;color:#16a34a;margin-bottom:8px;}
+.result-box p{font-size:12px;color:#3d4a5c;}
+
+/* ── ALERTA ── */
+.alert{border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;font-size:12px;}
+.alert-info{background:#e8f1fb;border:1px solid #c5d9f1;color:#1a3a5c;}
+.alert-warn{background:#fffbeb;border:1px solid #fcd34d;color:#78350f;}
+
+/* ── FOOTER ── */
+.footer{text-align:center;padding:20px;font-size:10px;color:#a0aab8;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📥 Importar Mapas de Depreciações 2024</h1>
+  <a href="ativos.html">← Ativos Fixos</a>
+</div>
+
+<div class="main">
+
+  <!-- PASSOS -->
+  <div class="steps">
+    <div class="step active" id="s1"><span class="step-num">1</span> Configurar</div>
+    <div class="step" id="s2"><span class="step-num">2</span> Carregar Excel</div>
+    <div class="step" id="s3"><span class="step-num">3</span> Rever linha a linha</div>
+    <div class="step" id="s4"><span class="step-num">4</span> Confirmar e gravar</div>
+  </div>
+
+  <!-- PASSO 1 — CONFIGURAR -->
+  <div id="passo1">
+    <div class="card">
+      <div class="card-title">Passo 1 — Configurar</div>
+      <div class="card-sub">Selecione a empresa e o exercício antes de carregar os ficheiros.</div>
+
+      <div class="config-row">
+        <div class="fg">
+          <label>Empresa *</label>
+          <select id="cfg-empresa">
+            <option value="">— Selecionar —</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Exercício (Ano 0)</label>
+          <select id="cfg-ano">
+            <option value="2024" selected>2024</option>
+            <option value="2023">2023</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>NIF da Empresa</label>
+          <input type="text" id="cfg-nif" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <span>Os mapas importados ficam marcados como <strong>Migração 2024 (Ano 0)</strong>. Os cálculos de 2025 em diante são feitos automaticamente a partir deste saldo.</span>
+      </div>
+
+      <button class="btn btn-primary" onclick="irPasso2()">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- PASSO 2 — CARREGAR -->
+  <div id="passo2" style="display:none">
+    <div class="card">
+      <div class="card-title">Passo 2 — Carregar ficheiros Excel</div>
+      <div class="card-sub">Carregue todos os mapas da empresa de uma vez. Pode seleccionar múltiplos ficheiros (Ctrl+click).</div>
+
+      <div class="upload-zone" id="uz" onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="onDrop(event)">
+        <div class="uz-icon">📊</div>
+        <div class="uz-title">Clique ou arraste os ficheiros Excel aqui</div>
+        <div class="uz-sub">Aceita .xls e .xlsx · Viaturas, Terrenos, Edifícios, Equipamentos, etc.</div>
+        <div class="uz-files" id="uz-files"></div>
+        <input type="file" id="file-input" multiple accept=".xls,.xlsx" onchange="onFileSelect(event)">
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-secondary" onclick="irPasso1()">← Voltar</button>
+        <button class="btn btn-primary" id="btn-processar" onclick="processarFicheiros()" disabled>Processar ficheiros →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSO 3 — REVER -->
+  <div id="passo3" style="display:none">
+    <div class="card">
+      <div class="card-title">Passo 3 — Rever linha a linha</div>
+      <div class="card-sub">Verifique cada bem. Pode editar, corrigir ou excluir linhas antes de gravar.</div>
+
+      <div class="rev-header">
+        <div class="rev-stats">
+          <span class="stat-pill sp-total" id="st-total">0 bens</span>
+          <span class="stat-pill sp-ok" id="st-ok">0 OK</span>
+          <span class="stat-pill sp-warn" id="st-warn">0 verificar</span>
+          <span class="stat-pill sp-skip" id="st-skip">0 excluídos</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="incluirTodos()">✓ Incluir todos</button>
+          <button class="btn btn-secondary btn-sm" onclick="excluirDepTotais()">⊖ Excluir totalmente depreciados</button>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table id="rev-table">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Ficheiro</th>
+              <th style="min-width:180px">Descrição</th>
+              <th>Código DR25</th>
+              <th>Ano</th>
+              <th class="num">V. Aquisição (€)</th>
+              <th class="num">Taxa %</th>
+              <th class="num">Dep. Acum. Ant. (€)</th>
+              <th class="num">Dep. 2024 (€)</th>
+              <th class="num">VLC 31/12/2024 (€)</th>
+              <th>Estado</th>
+              <th>Acção</th>
+            </tr>
+          </thead>
+          <tbody id="rev-body"></tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-secondary" onclick="irPasso2()">← Voltar</button>
+        <button class="btn btn-primary" onclick="irPasso4()">Continuar →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSO 4 — CONFIRMAR -->
+  <div id="passo4" style="display:none">
+    <div class="card">
+      <div class="card-title">Passo 4 — Confirmar e gravar</div>
+      <div class="card-sub">Resumo final antes de gravar no Firebase.</div>
+
+      <div id="resumo-final" style="margin-bottom:16px;"></div>
+
+      <div class="alert alert-warn">
+        <span>⚠️</span>
+        <span>Esta operação vai gravar os dados no Firebase. Os bens excluídos na revisão não serão importados. Esta acção <strong>não pode ser desfeita automaticamente</strong>.</span>
+      </div>
+
+      <div class="progress-bar" id="prog-bar" style="display:none">
+        <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+      </div>
+      <div id="prog-msg" style="font-size:11px;color:#6b7585;margin-bottom:10px;display:none"></div>
+
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="irPasso3()">← Rever</button>
+        <button class="btn btn-success" id="btn-gravar" onclick="gravarFirebase()">💾 Gravar no Firebase</button>
+      </div>
+    </div>
+
+    <div id="result-final" style="display:none">
+      <div class="result-box">
+        <h2>✅ Importação concluída!</h2>
+        <p id="result-msg"></p>
+        <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;">
+          <a href="ativos.html" class="btn btn-primary">Ver Ativos Fixos →</a>
+          <button class="btn btn-secondary" onclick="novaImportacao()">+ Nova importação</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">Dafilgest · Contabilista Certificado — Inscrito na OCC 46003 · © Rui Gonçalves</div>
+
+<script>
+// ── CONFIGURAÇÃO ──────────────────────────────────────────────
+const FB_URL  = 'https://dafilgest-interno-default-rtdb.europe-west1.firebasedatabase.app';
+const FB_PATH = '/dafilgest/ativos';
+
+// Lista de empresas
+const EMPRESAS = [{"num":1,"nome":"1966 A Evolução do Parquet Unipessoal, Lda."},{"num":2,"nome":"ACOLHINICIATIVA UNIPESSOAL LDA"},{"num":3,"nome":"Adão Carlos Ferreira Pereira"},{"num":4,"nome":"Agostinho Eduardo Silva Magalhães"},{"num":5,"nome":"Albino Ricardo Carvalho Unipessoal, Lda"},{"num":6,"nome":"Alcina de Jesus Pereira Alves"},{"num":7,"nome":"Alesckdoom Unipessoal,Lda"},{"num":8,"nome":"ANA CRISTINA FERREIRA DOS SANTOS"},{"num":9,"nome":"André Filipe de Oliveira Moutas Macedo"},{"num":10,"nome":"André Ribas Ribeiro Unipessoal, Lda."},{"num":11,"nome":"Angela Beatriz Gomes da Silva"},{"num":12,"nome":"Antonio Miguel Costa Silva"},{"num":13,"nome":"ARMINDA ALVES BAPTISTA"},{"num":14,"nome":"ARMINDO FERNANDO PINTO MONTEIRO"},{"num":15,"nome":"AROMA ASSIDUO LAVANDARIAS SELF SERV.LDA."},{"num":16,"nome":"Augusto Leite da Costa"},{"num":17,"nome":"Bruno António de Oliveira Moutas Macedo"},{"num":18,"nome":"Calculo Vibrante Unipessoal,Lda"},{"num":19,"nome":"Carlos Ferreira Magalhães"},{"num":20,"nome":"Carlos Silva & Rui Silva - Construções e Remodelações Lda"},{"num":21,"nome":"CASUAL E BREVE CONSTRUÇÕES UNIPESSOAL,LDA"},{"num":22,"nome":"CONSTRUÇÕES PEDRO VAZ FERREIRA LDA"},{"num":23,"nome":"CRISTINA MOITA UNIPESSOAL, LDA."},{"num":24,"nome":"Daniel Jose da Costa Ferreira"},{"num":25,"nome":"Diamantino Costa Alonso Lda"},{"num":26,"nome":"DIGNIDADE GARRIDA TRANSPORTES UNIPESSOAL LDA"},{"num":27,"nome":"Doce Forum Unipessoal, Lda"},{"num":28,"nome":"ENJOY VIEW GESTÃO E ADMINISTRAÇÃO DE BENS S A"},{"num":29,"nome":"Espírito Inalterável, Lda"},{"num":30,"nome":"EXTRURECICLA,LDA."},{"num":31,"nome":"Fanviclima - Instalações de Climatização, lda"},{"num":32,"nome":"Fernando Brás Martins Unipessoal, Lda"},{"num":33,"nome":"FEYDOM SOFA SYSTEMS UNIPESSOAL LDA"},{"num":34,"nome":"Filipe Silva Lopes Unipessoal, Lda"},{"num":35,"nome":"FRANCISCO DANIEL PEDROSA DA SILVA UNIPESSOAL LDA."},{"num":36,"nome":"H.C Araújo,Lda"},{"num":37,"nome":"Helder Carneiro Unipessoal, Lda"},{"num":38,"nome":"Joao Pedro Coelho Magalhaes"},{"num":39,"nome":"JOAQUIM CUNHA FARIA UNIPESSOAL LDA."},{"num":40,"nome":"Joaquim David Abreu Unipessoal, Lda"},{"num":41,"nome":"João Carlos Ferreira Pereira"},{"num":42,"nome":"João Fernandes de Castro"},{"num":43,"nome":"JP INOVAÇÕES UNIPESSOAL LDA"},{"num":44,"nome":"Justina Pereira da Costa"},{"num":45,"nome":"Luis Manuel Costa Unipessoal,Lda"},{"num":46,"nome":"Manuel António Mendes Ribeiro"},{"num":47,"nome":"Manuel Costa & Filhos Lda."},{"num":48,"nome":"Manuel Fernando Ferreira Gomes"},{"num":49,"nome":"MARCO PAULO RIBEIRO ALVES"},{"num":50,"nome":"MARIA DA CONCEIÇÃO FERREIRA LEAO TORRES"},{"num":51,"nome":"Maria de Fátima Miranda Vaz"},{"num":52,"nome":"MARIA JÚLIA AMORIM DE BARROS"},{"num":53,"nome":"Maria Machado Almeida Unipessoal, Lda"},{"num":54,"nome":"Maria Orquídia Alves Ferreira Silva"},{"num":55,"nome":"MARIANA GABRIELA DE FREITAS GOMES"},{"num":56,"nome":"Marina Fernanda R. Martins"},{"num":57,"nome":"Maura Marlene Ferreira Silva Unipessoal, Lda"},{"num":58,"nome":"Mendes de Freitas, Lda"},{"num":59,"nome":"MOTIVOS UNIVERSAIS UNIPESSOAL,LDA"},{"num":60,"nome":"Nelson Fernando Gomes Silva"},{"num":61,"nome":"Original Flame, Lda"},{"num":62,"nome":"Paulo Joaquim Faria Leite"},{"num":63,"nome":"PAULO JORGE FELIX UNIPESSOAL LDA"},{"num":64,"nome":"Pedro Abreu - Materiais de Construção, Unipessoal Lda"},{"num":65,"nome":"PORTAL FUCHSIA UNIPESSOAL LDA."},{"num":66,"nome":"POSTURA DE FADA UNIPESSOAL,LDA"},{"num":67,"nome":"Ricardo Mendes Fernandes, Unipessoal, Lda"},{"num":68,"nome":"ROGERIO DE SOUSA PEREIRA CARNEIRO"},{"num":69,"nome":"ROSA MARIA GOMES DA SILVA"},{"num":70,"nome":"Sara Maria Costa Oliveira"},{"num":71,"nome":"SOCIEDADE AGRICOLA SOCALCOS DE TRESOURAS LDA"},{"num":72,"nome":"SPORTCALÇAR UNIPESSOAL LDA"},{"num":73,"nome":"Supermercados Vilela, Lda"},{"num":74,"nome":"Susana Filipa Oliveira Novais"},{"num":75,"nome":"Tania Patricia Silva Pinto"},{"num":76,"nome":"TC Mendes Têxtil, Lda"},{"num":77,"nome":"URBOOST CREATIVE SOLUTIONS, LDA"},{"num":78,"nome":"WELCOME GENIALITY UNIPESSOAL, LDA"}];
+
+// ── ESTADO ────────────────────────────────────────────────────
+let state = {
+  passoActual: 1,
+  empresa: null,
+  empKey: null,
+  ano: '2024',
+  ficheiros: [],
+  linhas: [],   // todas as linhas extraídas
+};
+
+// ── INICIALIZAÇÃO ─────────────────────────────────────────────
+window.onload = () => {
+  const sel = document.getElementById('cfg-empresa');
+  EMPRESAS.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.nome;
+    opt.textContent = e.nome;
+    sel.appendChild(opt);
+  });
+};
+
+// ── NAVEGAÇÃO ─────────────────────────────────────────────────
+function setStep(n) {
+  state.passoActual = n;
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById(`passo${i}`);
+    const st = document.getElementById(`s${i}`);
+    if (el) el.style.display = i === n ? '' : 'none';
+    if (st) {
+      st.className = 'step ' + (i < n ? 'done' : i === n ? 'active' : '');
+    }
+  });
+}
+
+function irPasso1() { setStep(1); }
+function irPasso2() { setStep(2); }
+
+function irPasso1() {
+  document.getElementById('result-final').style.display = 'none';
+  setStep(1);
+}
+
+function irPasso2() {
+  setStep(2);
+}
+
+function irPasso3() { setStep(3); }
+
+function irPasso4() {
+  const incluidas = state.linhas.filter(l => !l.excluir);
+  if (incluidas.length === 0) {
+    alert('Não há bens para importar. Verifique se excluiu todos.');
+    return;
+  }
+  renderResumoFinal(incluidas);
+  setStep(4);
+}
+
+// ── PASSO 1 ───────────────────────────────────────────────────
+function irPasso2() {
+  const emp = document.getElementById('cfg-empresa').value;
+  if (!emp) { alert('Selecione uma empresa.'); return; }
+  state.empresa = emp;
+  state.empKey  = emp.replace(/[.#$/\[\]]/g, '_');
+  state.ano     = document.getElementById('cfg-ano').value;
+  setStep(2);
+}
+
+// ── PASSO 2 — UPLOAD ──────────────────────────────────────────
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('uz').classList.remove('drag');
+  adicionarFicheiros(Array.from(e.dataTransfer.files));
+}
+
+function onFileSelect(e) {
+  adicionarFicheiros(Array.from(e.target.files));
+}
+
+function adicionarFicheiros(files) {
+  files.forEach(f => {
+    if (!state.ficheiros.find(x => x.name === f.name)) {
+      state.ficheiros.push(f);
+    }
+  });
+  renderFicheirosList();
+  document.getElementById('btn-processar').disabled = state.ficheiros.length === 0;
+}
+
+const CATEGORIAS = ['Equipamento Básico','Viaturas','Imóveis','Terrenos','Equip. Informático','Mobiliário','Intangíveis','Outros'];
+
+function detectarCategoria(nome) {
+  const n = nome.toLowerCase();
+  if (n.includes('viatur') || n.includes('veic')) return 'Viaturas';
+  if (n.includes('terreno')) return 'Terrenos';
+  if (n.includes('edific') || n.includes('imovel') || n.includes('imov')) return 'Imóveis';
+  if (n.includes('inform') || n.includes('comput')) return 'Equip. Informático';
+  if (n.includes('mobil')) return 'Mobiliário';
+  if (n.includes('intang') || n.includes('softw')) return 'Intangíveis';
+  if (n.includes('eq_bas') || n.includes('equip_bas') || n.includes('basico') || n.includes('básico')) return 'Equipamento Básico';
+  if (n.includes('proder') || n.includes('projec')) return 'Equipamento Básico';
+  if (n.includes('admin') || n.includes('escrit')) return 'Equip. Informático';
+  return 'Equipamento Básico';
+}
+
+function renderFicheirosList() {
+  const el = document.getElementById('uz-files');
+  if (state.ficheiros.length === 0) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `
+    <div style="width:100%;margin-top:8px">
+      <div style="font-size:11px;font-weight:700;color:#1a2a3d;margin-bottom:8px;text-align:left">
+        ${state.ficheiros.length} ficheiro(s) — confirme a categoria de cada um:
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:left">
+        <thead>
+          <tr style="background:#f7f8fa">
+            <th style="padding:5px 8px;border-bottom:1px solid #e8eaed;font-weight:700">Ficheiro</th>
+            <th style="padding:5px 8px;border-bottom:1px solid #e8eaed;font-weight:700">Categoria detectada</th>
+            <th style="padding:5px 8px;border-bottom:1px solid #e8eaed;width:30px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.ficheiros.map((f,i) => {
+            if (!f._categoria) f._categoria = detectarCategoria(f.name);
+            const opts = CATEGORIAS.map(c =>
+              `<option value="${c}" ${c === f._categoria ? 'selected' : ''}>${c}</option>`
+            ).join('');
+            return `<tr style="border-bottom:1px solid #f0f0f0">
+              <td style="padding:5px 8px;color:#3d4a5c;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.name}">
+                <span style="color:#16a34a;margin-right:4px">✓</span>${f.name}
+              </td>
+              <td style="padding:3px 8px">
+                <select onchange="state.ficheiros[${i}]._categoria=this.value"
+                        style="border:1px solid #d4d8de;border-radius:4px;padding:3px 6px;font-size:11px;outline:none;min-width:160px">
+                  ${opts}
+                </select>
+              </td>
+              <td style="padding:5px 8px">
+                <span onclick="removerFicheiro(${i})" style="cursor:pointer;color:#dc2626;font-weight:700">✕</span>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function removerFicheiro(i) {
+  state.ficheiros.splice(i, 1);
+  renderFicheirosList();
+  document.getElementById('btn-processar').disabled = state.ficheiros.length === 0;
+}
+
+// ── PROCESSAMENTO DOS EXCEL ───────────────────────────────────
+function processarFicheiros() {
+  state.linhas = [];
+  let pending = state.ficheiros.length;
+
+  state.ficheiros.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const linhas = parseModelo32(raw, file.name);
+      state.linhas.push(...linhas);
+      pending--;
+      if (pending === 0) {
+        renderRevisao();
+        setStep(3);
+      }
+    };
+    reader.readAsBinaryString(file);
+  });
+}
+
+// ── PARSE MODELO 32 ───────────────────────────────────────────
+function parseModelo32(raw, filename) {
+  // Usar categoria já confirmada pelo utilizador no passo 2
+  const fObj = state.ficheiros.find(f => f.name === filename);
+  let categoria = fObj ? (fObj._categoria || 'Equipamento Básico') : 'Equipamento Básico';
+
+  // Cabeçalhos a ignorar
+  const IGNORAR = ['total geral','a transportar','transporte','periodo de tribut',
+    'descrição dos elem','natureza dos','activos tang','activos intang',
+    'nº de identif','modelo 32','mapa de deprec','quotas const','quotas decresc'];
+
+  const linhas = [];
+
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i];
+    const desc = String(row[4] || '').trim();
+    if (!desc || desc.length < 2) continue;
+
+    // Tentar obter ano e valor
+    let ano = 0, valor = 0;
+    try {
+      ano   = parseInt(String(row[20]).replace(',','.'));
+      valor = parseFloat(String(row[22] || '0').replace(/[€\s]/g,'').replace(',','.'));
+    } catch(e) {}
+
+    if (!(ano > 1900 && valor > 0)) continue;
+
+    const dl = desc.toLowerCase();
+    if (IGNORAR.some(c => dl.includes(c))) continue;
+
+    // Extrair código DR25 das colunas 0-3 (4 dígitos)
+    const c0 = String(row[0]||'').trim();
+    const c1 = String(row[1]||'').trim();
+    const c2 = String(row[2]||'').trim();
+    const c3 = String(row[3]||'').trim();
+    let codDR = '';
+    if (c0 && c1 && c2 && c3 && !isNaN(c0+c1+c2+c3)) {
+      codDR = (c0+c1+c2+c3).padStart(4,'0');
+    }
+
+    // Taxa: col 32 tem taxa %, col 42 também em alguns ficheiros
+    let taxa = parseFloat(String(row[32]||'0').replace(',','.')) || 0;
+    const taxa42 = parseFloat(String(row[42]||'0').replace(',','.')) || 0;
+    if (taxa42 > 0 && taxa === 0) taxa = taxa42;
+
+    // Dep. acumuladas aceites anteriores: col 38
+    const depAcumAnt = parseFloat(String(row[38]||'0').replace(/[€\s]/g,'').replace(',','.')) || 0;
+
+    // Dep. exercício (limite fiscal): col 46
+    let depExerc = parseFloat(String(row[46]||'0').replace(/[€\s]/g,'').replace(',','.')) || 0;
+    // Se col46 = 0 mas taxa > 0 e bem não totalmente depreciado, calcular
+    const vlc2024 = Math.max(0, valor - depAcumAnt - depExerc);
+
+    // Determinar estado
+    let estado = 'OK';
+    let aviso = '';
+    if (taxa === 0 && categoria !== 'Terrenos' && categoria !== 'Imóveis') {
+      estado = 'VERIFICAR';
+      aviso = 'Taxa 0%';
+    }
+    if (depAcumAnt >= valor && depExerc === 0) {
+      estado = 'DEP_TOTAL';
+      aviso = 'Totalmente depreciado';
+    }
+    if (!codDR) {
+      estado = 'VERIFICAR';
+      aviso = (aviso ? aviso + ' · ' : '') + 'Sem código DR25';
+    }
+
+    linhas.push({
+      id: genId(),
+      ficheiro: filename,
+      desc,
+      codDR,
+      ano,
+      valor,
+      taxa,
+      depAcumAnt,
+      depExerc,
+      vlc2024,
+      categoria,
+      estado,
+      aviso,
+      excluir: estado === 'DEP_TOTAL', // sugestão: excluir totalmente depreciados
+    });
+  }
+
+  return linhas;
+}
+
+// ── RENDERIZAR REVISÃO ────────────────────────────────────────
+function renderRevisao() {
+  const body = document.getElementById('rev-body');
+  body.innerHTML = '';
+
+  state.linhas.forEach((l, i) => {
+    const tr = document.createElement('tr');
+    tr.id = `row-${i}`;
+    tr.className = l.excluir ? 'row-skip' : l.estado === 'VERIFICAR' ? 'row-warn' : 'row-ok';
+
+    const estadoBadge = l.excluir
+      ? `<span class="badge b-skip">Excluído</span>`
+      : l.estado === 'DEP_TOTAL'
+        ? `<span class="badge b-dep">Dep. total</span>`
+        : l.estado === 'VERIFICAR'
+          ? `<span class="badge b-warn">⚠ ${l.aviso}</span>`
+          : `<span class="badge b-ok">✓ OK</span>`;
+
+    tr.innerHTML = `
+      <td style="color:#a0aab8;font-size:10px">${i+1}</td>
+      <td style="font-size:10px;color:#6b7585;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.ficheiro}">${l.ficheiro.replace('MAPA_DEPRECIAÇÕES_','').replace('_2024','').replace('.xls','').replace('.xlsx','')}</td>
+      <td><input type="text" value="${escHtml(l.desc)}" onchange="updateLinha(${i},'desc',this.value)" style="min-width:160px"></td>
+      <td><input type="text" value="${l.codDR}" onchange="updateLinha(${i},'codDR',this.value)" style="width:60px"></td>
+      <td><input type="number" value="${l.ano}" onchange="updateLinha(${i},'ano',this.value)" style="width:60px"></td>
+      <td class="num">${fmt(l.valor)}</td>
+      <td class="num">${l.taxa > 0 ? l.taxa + '%' : '<span style="color:#d97706">—</span>'}</td>
+      <td class="num">${fmt(l.depAcumAnt)}</td>
+      <td class="num">${l.depExerc > 0 ? fmt(l.depExerc) : '—'}</td>
+      <td class="num" style="font-weight:600;color:${l.vlc2024 <= 0.01 ? '#16a34a' : '#1a1f2e'}">${l.vlc2024 <= 0.01 ? '✓ 0,00' : fmt(l.vlc2024)}</td>
+      <td>${estadoBadge}</td>
+      <td>
+        <div class="row-actions">
+          ${l.excluir
+            ? `<button class="btn btn-secondary btn-sm" onclick="toggleExcluir(${i},false)">+ Incluir</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="toggleExcluir(${i},true)">✕ Excluir</button>`
+          }
+        </div>
+      </td>`;
+    body.appendChild(tr);
+  });
+
+  actualizarStats();
+}
+
+function updateLinha(i, campo, valor) {
+  state.linhas[i][campo] = valor;
+  // Recalcular VLC se necessário
+  if (campo === 'valor' || campo === 'depAcumAnt' || campo === 'depExerc') {
+    const l = state.linhas[i];
+    l.vlc2024 = Math.max(0, parseFloat(l.valor)||0 - (parseFloat(l.depAcumAnt)||0) - (parseFloat(l.depExerc)||0));
+  }
+}
+
+function toggleExcluir(i, excluir) {
+  state.linhas[i].excluir = excluir;
+  renderRevisao();
+}
+
+function incluirTodos() {
+  state.linhas.forEach(l => l.excluir = false);
+  renderRevisao();
+}
+
+function excluirDepTotais() {
+  state.linhas.forEach(l => { if (l.estado === 'DEP_TOTAL') l.excluir = true; });
+  renderRevisao();
+}
+
+function actualizarStats() {
+  const total  = state.linhas.length;
+  const skip   = state.linhas.filter(l => l.excluir).length;
+  const warn   = state.linhas.filter(l => !l.excluir && l.estado === 'VERIFICAR').length;
+  const ok     = total - skip - warn;
+  document.getElementById('st-total').textContent = `${total} bens`;
+  document.getElementById('st-ok').textContent    = `${ok} OK`;
+  document.getElementById('st-warn').textContent  = `${warn} verificar`;
+  document.getElementById('st-skip').textContent  = `${skip} excluídos`;
+}
+
+// ── PASSO 4 — RESUMO ──────────────────────────────────────────
+function renderResumoFinal(incluidas) {
+  const totalValor = incluidas.reduce((s,l) => s + (parseFloat(l.valor)||0), 0);
+  const totalDepAcum = incluidas.reduce((s,l) => s + (parseFloat(l.depAcumAnt)||0) + (parseFloat(l.depExerc)||0), 0);
+  const totalVLC = incluidas.reduce((s,l) => s + (parseFloat(l.vlc2024)||0), 0);
+  const cats = {};
+  incluidas.forEach(l => { cats[l.categoria] = (cats[l.categoria]||0) + 1; });
+
+  document.getElementById('resumo-final').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:#f7f8fa;border-radius:8px;padding:12px;border:1px solid #e8eaed">
+        <div style="font-size:10px;color:#6b7585;font-weight:700;text-transform:uppercase;margin-bottom:4px">Bens a importar</div>
+        <div style="font-size:22px;font-weight:700;color:#1a6fc4">${incluidas.length}</div>
+        <div style="font-size:10px;color:#6b7585">${state.empresa}</div>
+      </div>
+      <div style="background:#f7f8fa;border-radius:8px;padding:12px;border:1px solid #e8eaed">
+        <div style="font-size:10px;color:#6b7585;font-weight:700;text-transform:uppercase;margin-bottom:4px">Valor bruto total</div>
+        <div style="font-size:16px;font-weight:700">${fmt(totalValor)} €</div>
+      </div>
+      <div style="background:#f7f8fa;border-radius:8px;padding:12px;border:1px solid #e8eaed">
+        <div style="font-size:10px;color:#6b7585;font-weight:700;text-transform:uppercase;margin-bottom:4px">Dep. acum. 31/12/2024</div>
+        <div style="font-size:16px;font-weight:700">${fmt(totalDepAcum)} €</div>
+      </div>
+      <div style="background:#f0fdf4;border-radius:8px;padding:12px;border:1px solid #86efac">
+        <div style="font-size:10px;color:#16a34a;font-weight:700;text-transform:uppercase;margin-bottom:4px">VLC 31/12/2024</div>
+        <div style="font-size:16px;font-weight:700;color:#16a34a">${fmt(totalVLC)} €</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#6b7585;margin-bottom:4px;font-weight:600">Por categoria:</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${Object.entries(cats).map(([c,n]) => `<span class="badge b-dep">${c}: ${n}</span>`).join('')}
+    </div>`;
+}
+
+// ── GRAVAR NO FIREBASE ────────────────────────────────────────
+async function gravarFirebase() {
+  const incluidas = state.linhas.filter(l => !l.excluir);
+  if (incluidas.length === 0) return;
+
+  document.getElementById('btn-gravar').disabled = true;
+  document.getElementById('prog-bar').style.display = '';
+  document.getElementById('prog-msg').style.display = '';
+
+  const updates = {};
+  incluidas.forEach(l => {
+    const id = l.id;
+    updates[id] = {
+      id,
+      descricao: l.desc,
+      cod_dp: l.codDR || '',
+      categoria: l.categoria,
+      data_aquisicao: `${l.ano}-01-01`,
+      valor: parseFloat(l.valor) || 0,
+      taxa: parseFloat(l.taxa) || 0,
+      taxa_max: parseFloat(l.taxa) || 0,
+      dep_acum_migracao: (parseFloat(l.depAcumAnt)||0) + (parseFloat(l.depExerc)||0),
+      dep_acum_ant: parseFloat(l.depAcumAnt) || 0,
+      dep_exercicio_2024: parseFloat(l.depExerc) || 0,
+      metodo: 'QC',
+      snc: getSNC(l.categoria),
+      migrado: 1,
+      estado: 'Ativo',
+      obs: `Importado de ${l.ficheiro} — Migração ${state.ano}`,
+      criado_em: new Date().toISOString(),
+    };
+  });
+
+  document.getElementById('prog-fill').style.width = '30%';
+  document.getElementById('prog-msg').textContent = `A gravar ${incluidas.length} bens no Firebase...`;
+
+  try {
+    const url = `${FB_URL}${FB_PATH}/${state.empKey}/fichas.json`;
+    const r = await fetch(url, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(updates)
+    });
+
+    document.getElementById('prog-fill').style.width = '100%';
+
+    if (r.ok) {
+      document.getElementById('prog-msg').textContent = '✅ Gravado com sucesso!';
+      document.getElementById('result-msg').textContent =
+        `${incluidas.length} bens importados para "${state.empresa}" — exercício ${state.ano}. Pode agora consultar os ativos no módulo Ativos Fixos.`;
+      document.getElementById('result-final').style.display = '';
+      document.getElementById('btn-gravar').style.display = 'none';
+    } else {
+      throw new Error(`HTTP ${r.status}`);
+    }
+  } catch(e) {
+    document.getElementById('prog-msg').textContent = `❌ Erro: ${e.message}`;
+    document.getElementById('btn-gravar').disabled = false;
+  }
+}
+
+function novaImportacao() {
+  state = {passoActual:1, empresa:null, empKey:null, ano:'2024', ficheiros:[], linhas:[]};
+  document.getElementById('uz-files').innerHTML = '';
+  document.getElementById('file-input').value = '';
+  document.getElementById('btn-processar').disabled = true;
+  document.getElementById('result-final').style.display = 'none';
+  document.getElementById('prog-bar').style.display = 'none';
+  document.getElementById('prog-msg').style.display = 'none';
+  document.getElementById('btn-gravar').style.display = '';
+  document.getElementById('btn-gravar').disabled = false;
+  setStep(1);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+function getSNC(cat) {
+  const m = {'Viaturas':'434','Imóveis':'432','Terrenos':'431','Equipamento Básico':'433',
+             'Equip. Informático':'435','Mobiliário':'435','Intangíveis':'443'};
+  return m[cat] || '433';
+}
+
+function fmt(v) {
+  return (parseFloat(v)||0).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2,5);
+}
+</script>
+</body>
+</html>
