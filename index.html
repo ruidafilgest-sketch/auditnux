@@ -645,7 +645,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.17.2';
+const APP_VERSION = '1.19.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -5240,6 +5240,7 @@ function pacoteTrimestral(Y,Yp,to){ to=Math.min(to||Y.maxP,Y.maxP); const qf=Mat
 const MENU_G=[
  {id:'cmd',l:'Gabinete',h:'visão geral e importação',c:'#22D3EE',v:['painel','gabinete','importar']},
  {id:'emp',l:'Empresas',h:'fichas, IES e carteira',c:'#A78BFA',v:['empresas','historico']},
+ {id:'proc',l:'Processamento mensal',h:'IVA, SAF-T, SS, declarações, ativos',c:'#F472B6',v:['proc_int','proc_decl','proc_atv','proc_cal','proc_rec','renomeacao','proc_mig']},
  {id:'fat',l:'Faturação',h:'SAF-T de faturação',c:'#34D399',v:['validacao','iva','correcoes','documentos','artigos','clientes','analises','evolucao','financeiro']},
  {id:'ctb',l:'Contabilidade',h:'SAF-T de contabilidade',c:'#F5B544',v:['contabilidade','apuramento']},
  {id:'out',l:'Saídas e sistema',h:'relatórios, definições e ajuda',c:'#94A3B8',v:['relatorios','definicoes','guia','contas']}];
@@ -5332,6 +5333,140 @@ const _empFichaSel=empFicha; empFicha=async function(nif,after){ await _empFicha
 /* Guia */
 (function(){ if(typeof GUIA==='undefined') return; const c=GUIA.find(x=>x.id==='irc'); if(!c) return;
   c.tp.unshift({t:'Começar as contas de qualquer empresa',q:'Fecho de contas de uma empresa da base, tenha ou não SAF-T de contabilidade carregado.',p:['Clique em <b>Demonstrações & IRC</b> (área Contabilidade).','No passo <b>1 · Balancete</b>, abra a lista <b>Empresa</b>: aparecem todas as empresas da base, separadas em «Com SAF-T de contabilidade» e «Sem SAF-T de contabilidade».','Escolha a empresa. Se tiver SAF-T, o balancete do último ano é carregado logo. Se não tiver, carregue o SAF-T (botão no cartão) ou arraste o balancete em Excel para o cartão ao lado.','Siga os passos: 2 · Existências (existência final e depreciações), 3 · Parâmetros fiscais, 4 · Correções, 5 a 8.','Clique em <b>Guardar</b>.'],d:'Também pode começar pela ficha da empresa (menu Empresas): botão <b>Demonstrações & IRC</b>.',ir:['apuramento','bal']}); })();
+
+/* =========================================================================
+   1.19 — PROCESSAMENTO MENSAL dentro do AuditNux
+   Os módulos do Sistema Interno e das Declarações Fiscais abrem aqui, com a
+   lógica de sempre, mas os dados passam a viver na base do AuditNux (login,
+   regras por espaço). As senhas ficam num COFRE cifrado com uma palavra-passe
+   que só o administrador conhece.
+   ========================================================================= */
+const PROC_MOD=[
+ {v:'proc_int',l:'IVA · SAF-T · DMR · SS',ic:'percent',f:'proc/index.html',db:'interno',d:'Envios de IVA e SAF-T, DMR/DRI, independentes (Segurança Social) e planos da AT — o Sistema Interno de sempre.'},
+ {v:'proc_decl',l:'Declarações fiscais',ic:'file',f:'proc/declaracoes.html',db:'decl',d:'Modelo 22, IES e IRC por empresa: fases, datas, PDFs e previsões.'},
+ {v:'proc_atv',l:'Ativos fixos',ic:'box',f:'proc/ativos.html',db:'interno',d:'Fichas de ativos, depreciações e mapas oficiais.'},
+ {v:'proc_cal',l:'Calendário da equipa',ic:'book',f:'proc/CalendarioFiscal2026.html',db:'interno',d:'Tarefas fiscais do ano por pessoa (Rui, Filipa, Beatriz).'},
+ {v:'proc_rec',l:'Recebimentos',ic:'scale',f:'proc/recebimentos.html',db:'interno',adm:1,d:'Avenças, recebimentos e importação de extratos bancários (só administrador).'},
+ {v:'renomeacao',l:'Renomeação mensal',ic:'file',f:'proc/renomeacao-mensal.html',db:null,d:'Faturas de avenças, guias SS, folhas de férias e DRI/DMR renomeados em lote — tudo no navegador.'},
+ {v:'proc_mig',l:'Migração e cofre',ic:'lock',f:null,db:null,d:'Cofre de senhas, passagem dos dados antigos para o AuditNux, conferência e cópias de segurança.'}];
+PROC_MOD.forEach(m=>VIEWS[m.v]=[m.l,m.d]);
+
+/* ---------- COFRE (AES-GCM 256 · PBKDF2-SHA256 250 000 iterações) ---------- */
+const COFRE={key:null,cfg:null,em:0}; const COFRE_CHK='AuditNux-cofre-v1'; const COFRE_IT=250000;
+const b64=u=>{ let s=''; const a=new Uint8Array(u); for(let i=0;i<a.length;i+=8192) s+=String.fromCharCode.apply(null,a.subarray(i,i+8192)); return btoa(s); };
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function cofreDerive(pw,salt,it){ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:it,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
+async function encWith(key,s){ const iv=crypto.getRandomValues(new Uint8Array(12)); const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(s)); const o=new Uint8Array(12+ct.byteLength); o.set(iv); o.set(new Uint8Array(ct),12); return b64(o); }
+async function decWith(key,s){ const a=unb64(s); const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},key,a.slice(12)); return new TextDecoder().decode(pt); }
+async function cofreCfg(force){ if(COFRE.cfg&&!force) return COFRE.cfg; const d=await wsCol('config').doc('cofre').get(); COFRE.cfg=d.exists?d.data():null; return COFRE.cfg; }
+async function cofreCriar(pw){ const salt=crypto.getRandomValues(new Uint8Array(16)); const key=await cofreDerive(pw,salt,COFRE_IT);
+  const cfg={salt:b64(salt),it:COFRE_IT,chk:await encWith(key,COFRE_CHK),criadoEm:new Date().toISOString(),por:S.oper||''}; await wsCol('config').doc('cofre').set(cfg); COFRE.cfg=cfg; COFRE.key=key; COFRE.em=Date.now(); }
+async function cofreAbrir(pw){ const c=await cofreCfg(true); if(!c) throw new Error('O cofre ainda não foi criado.'); const key=await cofreDerive(pw,unb64(c.salt),c.it||COFRE_IT);
+  try{ if(await decWith(key,c.chk)!==COFRE_CHK) throw 0; }catch(e){ throw new Error('Palavra-passe do cofre incorreta.'); } COFRE.key=key; COFRE.em=Date.now(); }
+function cofreFechar(){ COFRE.key=null; procRecarregar(); }
+document.addEventListener('mousemove',()=>{ if(COFRE.key) COFRE.em=Date.now(); },{passive:true});
+setInterval(()=>{ if(COFRE.key&&Date.now()-COFRE.em>45*60*1000){ cofreFechar(); toast(`${ico('lock')} Cofre fechado por inatividade (45 min).`,'ok'); } },60000);
+
+/* ---------- ponte para os módulos (PROC_HOST) ---------- */
+window.PROC_HOST={ ok:()=>!!(S.cloud&&S.cloud.on&&S.cloud.db&&S.ws), col:()=>wsCol('proc'), fs:()=>S.cloud.db, user:()=>S.oper||'',
+  role:()=>COFRE.key?'admin':'equipa', locked:()=>!COFRE.key, enc:s=>encWith(COFRE.key,s), dec:s=>decWith(COFRE.key,s), toast:m=>toast(`${ico('alert')} ${esc(m)}`,'err') };
+
+/* ---------- estado da migração ---------- */
+const PROC_MIG={}; async function procMig(db,force){ if(!db) return {ok:true}; if(PROC_MIG[db]&&!force) return PROC_MIG[db]; try{ const d=await wsCol('proc').doc('mig~'+db).get(); PROC_MIG[db]=d.exists?d.data():{ok:false}; }catch(e){ PROC_MIG[db]={ok:false,erro:e.message}; } return PROC_MIG[db]; }
+
+/* ---------- menu ---------- */
+(function(){ const nav=$('#nav'); if(nav) for(const m of PROC_MOD) if(!$(`.nav[data-v="${m.v}"]`)) nav.insertAdjacentHTML('beforeend',`<div class="nav" data-v="${m.v}"><svg class="i"><use href="#i-${m.ic}"/></svg>${m.l}${m.adm?' <span class="badge b-warn" style="margin-left:auto">admin</span>':''}</div>`);
+  const ct=$('.content'); if(ct) for(const m of PROC_MOD) if(!$('#v-'+m.v)) ct.insertAdjacentHTML('beforeend',`<section class="view" id="v-${m.v}"></section>`); })();
+document.addEventListener('DOMContentLoaded',()=>{ for(const m of PROC_MOD){ const n=$(`.nav[data-v="${m.v}"]`); if(n) n.onclick=()=>go(m.v); if(!$('#v-'+m.v)) $('.content').insertAdjacentHTML('beforeend',`<section class="view" id="v-${m.v}"></section>`); } });
+
+function cofreChip(){ return COFRE.key?`<span class="chip" style="border-color:var(--good)">${ico('lock')} Cofre aberto · administrador</span><button class="btn sm" onclick="cofreFechar()">${ico('lock')} Fechar cofre</button>`
+  :`<span class="chip">${ico('lock')} Cofre fechado · equipa</span><button class="btn sm pri" onclick="cofreModal()">${ico('lock')} Abrir cofre</button>`; }
+function procRecarregar(){ for(const m of PROC_MOD){ const el=$('#v-'+m.v); if(el&&m.f&&m.v!=='renomeacao'){ el.dataset.role=''; } } if(S.view&&PROC_MOD.some(m=>m.v===S.view)) RENDER[S.view](); }
+async function cofreModal(){ let c=null; try{ c=await cofreCfg(true); }catch(e){ return toast(esc(e.message),'err'); }
+  if(!c){ modal(`${ico('lock')} Criar o cofre de senhas`,`<p>O cofre guarda as senhas do Portal das Finanças e da Segurança Social <b>cifradas</b>. Só quem souber a palavra-passe do cofre as consegue ver — nem a base de dados as vê às claras.</p>
+     <div class="grid g2" style="margin-top:10px"><label class="fld">Palavra-passe do cofre (mín. 10 caracteres)<input class="inp" type="password" id="cfP1" autocomplete="new-password"></label><label class="fld">Repetir<input class="inp" type="password" id="cfP2" autocomplete="new-password"></label></div>
+     <p class="hint st-warn" style="margin-top:10px">${ico('alert')} Guarde esta palavra-passe num sítio seguro. Se a perder, as senhas cifradas não se recuperam (terá de as voltar a importar da cópia de segurança). Com o cofre aberto, entra como <b>administrador</b> nos módulos.</p>`,`<button class="btn pri" id="cfGo">${ico('lock')} Criar cofre</button>`);
+    $('#cfGo').onclick=async()=>{ const a=$('#cfP1').value, b=$('#cfP2').value; if(a.length<10) return toast('Use pelo menos 10 caracteres.','err'); if(a!==b) return toast('As palavras-passe não coincidem.','err');
+      try{ await cofreCriar(a); closeModal(); toast(`${ico('check')} Cofre criado e aberto.`,'ok'); procRecarregar(); }catch(e){ toast(esc(e.message),'err'); } }; return; }
+  modal(`${ico('lock')} Abrir o cofre`,`<p class="hint">Com o cofre aberto vê e grava senhas e entra como administrador nos módulos do Processamento mensal. Fecha sozinho após 45 minutos sem atividade.</p><label class="fld" style="margin-top:10px">Palavra-passe do cofre<input class="inp" type="password" id="cfP" autocomplete="current-password"></label>`,`<button class="btn pri" id="cfGo">${ico('lock')} Abrir</button>`);
+  const go2=async()=>{ try{ await cofreAbrir($('#cfP').value); closeModal(); toast(`${ico('check')} Cofre aberto.`,'ok'); procRecarregar(); }catch(e){ toast(esc(e.message),'err'); } };
+  $('#cfGo').onclick=go2; $('#cfP').onkeydown=e=>{ if(e.key==='Enter') go2(); }; setTimeout(()=>$('#cfP').focus(),50); }
+
+/* ---------- ecrãs dos módulos ---------- */
+for(const m of PROC_MOD.filter(x=>x.f)) RENDER[m.v]=async function(){ const el=$('#v-'+m.v); const role=PROC_HOST.role();
+  if(!S.cloud.on){ el.innerHTML=`<div class="card empty">${ico('cloud')} O Processamento mensal precisa da ligação à nuvem do AuditNux.</div>`; return; }
+  if(m.adm&&!COFRE.key){ el.dataset.role=''; el.innerHTML=`<div class="card hero-empty" style="min-height:46vh"><div>${ico('lock')}<h2>${m.l}</h2><p>${m.d}</p><p class="hint">Área reservada ao administrador: abra o cofre para entrar.</p><button class="btn pri" onclick="cofreModal()">${ico('lock')} Abrir cofre</button></div></div>`; return; }
+  if(m.db){ const mg=await procMig(m.db); if(!mg.ok){ el.dataset.role=''; el.innerHTML=`<div class="card hero-empty" style="min-height:46vh"><div>${ico(m.ic)}<h2>${m.l}</h2><p>${m.d}</p><p class="hint">Os dados deste módulo ainda não foram passados para o AuditNux. Faça primeiro a migração (com conferência automática) em <b>Processamento mensal › Migração e cofre</b>.</p><button class="btn pri" onclick="go('proc_mig')">${ico('lock')} Ir para Migração e cofre</button></div></div>`; return; } }
+  if(el.dataset.role===role&&$('iframe',el)) return; // mantém o trabalho em curso
+  el.dataset.role=role;
+  el.innerHTML=`<div class="row" style="margin-bottom:10px;gap:10px;flex-wrap:wrap">${m.db?cofreChip():`<span class="chip">${ico('lock')} Os ficheiros são lidos neste computador e não são enviados para lado nenhum</span>`}<span class="sp"></span><button class="btn sm" id="pfR">${ico('undo')} Recarregar</button><a class="btn sm" href="${m.f}" target="_blank">${ico('out')} Janela própria</a></div>
+   <iframe src="${m.f}" title="${esc(m.l)}" style="width:100%;height:calc(100vh - 170px);min-height:560px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe>`;
+  $('#pfR',el).onclick=()=>{ el.dataset.role=''; RENDER[m.v](); }; };
+
+/* ---------- Migração e cofre ---------- */
+const PROC_DB={interno:{l:'Sistema Interno',h:'IVA, SAF-T, DMR, Segurança Social, planos AT, ativos, recebimentos e calendário',raiz:['dafilgest','calendario2026','apuramento']},decl:{l:'Declarações Fiscais',h:'empresas, Modelo 22, IES e IRC (com PDFs e Excel)',raiz:['empresas','anos']}};
+async function procLoadLib(){ if(window.PROCDB) return window.PROCDB; await new Promise((ok,ko)=>{ const s=document.createElement('script'); s.src='proc/procdb.js'; s.onload=ok; s.onerror=()=>ko(new Error('Não foi possível carregar proc/procdb.js')); document.head.appendChild(s); }); return window.PROCDB; }
+function procParts(db,R){ const P=window.PROCDB, out=[]; for(const [k,v] of Object.entries(R||{})){ if(v==null) continue; const d=P._depth(db,[k]); if(d>=2&&v&&typeof v==='object'&&!Array.isArray(v)){ for(const [c,x] of Object.entries(v)) if(x!=null) out.push({ps:[k,c],v:x}); } else out.push({ps:[k],v}); } return out; }
+const procCanon=v=>{ if(Array.isArray(v)){ const a=v.map(procCanon); while(a.length&&a[a.length-1]==null) a.pop(); return a.length?a:null; } if(v&&typeof v==='object'){ const o={}; for(const k of Object.keys(v).sort()){ const x=procCanon(v[k]); if(x!=null) o[k]=x; } return Object.keys(o).length?o:null; } return v; };
+const procFolhas=v=>Array.isArray(v)||(v&&typeof v==='object')?Object.values(v).reduce((a,x)=>a+procFolhas(x),0):(v==null?0:1);
+RENDER.proc_mig=async function(){ const el=$('#v-proc_mig'); if(!S.cloud.on){ el.innerHTML=`<div class="card empty">${ico('cloud')} Precisa da ligação à nuvem.</div>`; return; }
+  let c=null; try{ c=await cofreCfg(true); }catch(e){} const M={}; for(const db of Object.keys(PROC_DB)) M[db]=await procMig(db,true);
+  el.innerHTML=`<div class="card"><h3>${ico('lock')} 1 · Cofre de senhas</h3><div class="row" style="gap:10px;flex-wrap:wrap">${c?cofreChip():`<span class="chip" style="border-color:var(--warn)">${ico('alert')} Cofre ainda não criado</span><button class="btn pri" onclick="cofreModal()">${ico('lock')} Criar cofre</button>`}</div>
+     <p class="hint" style="margin-top:8px">As senhas AT e SS das empresas são cifradas com a palavra-passe do cofre antes de irem para a nuvem. A migração só corre com o cofre aberto.</p></div>
+   ${Object.entries(PROC_DB).map(([db,x])=>{ const m=M[db]; return `<div class="card" style="margin-top:16px"><h3>${ico('layers')} ${db==='interno'?2:3} · ${x.l} <span class="r">${m.ok?`<span class="badge b-ok">migrado ${esc(String(m.em||'').slice(0,16).replace('T',' '))}</span>`:'<span class="badge b-warn">por migrar</span>'}</span></h3>
+     <p class="hint">${x.h}.</p>
+     ${m.ok?`<div class="row" style="gap:8px;flex-wrap:wrap;margin:6px 0"><span class="chip">${n0(m.partes||0)} blocos</span><span class="chip">${n0(m.folhas||0)} valores conferidos</span><span class="chip">ficheiro: ${esc(m.ficheiro||'')}</span><span class="chip">por ${esc(m.por||'')}</span></div>`:''}
+     <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn ${m.ok?'':'pri'}" data-pmig="${db}">${ico('upload')} ${m.ok?'Voltar a migrar (substituir)':'Migrar a partir da cópia (.json)'}</button>${m.ok?`<button class="btn" data-pver="${db}">${ico('shield')} Conferir de novo</button><button class="btn" data-pexp="${db}">${ico('down')} Cópia de segurança (.json)</button>`:''}</div>
+     <div id="pmLog-${db}" style="margin-top:10px"></div></div>`; }).join('')}
+   <div class="card" style="margin-top:16px"><h3>${ico('book')} Como funciona</h3><ol class="hint" style="padding-left:18px;line-height:1.7">
+     <li>Exporte a cópia na consola do Firebase (Realtime Database › ⋮ › Exportar JSON) e escolha-a aqui.</li>
+     <li>O AuditNux copia tudo para a base dele (as senhas vão cifradas; PDFs e Excel em blocos próprios).</li>
+     <li>No fim lê tudo de volta da nuvem e compara valor a valor com o ficheiro. Só marca «migrado» se tudo bater certo.</li>
+     <li>Enquanto não deixar de usar o sistema antigo, pode voltar a migrar quantas vezes quiser (substitui).</li></ol></div>`;
+  $$('[data-pmig]',el).forEach(b=>b.onclick=()=>procMigrar(b.dataset.pmig));
+  $$('[data-pver]',el).forEach(b=>b.onclick=()=>procConferir(b.dataset.pver));
+  $$('[data-pexp]',el).forEach(b=>b.onclick=()=>procExportar(b.dataset.pexp)); };
+function procLog(db,h){ const e=$('#pmLog-'+db); if(e) e.innerHTML=h; }
+async function procMigrar(db){ if(!COFRE.key){ toast('Abra (ou crie) primeiro o cofre de senhas.','err'); return cofreModal(); }
+  const fi=$('#fileIn'); fi.multiple=false; fi.accept='.json'; fi.value='';
+  fi.onchange=async()=>{ fi.accept=''; const f=fi.files[0]; if(!f) return; let R;
+    try{ procLog(db,`<div class="hint">${ico('cpu')} A ler ${esc(f.name)} (${fmtBytes(f.size)})…</div>`); R=JSON.parse(await f.text()); }catch(e){ return procLog(db,`<div class="st-crit">Ficheiro inválido: ${esc(e.message)}</div>`); }
+    const raiz=Object.keys(R||{}); const esperado=PROC_DB[db].raiz; if(!raiz.some(k=>esperado.includes(k))) return procLog(db,`<div class="st-crit">${ico('alert')} Este ficheiro não parece ser a cópia de ${esc(PROC_DB[db].l)} (esperava ${esperado.join(', ')}; tem ${esc(raiz.join(', '))}).</div>`);
+    const P=await procLoadLib(); P._reset(); const L=procParts(db,R);
+    const exist=(await wsCol('proc').where('db','==',db).get()).docs.map(d=>d.data().p);
+    if(exist.length&&prompt(`Já existem dados de ${PROC_DB[db].l} no AuditNux (${exist.length} blocos).\n\nA migração SUBSTITUI esses dados pelos do ficheiro ${f.name}.\nAlterações feitas no AuditNux desde a última migração perdem-se.\n\nPara confirmar, escreva SUBSTITUIR:`)!=='SUBSTITUIR') return procLog(db,'<div class="hint">Cancelado — nada foi alterado.</div>');
+    const t0=Date.now(); let i=0;
+    try{ for(const x of L){ i++; procLog(db,`<div class="hint">${ico('upload')} A copiar ${i}/${L.length}: ${esc(x.ps.join(' › '))}…</div><div class="bar" style="height:6px;background:var(--line);border-radius:4px;margin-top:6px"><i style="display:block;height:100%;width:${(i/L.length*100).toFixed(0)}%;background:var(--acc);border-radius:4px"></i></div>`); await P.write(db,x.ps,'set',x.v); }
+      const novos=new Set(L.map(x=>x.ps.join('/'))); for(const p of exist) if(!novos.has(p)) await P.write(db,P.segs(p),'remove');
+    }catch(e){ console.error(e); return procLog(db,`<div class="st-crit">${ico('alert')} Erro a copiar (${esc(e.message)}). Nada foi marcado como migrado — corrija e repita.</div>`); }
+    await procConferir(db,R,f.name,L.length,t0); };
+  fi.click(); }
+async function procConferir(db,R,nome,np,t0){ const P=await procLoadLib(); P._reset(); procLog(db,`<div class="hint">${ico('shield')} A conferir valor a valor, lendo de novo da nuvem…</div>`);
+  if(!R){ const pick=await new Promise(ok=>{ const fi=$('#fileIn'); fi.multiple=false; fi.accept='.json'; fi.value=''; fi.onchange=async()=>{ fi.accept=''; const f=fi.files[0]; if(!f) return ok(null); try{ ok({R:JSON.parse(await f.text()),nome:f.name}); }catch(e){ ok(null); } }; fi.click(); }); if(!pick) return procLog(db,'<div class="hint">Escolha o ficheiro .json da cópia para conferir.</div>'); R=pick.R; nome=pick.nome; }
+  const L=procParts(db,R); const res=[]; let folhas=0, bad=0;
+  for(const x of L){ let v=null, err=''; try{ v=await P.read(db,x.ps); }catch(e){ err=e.message; } const a=JSON.stringify(procCanon(x.v)), b=JSON.stringify(procCanon(v)); const ok=!err&&a===b; const n=procFolhas(x.v); folhas+=n; if(!ok) bad++; res.push({p:x.ps.join(' › '),n,ok,err}); }
+  const ok=bad===0; const rel={db,ok,em:new Date().toISOString(),por:S.oper||'',ficheiro:nome||'',partes:L.length,folhas,falhas:bad,seg:t0?Math.round((Date.now()-t0)/1000):null};
+  if(ok){ await wsCol('proc').doc('mig~'+db).set(rel); PROC_MIG[db]=rel; }
+  procLog(db,`<div class="card" style="margin:0;border-color:var(--${ok?'good':'crit'})"><b>${ok?`${ico('check')} Tudo confere: ${n0(folhas)} valores em ${n0(L.length)} blocos iguais ao ficheiro.`:`${ico('alert')} ${bad} bloco(s) não conferem — o módulo NÃO foi marcado como migrado.`}</b>
+    <div class="tbl-wrap" style="margin-top:8px;max-height:280px;overflow:auto"><table class="t"><thead><tr><th>Bloco</th><th class="num">Valores</th><th>Conferência</th></tr></thead><tbody>${res.map(r=>`<tr><td>${esc(r.p)}</td><td class="num">${n0(r.n)}</td><td>${r.ok?'<span class="badge b-ok">igual</span>':`<span class="badge b-crit">diferente</span> ${esc(r.err)}`}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" id="pmRel-${db}">${ico('down')} Relatório da conferência</button></div></div>`);
+  $('#pmRel-'+db).onclick=()=>download(new Blob([JSON.stringify({...rel,blocos:res},null,1)],{type:'application/json'}),`Conferencia_migracao_${db}_${rel.em.slice(0,10)}.json`);
+  if(ok) toast(`${ico('check')} ${esc(PROC_DB[db].l)}: migração conferida.`,'ok'); }
+async function procExportar(db){ if(!COFRE.key&&!confirm('Com o cofre fechado, as senhas saem na cópia como "cofre bloqueado". Continuar?')) return;
+  const P=await procLoadLib(); P._reset(); procLog(db,`<div class="hint">${ico('down')} A preparar a cópia…</div>`);
+  try{ const v=await P.read(db,[]); download(new Blob([JSON.stringify(v)],{type:'application/json'}),`Copia_${db}_${new Date().toISOString().slice(0,10)}.json`); procLog(db,`<div class="hint">${ico('check')} Cópia descarregada. Guarde-a num sítio seguro (tem as senhas às claras se o cofre estiver aberto).</div>`); }
+  catch(e){ procLog(db,`<div class="st-crit">${esc(e.message)}</div>`); } }
+
+/* ---------- Guia ---------- */
+(function(){ if(typeof GUIA==='undefined') return; const i=GUIA.findIndex(c=>c.id==='multi');
+  GUIA.splice(i+1,0,{id:'proc',n:'',t:'Processamento mensal',ic:'file',v:'proc_int',intro:'Tudo o que estava no Sistema Interno e nas Declarações Fiscais, agora dentro do AuditNux: o mesmo funcionamento, com login, regras por espaço e senhas num cofre cifrado.',
+   tp:[{t:'Abrir os módulos do mês',q:'No dia a dia: IVA, SAF-T, DMR/DRI, Segurança Social dos independentes, Declarações fiscais, Ativos e Calendário.',p:['Clique na área <b>Processamento mensal</b> do menu.','Escolha o módulo (por exemplo <b>IVA · SAF-T · DMR · SS</b>).','Trabalha exatamente como antes; as gravações vão para a base do AuditNux.','<b>Recarregar</b> volta a ler os dados; <b>Janela própria</b> abre o módulo num separador à parte (com a sessão do AuditNux).'],d:'Com o cofre fechado entra como equipa (as senhas aparecem como «cofre bloqueado»). Com o cofre aberto entra como administrador.',ir:['proc_int']},
+    {t:'Abrir e fechar o cofre de senhas',q:'Para ver ou gravar senhas AT/SS e entrar como administrador (Recebimentos, gestão).',p:['Em qualquer módulo do Processamento mensal clique em <b>Abrir cofre</b>.','Escreva a palavra-passe do cofre e clique em <b>Abrir</b>.','Ao terminar clique em <b>Fechar cofre</b> (fecha sozinho após 45 minutos sem atividade).'],d:'A palavra-passe do cofre não fica guardada em lado nenhum. Se a perder, as senhas só se recuperam da cópia de segurança.',ir:['proc_mig']},
+    {t:'Migrar os dados antigos (uma vez, com conferência)',q:'Na passagem do Sistema Interno e das Declarações para o AuditNux.',p:['Na consola do Firebase exporte cada base (Realtime Database › ⋮ › Exportar JSON).','No AuditNux vá a <b>Processamento mensal › Migração e cofre</b> e crie/abra o cofre.','Em <b>Sistema Interno</b> clique em <b>Migrar a partir da cópia</b> e escolha o ficheiro do interno; repita em <b>Declarações Fiscais</b>.','Espere pela conferência: só fica «migrado» se todos os valores forem iguais ao ficheiro.','A partir daí trabalhe só no AuditNux.'],d:'Pode repetir a migração enquanto ainda estiver a usar o sistema antigo: substitui os dados pelos do ficheiro mais recente.',ir:['proc_mig']},
+    {t:'Renomear os documentos do mês',q:'Depois de descarregar faturas de avenças, guias SS, folhas de remunerações/férias e DRI/DMR.',p:['Clique em <b>Renomeação mensal</b>.','Arraste os ficheiros; o programa lê o conteúdo e propõe os nomes.','Descarregue o ZIP com os ficheiros renomeados.'],ir:['renomeacao']},
+    {t:'Cópia de segurança do Processamento mensal',q:'Todas as semanas, ou antes de mudanças grandes.',p:['Vá a <b>Migração e cofre</b>.','Com o cofre aberto, clique em <b>Cópia de segurança (.json)</b> em cada base.','Guarde os ficheiros num sítio seguro (têm as senhas às claras).'],ir:['proc_mig']}]});
+  GUIA.forEach((c,k)=>c.n=String(k+1).padStart(2,'0')); if(typeof GUIA_CTX!=='undefined') for(const m of PROC_MOD) GUIA_CTX[m.v]='proc'; if(typeof GUIA_NOME!=='undefined') for(const m of PROC_MOD) GUIA_NOME[m.v]=m.l; })();
 </script>
 </body>
 </html>
