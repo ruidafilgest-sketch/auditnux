@@ -102,6 +102,18 @@ Para partilhar com outro profissional, basta enviar-lhe o mesmo endereço e dize
 
 ---
 
+## 1.19.2 — lembrar neste computador
+
+- Ao abrir o cofre (senhas) ou os Recebimentos, a opção «Lembrar neste computador» vem marcada: nesse computador não volta a pedir, nem depois de fechar o navegador.
+- «Esquecer neste computador» desfaz. Num computador partilhado ou público, desmarque a opção.
+- A chave fica guardada no próprio navegador como chave não exportável (não fica em texto em lado nenhum).
+
+## 1.19.1 — acessos da equipa
+
+- A equipa (Filipa, Beatriz) tem acesso total a todos os módulos do Processamento mensal: gerir listas, planos AT, prestações pagas, DMR, SAF-T, IVA, Declarações, Ativos e Calendário.
+- O cofre serve só para as senhas AT/SS: fechado, aparecem como «cofre bloqueado»; aberto, aparecem às claras (a palavra-passe do cofre pode ser dada à equipa).
+- Recebimentos: chave própria, só do Rui (criada no primeiro acesso); fecham após 30 minutos sem atividade.
+
 ## 1.19 — Processamento mensal completo (um só acesso)
 
 - **Processamento mensal** passa a ter: IVA · SAF-T · DMR · SS (o Sistema Interno), Declarações fiscais, Ativos fixos, Calendário da equipa, Recebimentos (só administrador), Renomeação mensal e **Migração e cofre**.
