@@ -135,7 +135,7 @@ async function rest(url,init){ const u=new URL(url); const db=dbFromUrl(u.hostna
 function aviso(e){ if(avisado&&e.code!=='cofre') return; avisado=true; try{ const h=host(); if(h&&h.toast) h.toast(e.message); else if(e.code!=='host') alert(e.message); }catch(x){} }
 window.fetch=function(input,init){ const url=typeof input==='string'?input:(input&&input.url)||''; if(/firebasedatabase\.app|firebaseio\.com/.test(url)) return rest(url,init||{}); return _fetch(input,init); };
 
-window.PROCDB={SENT,ligado:()=>!!host(),role:()=>{ const h=host(); return h?h.role():null; },user:()=>{ const h=host(); return h?h.user():''; },dbFromUrl,segs:segsOf,read,write,on,
+window.PROCDB={SENT,ligado:()=>!!host(),role:()=>{ const h=host(); return h?h.role():null; },recOk:()=>{ const h=host(); return !!(h&&h.recOk&&h.recOk()); },user:()=>{ const h=host(); return h?h.user():''; },dbFromUrl,segs:segsOf,read,write,on,
   _parts:parts,_reset:()=>{ for(const e of parts.values()) e.unsub&&e.unsub(); parts.clear(); listCache={}; safeMode=false; avisado=false; },_prepare:prepare,_resolve:resolve,_pidOf:pidOf,_depth:depth};
 
 /* fora do AuditNux: aviso claro em vez de um ecrã vazio */

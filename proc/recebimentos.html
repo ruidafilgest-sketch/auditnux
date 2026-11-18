@@ -590,7 +590,7 @@ function saveMeta(){
 }
 
 function doLogin(){
-  if(window.PROCDB&&PROCDB.ligado()&&PROCDB.role()==='admin'){ startApp(); return; }
+  if(window.PROCDB&&PROCDB.ligado()&&PROCDB.recOk()){ startApp(); return; }
   const p=document.getElementById('loginPass').value;
   if(p===PASS_RUI){ startApp(); }
   else document.getElementById('loginErr').textContent='Senha incorreta.';
