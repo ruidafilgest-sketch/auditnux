@@ -397,7 +397,7 @@ html.modo-painel #login,html.modo-painel #app{display:none!important}
 <!-- ============ APP ============ -->
 <div id="app" class="hidden">
  <aside id="side">
-  <div class="brand"><div class="logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-anx"/></svg></div><div><h1 class="wm" aria-label="AuditNux"><svg aria-hidden="true"><use href="#i-anx-wm"/></svg></h1><small>Auditoria SAF-T</small></div></div>
+  <div class="brand"><div class="logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-anx"/></svg></div><div><h1 class="wm" aria-label="AuditNux"><svg aria-hidden="true"><use href="#i-anx-wm"/></svg></h1><small>Centro de Auditoria</small></div></div>
   <nav id="nav">
    <div class="navsec">Comando</div>
    <div class="nav on" data-v="painel"><svg class="i"><use href="#i-dash"/></svg>Painel</div>
@@ -708,7 +708,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.20.1';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -4759,7 +4759,7 @@ function guiaHtml(o){ o=o||{}; const pg=o.pages||{}; const hoje=new Date().toLoc
   const irTxt=ir=>ir?`Menu › ${esc(GUIA_NOME[ir[0]]||ir[0])}`:'';
   const cover=`<section class="cv"><div class="band"></div><div class="g"></div><div class="in"><div class="k">Manual do utilizador · versão ${APP_VERSION}</div><h1>Audit<span>Nux</span><br>Guia completo</h1><div class="s">Tudo o que o programa faz, passo a passo: SAF-T de faturação e contabilidade, IES, base de empresas, IVA, risco fiscal, demonstrações financeiras, IRC e relatórios.</div>
     <div class="chips"><div><b>${GUIA.length}</b>capítulos</div><div><b>${nTot}</b>tarefas explicadas</div><div><b>clique a clique</b>com atalhos no programa</div></div></div>
-    <div class="sg"><div><b>${gab||'AuditNux'}</b><br>Auditoria SAF-T · Contabilidade · Fiscalidade</div><div style="text-align:right">${hoje}<br>Também disponível no programa: menu <b>Guia & Como fazer</b></div></div></section>`;
+    <div class="sg"><div><b>${gab||'AuditNux'}</b><br>Centro de Auditoria · Contabilidade · Fiscalidade</div><div style="text-align:right">${hoje}<br>Também disponível no programa: menu <b>Guia & Como fazer</b></div></div></section>`;
   const idx=`<section class="sheet idx"><div class="k2">Índice</div><h2>O que vai encontrar</h2>${GUIA.map(c=>`<a class="il" href="#c-${c.id}"><span class="n">${c.n}</span><span class="t">${esc(c.t)}</span><span class="d"></span><span class="p">${pg[c.id]||''}</span></a>${c.tp.map(t=>`<div class="il2">${t.t}</div>`).join('')}`).join('')}</section>`;
   const tpH=t=>`<div class="tp"><div class="h"><b>${t.t}</b><span>${irTxt(t.ir)}</span></div><div class="q"><b>Quando:</b> ${t.q}</div><ol>${t.p.map(s=>`<li>${s}</li>`).join('')}</ol>${t.d?`<div class="d">${t.d}</div>`:''}</div>`;
   const caps=GUIA.map(c=>`<section class="sheet cap" id="c-${c.id}"><div class="grp"><div class="ch"><div class="n">${c.n}</div><div><div class="m">Capítulo ${c.n}</div><h2>${esc(c.t)}</h2></div></div><div class="intro">${c.intro}</div>${tpH(c.tp[0])}</div>
