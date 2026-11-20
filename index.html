@@ -645,7 +645,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.19.2';
+const APP_VERSION = '1.19.3';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -5355,8 +5355,8 @@ PROC_MOD.forEach(m=>VIEWS[m.v]=[m.l,m.d]);
 const COFRE={key:null,cfg:null,em:0}; const COFRE_CHK='AuditNux-cofre-v1'; const COFRE_IT=250000;
 const b64=u=>{ let s=''; const a=new Uint8Array(u); for(let i=0;i<a.length;i+=8192) s+=String.fromCharCode.apply(null,a.subarray(i,i+8192)); return btoa(s); };
 const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-async function cofreDerive(pw,salt,it){ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:it,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
+async function cofreDerive(pw,salt,it,ext){ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:it,hash:'SHA-256'},base,{name:'AES-GCM',length:256},!!ext,['encrypt','decrypt']); }
 async function encWith(key,s){ const iv=crypto.getRandomValues(new Uint8Array(12)); const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(s)); const o=new Uint8Array(12+ct.byteLength); o.set(iv); o.set(new Uint8Array(ct),12); return b64(o); }
 async function decWith(key,s){ const a=unb64(s); const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},key,a.slice(12)); return new TextDecoder().decode(pt); }
 async function cofreCfg(force){ if(COFRE.cfg&&!force) return COFRE.cfg; const d=await wsCol('config').doc('cofre').get(); COFRE.cfg=d.exists?d.data():null; return COFRE.cfg; }
@@ -5364,7 +5364,18 @@ async function cofreCriar(pw){ const salt=crypto.getRandomValues(new Uint8Array(
   const cfg={salt:b64(salt),it:COFRE_IT,chk:await encWith(key,COFRE_CHK),criadoEm:new Date().toISOString(),por:S.oper||''}; await wsCol('config').doc('cofre').set(cfg); COFRE.cfg=cfg; COFRE.key=key; COFRE.em=Date.now(); }
 async function cofreAbrir(pw){ const c=await cofreCfg(true); if(!c) throw new Error('O cofre ainda não foi criado.'); const key=await cofreDerive(pw,unb64(c.salt),c.it||COFRE_IT);
   try{ if(await decWith(key,c.chk)!==COFRE_CHK) throw 0; }catch(e){ throw new Error('Palavra-passe do cofre incorreta.'); } COFRE.key=key; COFRE.em=Date.now(); }
-function cofreFechar(){ COFRE.key=null; COFRE.lembrar=false; pcPut(pcKey('cofre'),null); procRecarregar(); }
+function cofreFechar(){ COFRE.key=null; COFRE.lembrar=false; COFRE.equipa=false; pcPut(pcKey('cofre'),null); procRecarregar(); }
+/* ---------- Cofre de EQUIPA: abre sozinho em todos os computadores da equipa (sem pedir palavra-passe) ---------- */
+async function cofreEquipaLer(){ const d=await wsCol('config').doc('cofreEquipa').get(); return d.exists?d.data():null; }
+async function cofreEquipaAtivar(pw){ const c=await cofreCfg(true); if(!c) throw new Error('O cofre ainda não foi criado.');
+  const kx=await cofreDerive(pw,unb64(c.salt),c.it||COFRE_IT,true); try{ if(await decWith(kx,c.chk)!==COFRE_CHK) throw 0; }catch(e){ throw new Error('Palavra-passe do cofre incorreta.'); }
+  const raw=await crypto.subtle.exportKey('raw',kx); await wsCol('config').doc('cofreEquipa').set({k:b64(raw),salt:c.salt,em:new Date().toISOString(),por:S.oper||''}); }
+async function cofreEquipaAbrir(){ const e=await cofreEquipaLer(); if(!e||!e.k) return false; const c=await cofreCfg(true); if(!c||e.salt!==c.salt) return false;
+  const key=await crypto.subtle.importKey('raw',unb64(e.k),{name:'AES-GCM'},false,['encrypt','decrypt']);
+  try{ if(await decWith(key,c.chk)!==COFRE_CHK) return false; }catch(x){ return false; }
+  COFRE.key=key; COFRE.lembrar=true; COFRE.equipa=true; COFRE.em=Date.now(); return true; }
+async function cofreEquipaDesligar(){ if(!confirm('Voltar a pedir a palavra-passe do cofre em todos os computadores da equipa?')) return;
+  try{ await wsCol('config').doc('cofreEquipa').delete(); }catch(e){ return toast(esc(e.message),'err'); } PCMEM.t=0; cofreFechar(); toast(`${ico('lock')} O cofre volta a pedir a palavra-passe.`,'ok'); }
 /* ---------- Chave dos Recebimentos (só o Rui) — independente do cofre das senhas ---------- */
 const RECK={ok:false,em:0};
 async function recHash(pw,salt,it){ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']); return b64(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:it,hash:'SHA-256'},base,256)); }
@@ -5389,7 +5400,8 @@ function pcDb(){ return PCMEM.db||(PCMEM.db=new Promise(ok=>{ try{ const r=index
 async function pcGet(k){ const d=await pcDb(); if(!d) return null; return new Promise(ok=>{ try{ const r=d.transaction('k').objectStore('k').get(k); r.onsuccess=()=>ok(r.result||null); r.onerror=()=>ok(null); }catch(e){ ok(null); } }); }
 async function pcPut(k,v){ const d=await pcDb(); if(!d) return; await new Promise(ok=>{ try{ const t=d.transaction('k','readwrite'); v==null?t.objectStore('k').delete(k):t.objectStore('k').put(v,k); t.oncomplete=ok; t.onerror=ok; }catch(e){ ok(); } }); }
 const pcKey=n=>n+'~'+(S.ws||'');
-async function procAuto(){ if(PCMEM.tried===S.ws) return; PCMEM.tried=S.ws;
+async function procAuto(){ if(COFRE.key&&RECK.ok) return; if(PCMEM.tried===S.ws&&Date.now()-(PCMEM.t||0)<15000) return; PCMEM.tried=S.ws; PCMEM.t=Date.now();
+  try{ if(!COFRE.key) await cofreEquipaAbrir(); }catch(e){ console.error(e); }
   try{ if(!COFRE.key){ const r=await pcGet(pcKey('cofre')); const c=r&&await cofreCfg(true); if(r&&c&&r.salt===c.salt){ try{ if(await decWith(r.key,c.chk)===COFRE_CHK){ COFRE.key=r.key; COFRE.lembrar=true; COFRE.em=Date.now(); } }catch(e){} } } }catch(e){ console.error(e); }
   try{ if(!RECK.ok){ const r=await pcGet(pcKey('rec')); if(r){ const c=await recCfg(); if(c&&r.h===c.h){ RECK.ok=true; RECK.lembrar=true; RECK.em=Date.now(); } } } }catch(e){ console.error(e); } }
 const lembrarChk=(id,txt)=>`<label class="chk" style="margin-top:10px"><input type="checkbox" id="${id}" checked> ${txt}</label>`;
@@ -5406,7 +5418,8 @@ const PROC_MIG={}; async function procMig(db,force){ if(!db) return {ok:true}; i
   const ct=$('.content'); if(ct) for(const m of PROC_MOD) if(!$('#v-'+m.v)) ct.insertAdjacentHTML('beforeend',`<section class="view" id="v-${m.v}"></section>`); })();
 document.addEventListener('DOMContentLoaded',()=>{ for(const m of PROC_MOD){ const n=$(`.nav[data-v="${m.v}"]`); if(n) n.onclick=()=>go(m.v); if(!$('#v-'+m.v)) $('.content').insertAdjacentHTML('beforeend',`<section class="view" id="v-${m.v}"></section>`); } });
 
-function cofreChip(){ return COFRE.key?`<span class="chip" style="border-color:var(--good)">${ico('lock')} Senhas visíveis${COFRE.lembrar?' · lembrado neste computador':''}</span><button class="btn sm" onclick="cofreFechar()" title="Esconde as senhas${COFRE.lembrar?' e deixa de lembrar neste computador':''}">${ico('lock')} ${COFRE.lembrar?'Esquecer neste computador':'Fechar cofre'}</button>`
+function cofreChip(){ if(COFRE.key&&COFRE.equipa) return `<span class="chip" style="border-color:var(--good)">${ico('lock')} Cofre de equipa · abre sozinho em todos os computadores</span><button class="btn sm" onclick="cofreEquipaDesligar()" title="Volta a pedir a palavra-passe do cofre">${ico('lock')} Voltar a pedir palavra-passe</button>`;
+  return COFRE.key?`<span class="chip" style="border-color:var(--good)">${ico('lock')} Senhas visíveis${COFRE.lembrar?' · lembrado neste computador':''}</span><button class="btn sm" onclick="cofreFechar()" title="Esconde as senhas${COFRE.lembrar?' e deixa de lembrar neste computador':''}">${ico('lock')} ${COFRE.lembrar?'Esquecer neste computador':'Fechar cofre'}</button>`
   :`<span class="chip">${ico('lock')} Senhas escondidas (cofre fechado)</span><button class="btn sm pri" onclick="cofreModal()">${ico('lock')} Abrir cofre</button>`; }
 function procRecarregar(){ for(const m of PROC_MOD){ const el=$('#v-'+m.v); if(el&&m.f&&m.v!=='renomeacao'){ el.dataset.role=''; } } if(S.view&&PROC_MOD.some(m=>m.v===S.view)) RENDER[S.view](); }
 async function cofreModal(){ let c=null; try{ c=await cofreCfg(true); }catch(e){ return toast(esc(e.message),'err'); }
@@ -5415,8 +5428,8 @@ async function cofreModal(){ let c=null; try{ c=await cofreCfg(true); }catch(e){
      <p class="hint st-warn" style="margin-top:10px">${ico('alert')} Guarde esta palavra-passe num sítio seguro. Se a perder, as senhas cifradas não se recuperam (terá de as voltar a importar da cópia de segurança). Pode dar esta palavra-passe à equipa: com o cofre aberto, as senhas aparecem nos módulos. Os Recebimentos têm uma chave própria.</p>`,`<button class="btn pri" id="cfGo">${ico('lock')} Criar cofre</button>`);
     $('#cfGo').onclick=async()=>{ const a=$('#cfP1').value, b=$('#cfP2').value; if(a.length<10) return toast('Use pelo menos 10 caracteres.','err'); if(a!==b) return toast('As palavras-passe não coincidem.','err');
       try{ await cofreCriar(a); if($('#cfL').checked){ COFRE.lembrar=true; await pcPut(pcKey('cofre'),{key:COFRE.key,salt:COFRE.cfg.salt}); } closeModal(); toast(`${ico('check')} Cofre criado e aberto.`,'ok'); procRecarregar(); }catch(e){ toast(esc(e.message),'err'); } }; return; }
-  modal(`${ico('lock')} Abrir o cofre`,`<p class="hint">Com o cofre aberto, as senhas AT/SS aparecem e podem ser gravadas. Fecha sozinho após 45 minutos sem atividade.</p><label class="fld" style="margin-top:10px">Palavra-passe do cofre<input class="inp" type="password" id="cfP" autocomplete="current-password"></label>${lembrarChk('cfL','Lembrar neste computador — não volta a pedir aqui (desmarque num computador partilhado ou público)')}`,`<button class="btn pri" id="cfGo">${ico('lock')} Abrir</button>`);
-  const go2=async()=>{ try{ await cofreAbrir($('#cfP').value); if($('#cfL').checked){ COFRE.lembrar=true; await pcPut(pcKey('cofre'),{key:COFRE.key,salt:COFRE.cfg.salt}); } closeModal(); toast(`${ico('check')} Cofre aberto.`,'ok'); procRecarregar(); }catch(e){ toast(esc(e.message),'err'); } };
+  modal(`${ico('lock')} Abrir o cofre`,`<p class="hint">Com o cofre aberto, as senhas AT/SS aparecem e podem ser gravadas. Fecha sozinho após 45 minutos sem atividade.</p><label class="fld" style="margin-top:10px">Palavra-passe do cofre<input class="inp" type="password" id="cfP" autocomplete="current-password"></label>${lembrarChk('cfE','<b>Abrir sempre, para toda a equipa</b> — é a última vez que pede: passa a abrir sozinho em todos os computadores')}`,`<button class="btn pri" id="cfGo">${ico('lock')} Abrir</button>`);
+  const go2=async()=>{ try{ const pw=$('#cfP').value; if($('#cfE').checked){ await cofreEquipaAtivar(pw); if(!await cofreEquipaAbrir()) throw new Error('Não foi possível ativar o cofre de equipa.'); closeModal(); toast(`${ico('check')} Cofre aberto para toda a equipa — não volta a pedir.`,'ok'); procRecarregar(); return; } await cofreAbrir(pw); if(false){ COFRE.lembrar=true; await pcPut(pcKey('cofre'),{key:COFRE.key,salt:COFRE.cfg.salt}); } closeModal(); toast(`${ico('check')} Cofre aberto.`,'ok'); procRecarregar(); }catch(e){ toast(esc(e.message),'err'); } };
   $('#cfGo').onclick=go2; $('#cfP').onkeydown=e=>{ if(e.key==='Enter') go2(); }; setTimeout(()=>$('#cfP').focus(),50); }
 
 /* ---------- ecrãs dos módulos ---------- */
