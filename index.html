@@ -274,46 +274,96 @@ aside nav::-webkit-scrollbar{width:6px}aside nav::-webkit-scrollbar-thumb{backgr
 @media (max-width:820px){aside{position:fixed;height:auto}}
 
 /* ===== Painel do dia (index.html?painel) ===== */
-html.modo-painel{background:#060A13}
-html.modo-painel body{background:radial-gradient(circle at 80% -10%,#16305A 0%,#060A13 55%) fixed #060A13;min-height:100vh;overflow-y:auto}
+html.modo-painel{background:#050912}
+html.modo-painel body{background:#050912;min-height:100vh;overflow-y:auto;overflow-x:hidden}
 html.modo-painel #login,html.modo-painel #app{display:none!important}
-#painel{max-width:560px;margin:0 auto;padding:14px 14px 10px;color:#E8EEFA;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
-.pn-h{display:flex;align-items:center;gap:12px;padding:6px 2px 14px}
-.pn-h .logo{width:40px;height:40px;border-radius:12px}
-.pn-tt{flex:1;min-width:0}.pn-tt b{display:block;font-size:17px;letter-spacing:.01em}
-.pn-tt small{display:block;color:#93A4B4;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pn-b{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#E8EEFA;font-size:16px;cursor:pointer;display:grid;place-items:center}
-.pn-b:hover{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.5)}
-.pn-b.rodar{animation:pnRodar .9s linear infinite}@keyframes pnRodar{to{transform:rotate(360deg)}}
-.pn-sum{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;margin-bottom:12px;border:1px solid}
-.pn-sum span{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:20px;flex:none}
-.pn-sum b{display:block;font-size:16px}.pn-sum small{color:#A9B6CF;font-size:12px}
-.pn-sum.ok{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.35)}.pn-sum.ok span{background:#22C55E;color:#04170B}
-.pn-sum.red{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.45)}.pn-sum.red span{background:#EF4444;color:#fff}
-.pn-sum.amber{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.4)}.pn-sum.amber span{background:#F59E0B;color:#1A1000}
-.pn-c{border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);margin-bottom:9px;overflow:hidden;border-left:4px solid #3A4A66;transition:background .2s}
-.pn-c.red{border-left-color:#EF4444}.pn-c.amber{border-left-color:#F59E0B}.pn-c.info{border-left-color:#22D3EE}.pn-c.ok{border-left-color:#22C55E}
-.pn-ct{display:flex;align-items:center;gap:11px;padding:11px 12px;cursor:pointer}
+#painel{position:relative;max-width:560px;margin:0 auto;padding:16px 16px 12px;color:#E8EEFA;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.pn-fundo{position:fixed;inset:0;z-index:-1;background:radial-gradient(60% 40% at 85% 0%,rgba(37,99,235,.28),transparent 70%),radial-gradient(50% 35% at 0% 30%,rgba(34,211,238,.14),transparent 70%),linear-gradient(180deg,#0A1426,#050912 60%)}
+.pn-fundo::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(180deg,#000,transparent 70%);-webkit-mask-image:linear-gradient(180deg,#000,transparent 70%)}
+.pn-h{display:flex;align-items:center;gap:12px;padding:2px 2px 16px}
+.pn-h .logo{width:42px;height:42px;border-radius:12px}
+.pn-tt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pn-wm{line-height:0;color:#fff}.pn-wm svg{height:17px;width:auto;aspect-ratio:483.5/84;display:block}
+.pn-tt small{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#7DD3E8;font-weight:700}
+.pn-hora{text-align:right}.pn-hora b{display:block;font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.pn-hora small{font-size:11px;color:#8FA0B6}
+.pn-hero{position:relative;overflow:hidden;display:flex;gap:14px;align-items:center;padding:18px 18px 16px;border-radius:20px;background:linear-gradient(150deg,rgba(22,48,90,.95),rgba(8,16,30,.95));border:1px solid rgba(125,211,232,.18);box-shadow:0 24px 50px -28px rgba(34,211,238,.45),inset 0 1px 0 rgba(255,255,255,.06);margin-bottom:12px}
+.pn-hero::before{content:"";position:absolute;width:260px;height:260px;right:-90px;top:-120px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.28),transparent 65%)}
+.pn-hl{flex:1;min-width:0;position:relative}.pn-hr{position:relative;text-align:center;flex:none}
+.pn-hr small{display:block;font-size:10.5px;color:#8FA0B6;line-height:1.3;margin-top:2px}
+.pn-k{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#22D3EE}
+.pn-hero h2{margin:6px 0 2px;font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
+.pn-hero p{margin:0;font-size:12px;color:#A9B6CF}
+.pn-cd{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.pn-cd div{border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:7px 2px 6px;text-align:center}
+.pn-cd b{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.pn-cd small{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#7F8EA3;margin-top:3px}
+.pn-anel{width:96px;height:96px;display:block}
+.pn-anel-n{fill:#fff;font-size:17px;font-weight:800;font-family:Inter,Arial}.pn-anel-s{fill:#8FA0B6;font-size:9.5px;font-weight:700;font-family:Inter,Arial}
+.pn-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.pn-kp{border-radius:14px;padding:11px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);text-align:center}
+.pn-kp b{display:flex;justify-content:center;align-items:center;height:28px;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.pn-kp small{display:block;font-size:10.5px;color:#8FA0B6;line-height:1.25;margin-top:2px}
+.pn-kp.red{background:linear-gradient(160deg,rgba(239,68,68,.22),rgba(239,68,68,.06));border-color:rgba(239,68,68,.45)}.pn-kp.red b{color:#FCA5A5}
+.pn-kp.amber{background:linear-gradient(160deg,rgba(245,158,11,.2),rgba(245,158,11,.05));border-color:rgba(245,158,11,.4)}.pn-kp.amber b{color:#FCD34D}
+.pn-kp.ok{background:linear-gradient(160deg,rgba(34,197,94,.2),rgba(34,197,94,.05));border-color:rgba(34,197,94,.4)}.pn-kp.ok b{color:#4ADE80}
+.pn-sec{font-size:10.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#7F8EA3;margin:4px 2px 8px;display:flex;align-items:center;gap:10px}
+.pn-sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.12),transparent)}
+.pn-c{border-radius:14px;background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.08);margin-bottom:8px;overflow:hidden;position:relative;animation:pnEntra .5s cubic-bezier(.2,.7,.2,1) both}
+@keyframes pnEntra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pn-c::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#3A4A66}
+.pn-c.red::before{background:#EF4444;box-shadow:0 0 12px #EF4444}.pn-c.amber::before{background:#F59E0B}.pn-c.info::before{background:#22D3EE}.pn-c.ok::before{background:#22C55E}
+.pn-ct{display:flex;align-items:center;gap:11px;padding:11px 12px 10px 14px;cursor:pointer}
 .pn-c.ok .pn-ct{cursor:default}
-.pn-ct:hover{background:rgba(255,255,255,.03)}
-.pn-ic{font-size:17px;width:24px;text-align:center;flex:none}
-.pn-ct>div{flex:1;min-width:0}.pn-ct b{display:block;font-size:13.5px;line-height:1.3}
-.pn-ct small{display:block;color:#93A4B4;font-size:11.5px;line-height:1.35;margin-top:2px}
-.pn-n{font-style:normal;font-weight:800;font-size:20px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
-.pn-n small{font-size:11px;color:#7F8EA3;font-weight:700}
+.pn-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:rgba(34,211,238,.1);color:#22D3EE;border:1px solid rgba(34,211,238,.22)}
+.pn-c.red .pn-ic{background:rgba(239,68,68,.12);color:#F87171;border-color:rgba(239,68,68,.3)}
+.pn-c.amber .pn-ic{background:rgba(245,158,11,.12);color:#FBBF24;border-color:rgba(245,158,11,.3)}
+.pn-c.ok .pn-ic{background:rgba(34,197,94,.1);color:#4ADE80;border-color:rgba(34,197,94,.28)}
+.pn-ct>div{flex:1;min-width:0}.pn-ct b{display:block;font-size:13.5px;font-weight:700;line-height:1.3}
+.pn-ct small{display:block;color:#8FA0B6;font-size:11.5px;line-height:1.35;margin-top:2px}
+.pn-n{font-style:normal;font-weight:800;font-size:21px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;justify-content:flex-end;gap:1px}
+.pn-n small{font-size:11px;color:#6B7A90;font-weight:700}
 .pn-n.red{color:#F87171}.pn-n.amber{color:#FBBF24}.pn-n.info{color:#22D3EE}.pn-n.ok{color:#4ADE80}
-.pn-prog{height:3px;background:rgba(255,255,255,.07);margin:0 12px 9px;border-radius:3px;overflow:hidden}
-.pn-prog i{display:block;height:100%;background:linear-gradient(90deg,#22D3EE,#2563EB);border-radius:3px;transition:width .8s}
+.pn-prog{height:3px;background:rgba(255,255,255,.06);margin:0 14px 10px 59px;border-radius:3px;overflow:hidden}
+.pn-prog i{display:block;height:100%;background:linear-gradient(90deg,#22D3EE,#2563EB);border-radius:3px;transition:width .9s}
 .pn-c.ok .pn-prog i{background:#22C55E}
-.pn-l{display:none;padding:0 12px 12px 47px}
-.pn-c.aberto .pn-l{display:block}
-.pn-l ul{margin:0;padding:0;list-style:none;max-height:260px;overflow:auto}
-.pn-l li{font-size:12.5px;padding:5px 0;border-top:1px solid rgba(255,255,255,.06);color:#D5DEE6}
-.pn-l li.mais{color:#93A4B4}
-.pn-ab{margin-top:8px;font:inherit;font-size:12px;font-weight:700;color:#22D3EE;background:none;border:1px solid rgba(34,211,238,.35);border-radius:8px;padding:5px 10px;cursor:pointer}
-.pn-ab:hover{background:rgba(34,211,238,.12)}
-.pn-load{padding:30px 10px;text-align:center;color:#A9B6CF;font-size:13.5px;line-height:1.6}
-.pn-f{display:flex;justify-content:space-between;gap:10px;color:#6B7A90;font-size:11px;padding:10px 2px 4px}
+.pn-l{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s ease}
+.pn-l>*{overflow:hidden}
+.pn-c.aberto .pn-l{grid-template-rows:1fr}
+.pn-l>div>ul,.pn-l>div>button{margin-left:14px;margin-right:12px}
+.pn-l ul{margin-top:0;margin-bottom:0;padding:0;list-style:none;max-height:300px;overflow:auto}
+.pn-l li{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}
+.pn-l li>div{flex:1;min-width:0}.pn-l li b{display:block;font-size:12.5px;font-weight:600;color:#E8EEFA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-l li small{display:block;font-size:11px;color:#8FA0B6}
+.pn-l li em{font-style:normal;font-size:12px;font-weight:800;color:#FCD34D;white-space:nowrap}
+.pn-av{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none;font-size:11.5px;font-weight:800;color:#0A1426;background:linear-gradient(135deg,#22D3EE,#2563EB)}
+.pn-l li.mais{color:#8FA0B6;font-size:12px}
+.pn-ab{display:inline-flex;align-items:center;gap:6px;margin:8px 0 12px;font:inherit;font-size:12px;font-weight:700;color:#22D3EE;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.3);border-radius:9px;padding:6px 11px;cursor:pointer;width:max-content}
+.pn-ab:hover{background:rgba(34,211,238,.16)}
+.pn-cal{border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);padding:4px 12px;margin-bottom:12px}
+.pn-cr{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)}
+.pn-cr:first-child{border-top:0}
+.pn-dt{width:38px;height:38px;border-radius:10px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)}
+.pn-dt b{font-size:15px;font-weight:800}.pn-dt small{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#8FA0B6;margin-top:2px}
+.pn-cr.perto .pn-dt{background:linear-gradient(135deg,#22D3EE,#2563EB);border-color:transparent;color:#05101E}.pn-cr.perto .pn-dt small{color:#05101E}
+.pn-cx{flex:1;min-width:0}.pn-cx b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pn-cx small{display:block;font-size:11px;color:#8FA0B6}
+.pn-tag{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.07);color:#A9B6CF;flex:none}
+.pn-tag.t-iva{background:rgba(34,211,238,.12);color:#67E8F9}.pn-tag.t-ss{background:rgba(34,197,94,.12);color:#86EFAC}.pn-tag.t-irs{background:rgba(167,139,250,.14);color:#C4B5FD}.pn-tag.t-anual{background:rgba(245,158,11,.14);color:#FCD34D}
+.pn-q{font-size:11.5px;font-weight:700;color:#A9B6CF;min-width:42px;text-align:right;flex:none}
+.pn-cr.perto .pn-q{color:#22D3EE}
+.pn-load{padding:26px 10px;text-align:center;color:#A9B6CF;font-size:13px;line-height:1.6}
+.pn-sp{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(34,211,238,.3);border-top-color:#22D3EE;animation:pnRodar .8s linear infinite;vertical-align:-2px;margin-right:8px}
+.pn-f{display:flex;justify-content:space-between;gap:8px;padding:4px 0 6px}
+.pn-b{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#A9B6CF;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.pn-b:hover{background:rgba(255,255,255,.08);color:#fff}
+.pn-bp{background:linear-gradient(135deg,#0891B2,#2563EB);border-color:transparent;color:#fff;font-weight:700}
+.pn-bp:hover{filter:brightness(1.1)}
+.pn-b.rodar svg{animation:pnRodar .9s linear infinite}@keyframes pnRodar{to{transform:rotate(360deg)}}
+.pn-copy{text-align:center;font-size:10.5px;color:#5B6A80;letter-spacing:.04em;padding:6px 0 2px}
+@media (max-width:380px){.pn-hr{display:none}.pn-hora small{display:none}}
+
+.side-foot .copy{order:9;font-size:10.5px;color:var(--ink2);opacity:.75;letter-spacing:.02em;text-align:center;padding-top:4px;border-top:1px dashed var(--line)}
+.login-copy{text-align:center;font-size:11px;color:var(--ink2);opacity:.8;margin-top:14px;letter-spacing:.02em}
 </style>
 </head>
 <body>
@@ -391,6 +441,7 @@ html.modo-painel #login,html.modo-painel #app{display:none!important}
    <button class="btn gold block" id="localBtn"><svg class="i"><use href="#i-cpu"/></svg>Entrar em modo local (sem nuvem)</button>
   </div>
   <div class="login-foot">Os ficheiros SAF-T são analisados neste computador e nunca são enviados para a internet.</div>
+  <div class="login-copy">© <span data-ano-anx>2026</span> AuditNux · Centro de Auditoria · Todos os direitos reservados</div>
  </div>
 </div>
 
@@ -419,6 +470,7 @@ html.modo-painel #login,html.modo-painel #app{display:none!important}
    <div class="nav adm" data-v="contas" style="display:none"><svg class="i"><use href="#i-users"/></svg>Contas da plataforma<span class="badge b-acc">Admin</span></div>
   </nav>
   <div class="side-foot">
+   <div class="copy">© <span data-ano-anx>2026</span> AuditNux · Centro de Auditoria · Todos os direitos reservados</div>
    <div class="ws"><span class="muted">Espaço</span><b id="wsName">—</b></div>
    <div class="cloud"><span class="dot" id="cloudDot"></span><span id="cloudTxt">—</span></div>
    <div class="row" style="justify-content:space-between"><span>Operador: <b id="operName">—</b></span>
@@ -708,7 +760,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.20.1';
+const APP_VERSION = '1.21.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -5571,13 +5623,16 @@ async function procExportar(db){ if(!COFRE.key&&!confirm('Com o cofre fechado, a
   GUIA.forEach((c,k)=>c.n=String(k+1).padStart(2,'0')); if(typeof GUIA_CTX!=='undefined') for(const m of PROC_MOD) GUIA_CTX[m.v]='proc'; if(typeof GUIA_NOME!=='undefined') for(const m of PROC_MOD) GUIA_NOME[m.v]=m.l; })();
 
 /* =====================================================================
-   AuditNux 1.20 — PAINEL DO DIA (janela pequena no ambiente de trabalho)
+   AuditNux 1.21 — PAINEL DO DIA (janela pequena no ambiente de trabalho)
    Abre com  index.html?painel  — usa a mesma sessão e os mesmos dados do
    «IVA · SAF-T · DMR · SS» (Processamento mensal). Só lê; nunca grava.
    ===================================================================== */
 const MODO_PAINEL = /[?&]painel\b/.test(location.search);
 const RODAPE_ANTIGO = 'Relatório gerado pelo AuditNux — Centro de Auditoria SAF-T';
-const PNL = { t: 0, timer: 0, dados: null, erro: '', abertos: {} };
+const PNL = { t: 0, timer: 0, tick: 0, dados: null, erro: '', abertos: {}, alvo: null };
+
+/* ano corrente no direito de autor (login e menu) */
+document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('[data-ano-anx]').forEach(e => e.textContent = new Date().getFullYear()));
 
 /* ligação direta a um módulo: index.html#v=proc_int */
 (function () {
@@ -5610,18 +5665,52 @@ function pnlHoje() { const h = new Date(); h.setHours(0, 0, 0, 0); return h; }
 function pnlDias(d) { return Math.round((d - pnlHoje()) / 864e5); }
 const PNL_M3 = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const PNL_MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const PNL_DS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 const pnlData = d => d.getDate() + ' ' + PNL_M3[d.getMonth()];
 const pnlQuando = n => n < 0 ? (Math.abs(n) + (Math.abs(n) === 1 ? ' dia' : ' dias') + ' de atraso') : n === 0 ? 'termina hoje' : n === 1 ? 'termina amanhã' : 'faltam ' + n + ' dias';
 const pnlKey = n => String(n || '').replace(/\.|\//g, '_').replace(/#/g, '_').replace(/\$/g, '_').replace(/\[/g, '_').replace(/\]/g, '_');
 const pnlArr = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
+const pnlEur = v => (+v || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+const PNL_IC = {
+  iva: '<path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',
+  alerta: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/>',
+  cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  euro: '<path d="M17 6.5A7 7 0 1 0 17 17.5"/><path d="M4 10.5h9M4 13.5h9"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c1.9.7 3.1 2.4 3.5 5.3"/>',
+  ok: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', seta: '<path d="M7 17 17 7M9 7h8v8"/>', relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  r: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>' };
+const pnlI = (n, s) => `<svg width="${s || 18}" height="${s || 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PNL_IC[n]}</svg>`;
 
 /* ---------- leitura dos dados (só leitura) ---------- */
 async function pnlLer() {
   const P = await procLoadLib();
   try { P._reset && P._reset(); } catch (e) {}
   const L = k => P.read('interno', ['dafilgest', k]).catch(() => null);
-  const [meta, iva, saft, dmr, ssdecl, planos] = await Promise.all([L('meta'), L('iva'), L('saft'), L('dmr'), L('ssdecl'), L('planosAT')]);
-  return { meta: meta || {}, iva: iva || {}, saft: saft || {}, dmr: dmr || {}, ssdecl: ssdecl || {}, planos: pnlArr(planos) };
+  const [meta, iva, saft, ssdecl, planos] = await Promise.all([L('meta'), L('iva'), L('saft'), L('ssdecl'), L('planosAT')]);
+  return { meta: meta || {}, iva: iva || {}, saft: saft || {}, ssdecl: ssdecl || {}, planos: pnlArr(planos) };
+}
+
+/* ---------- calendário fiscal geral (sem DMR/DRI) ---------- */
+function pnlCalendario(n) {
+  const hoje = pnlHoje(), Y = hoje.getFullYear(), m0 = hoje.getMonth(), L = [];
+  const add = (y, m, d, t, s, c) => { const ef = pnlUtil(y, m, d); if (ef >= hoje) L.push({ ef, t, s, c }); };
+  for (let k = 0; k < 14; k++) {
+    const y = Y + Math.floor((m0 + k) / 12), m = (m0 + k) % 12, pm = (m + 11) % 12, pm2 = (m + 10) % 12;
+    add(y, m, 5, 'Comunicação das faturas', 'Faturas de ' + PNL_MES[pm], 'Faturação');
+    add(y, m, 20, 'Segurança Social · contribuições', 'Contribuições de ' + PNL_MES[pm], 'SS');
+    add(y, m, 20, 'Retenções na fonte · IRS/IRC', 'Retenções de ' + PNL_MES[pm], 'IRS');
+    add(y, m, 20, 'IVA mensal · declaração', 'Período de ' + PNL_MES[pm2], 'IVA');
+    add(y, m, 25, 'IVA mensal · pagamento', 'Período de ' + PNL_MES[pm2], 'IVA');
+    if ([1, 4, 7, 10].includes(m)) { const q = { 1: 4, 4: 1, 7: 2, 10: 3 }[m]; add(y, m, 20, 'IVA trimestral · declaração', q + '.º trimestre', 'IVA'); add(y, m, 25, 'IVA trimestral · pagamento', q + '.º trimestre', 'IVA'); }
+    if (m === 0) add(y, 0, 31, 'Comunicação de inventários', 'A 31 de dezembro', 'Anual');
+    if (m === 4) add(y, 4, 31, 'Modelo 22 · IRC', 'Exercício de ' + (y - 1), 'Anual');
+    if (m === 5) add(y, 5, 30, 'IRS · fim do prazo', 'Rendimentos de ' + (y - 1), 'Anual');
+    if (m === 6) { add(y, 6, 15, 'IES', 'Exercício de ' + (y - 1), 'Anual'); add(y, 6, 31, '1.º pagamento por conta', 'IRC ' + y, 'Anual'); }
+    if (m === 8) add(y, 8, 30, '2.º pagamento por conta', 'IRC ' + y, 'Anual');
+    if (m === 11) add(y, 11, 15, '3.º pagamento por conta', 'IRC ' + y, 'Anual');
+  }
+  return L.sort((a, b) => a.ef - b.ef).slice(0, n || 6);
 }
 
 /* ---------- regras: o que é relevante hoje ---------- */
@@ -5629,53 +5718,44 @@ function pnlCalcular(D) {
   const hoje = pnlHoje(), Y = hoje.getFullYear(), mi = hoje.getMonth();
   const emp = pnlArr(D.meta.empresasIVA).filter(e => e && e.ativa === 'Sim');
   const enviado = (ano, nome, k) => { const t = ((D.iva[ano] || {})[pnlKey(nome)] || {})[k]; return !!(t && t.dataEnvio); };
-  const B = [];   // blocos
+  const temAno = a => !!D.iva[String(a)];
+  const R = { blocos: [], ivaT: null };
   /* IVA trimestral */
   const trim = emp.filter(e => e.periodo === 'Trimestral');
   const per = [];
-  const temAno = a => !!D.iva[String(a)];
   [Y - 1, Y].filter(temAno).forEach(a => [1, 2, 3, 4].forEach(q => { const env = q === 4 ? pnlUtil(a + 1, 1, 20) : pnlUtil(a, q * 3 + 1, 20); const pag = q === 4 ? pnlUtil(a + 1, 1, 25) : pnlUtil(a, q * 3 + 1, 25); per.push({ a, q, k: 'T' + q, env, pag }); }));
   const atualT = per.filter(p => p.env >= hoje).sort((x, y) => x.env - y.env)[0];
-  if (atualT && trim.length) {
-    const falta = trim.filter(e => !enviado(String(atualT.a), e.nome, atualT.k)).map(e => e.nome);
-    const n = pnlDias(atualT.env);
-    B.push({ id: 'ivat', ic: '🟡', t: `IVA trimestral · ${atualT.q}.º trim. ${atualT.a}`, sub: `Envio até ${pnlData(atualT.env)} (${pnlQuando(n)}) · pagamento até ${pnlData(atualT.pag)}`,
-      n: falta.length, de: trim.length, nivel: !falta.length ? 'ok' : n <= 3 ? 'red' : n <= 15 ? 'amber' : 'info', lista: falta, ok: `${trim.length} de ${trim.length} enviadas`, link: 'proc_int' });
-  }
-  const atrasoT = [];
-  per.filter(p => p.env < hoje && p.a === Y || (p.a === Y - 1 && p.q === 4 && p.env < hoje)).forEach(p => trim.forEach(e => { if (!enviado(String(p.a), e.nome, p.k)) atrasoT.push(`${e.nome} · ${p.q}.º trim.`); }));
+  const atraso = [];
+  per.filter(p => p.env < hoje && (p.a === Y || p.q === 4)).forEach(p => trim.forEach(e => { if (!enviado(String(p.a), e.nome, p.k)) atraso.push({ nome: e.nome, det: p.q + '.º trim. ' + p.a }); }));
   /* IVA mensal */
   const mens = emp.filter(e => e.periodo === 'Mensal');
   const perM = [];
-  [Y - 1, Y].filter(temAno).forEach(a => { for (let m = 0; m < 12; m++) { const env = pnlUtil(m >= 10 ? a + 1 : a, (m + 2) % 12, 20); perM.push({ a, m, k: 'M' + (m + 1), env, pag: pnlUtil(m >= 10 ? a + 1 : a, (m + 2) % 12, 25) }); } });
+  [Y - 1, Y].filter(temAno).forEach(a => { for (let m = 0; m < 12; m++) perM.push({ a, m, k: 'M' + (m + 1), env: pnlUtil(m >= 10 ? a + 1 : a, (m + 2) % 12, 20), pag: pnlUtil(m >= 10 ? a + 1 : a, (m + 2) % 12, 25) }); });
   const atualM = perM.filter(p => p.env >= hoje).sort((x, y) => x.env - y.env)[0];
-  if (atualM && mens.length) {
-    const falta = mens.filter(e => !enviado(String(atualM.a), e.nome, atualM.k)).map(e => e.nome); const n = pnlDias(atualM.env);
-    B.push({ id: 'ivam', ic: '🟠', t: `IVA mensal · ${PNL_MES[atualM.m]} ${atualM.a}`, sub: `Envio até ${pnlData(atualM.env)} (${pnlQuando(n)}) · pagamento até ${pnlData(atualM.pag)}`,
-      n: falta.length, de: mens.length, nivel: !falta.length ? 'ok' : n <= 3 ? 'red' : n <= 15 ? 'amber' : 'info', lista: falta, ok: `${mens.length} de ${mens.length} enviadas`, link: 'proc_int' });
+  perM.filter(p => p.env < hoje && (p.a === Y || p.m >= 10)).forEach(p => mens.forEach(e => { if (!enviado(String(p.a), e.nome, p.k)) atraso.push({ nome: e.nome, det: PNL_MES[p.m] + ' ' + p.a }); }));
+  if (atraso.length) R.blocos.push({ id: 'atraso', ic: 'alerta', t: 'IVA em atraso', sub: 'Períodos terminados sem data de envio', n: atraso.length, nivel: 'red', lista: atraso, link: 'proc_int' });
+  if (atualT && trim.length) {
+    const falta = trim.filter(e => !enviado(String(atualT.a), e.nome, atualT.k)).map(e => ({ nome: e.nome })); const n = pnlDias(atualT.env);
+    R.ivaT = { q: atualT.q, a: atualT.a, env: atualT.env, pag: atualT.pag, feitas: trim.length - falta.length, total: trim.length, n };
+    R.blocos.push({ id: 'ivat', ic: 'iva', t: `IVA trimestral · ${atualT.q}.º trimestre`, sub: `Envio até ${pnlData(atualT.env)} · ${pnlQuando(n)}`, n: falta.length, de: trim.length, nivel: !falta.length ? 'ok' : n <= 3 ? 'red' : n <= 15 ? 'amber' : 'info', lista: falta, ok: `Todas as ${trim.length} enviadas`, link: 'proc_int' });
   }
-  perM.filter(p => p.env < hoje && (p.a === Y || p.m >= 10)).forEach(p => mens.forEach(e => { if (!enviado(String(p.a), e.nome, p.k)) atrasoT.push(`${e.nome} · ${PNL_M3[p.m]}`); }));
-  if (atrasoT.length) B.unshift({ id: 'atraso', ic: '🔴', t: 'Declarações de IVA em atraso', sub: 'Períodos já terminados sem data de envio no Mapa IVA', n: atrasoT.length, nivel: 'red', lista: atrasoT, link: 'proc_int' });
+  if (atualM && mens.length) {
+    const falta = mens.filter(e => !enviado(String(atualM.a), e.nome, atualM.k)).map(e => ({ nome: e.nome })); const n = pnlDias(atualM.env);
+    R.blocos.push({ id: 'ivam', ic: 'iva', t: `IVA mensal · ${PNL_MES[atualM.m]}`, sub: `Envio até ${pnlData(atualM.env)} · ${pnlQuando(n)}`, n: falta.length, de: mens.length, nivel: !falta.length ? 'ok' : n <= 3 ? 'red' : n <= 15 ? 'amber' : 'info', lista: falta, ok: `Todas as ${mens.length} enviadas`, link: 'proc_int' });
+  }
   /* Planos AT */
   const pl = [];
-  D.planos.forEach(p => pnlArr(p && p.prestacoes).forEach(pr => { if (!pr || pr.paga) return; const d = new Date(pr.data); d.setHours(0, 0, 0, 0); const n = pnlDias(d); if (n <= 7) pl.push({ n, txt: `${p.cliente} · ${p.decl} · ${pnlData(d)} · ${(+pr.valor || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, q: pnlQuando(n) }); }));
+  D.planos.forEach(p => pnlArr(p && p.prestacoes).forEach(pr => { if (!pr || pr.paga) return; const d = new Date(pr.data); d.setHours(0, 0, 0, 0); const n = pnlDias(d); if (n <= 7) pl.push({ n, nome: p.cliente, det: `${p.decl} · ${pnlData(d)} · ${pnlQuando(n)}`, val: pnlEur(pr.valor) }); }));
   pl.sort((a, b) => a.n - b.n);
-  B.push({ id: 'planos', ic: '📅', t: 'Planos de pagamento AT', sub: pl.length ? 'Prestações vencidas ou nos próximos 7 dias' : 'Nenhuma prestação nos próximos 7 dias', n: pl.length, nivel: !pl.length ? 'ok' : pl.some(x => x.n <= 3) ? 'red' : 'amber', lista: pl.map(x => x.txt + ' — ' + x.q), ok: 'Sem prestações a pagar esta semana', link: 'proc_int' });
+  R.planosTotal = pl.reduce((s, x) => s + (parseFloat(String(x.val).replace(/\./g, '').replace(',', '.')) || 0), 0);
+  R.blocos.push({ id: 'planos', ic: 'euro', t: 'Planos de pagamento AT', sub: pl.length ? 'Prestações vencidas ou até 7 dias' : 'Nenhuma prestação nos próximos 7 dias', n: pl.length, nivel: !pl.length ? 'ok' : pl.some(x => x.n <= 3) ? 'red' : 'amber', lista: pl, ok: 'Sem prestações esta semana', link: 'proc_int' });
   /* SAF-T de faturação do mês anterior (até dia 5) */
   const nomesSAFT = pnlArr(D.meta.nomesSAFT);
   if (nomesSAFT.length) {
     const pm = mi === 0 ? 11 : mi - 1, pa = mi === 0 ? Y - 1 : Y, dl = pnlUtil(Y, mi, 5), n = pnlDias(dl);
     const s = D.saft[String(pa)] || {};
-    const falta = nomesSAFT.filter(nm => { const o = s[pnlKey(nm)] || {}; const est = Array.isArray(o) ? o : (o.estados || {}); return !est[pm * 2] && !est[String(pm * 2)]; });
-    B.push({ id: 'saft', ic: '📁', t: `SAF-T de faturação · ${PNL_MES[pm]}`, sub: `Até ${pnlData(dl)} (${pnlQuando(n)})`, n: falta.length, de: nomesSAFT.length, nivel: !falta.length ? 'ok' : n < 0 ? 'red' : n <= 3 ? 'amber' : 'info', lista: falta, ok: `${nomesSAFT.length} de ${nomesSAFT.length} tratados`, link: 'proc_int' });
-  }
-  /* DMR / DRI do mês anterior (até dia 10) */
-  const ed = pnlArr(D.meta.empresasDMR);
-  if (ed.length) {
-    const pm = mi === 0 ? 12 : mi, pa = mi === 0 ? Y - 1 : Y, dl = pnlUtil(Y, mi, 10), n = pnlDias(dl);
-    const s = D.dmr[String(pa)] || {};
-    const falta = []; ed.forEach(e => { const r = (s[pnlKey(String(e.nif))] || {})[pm] || {}; const f = []; if (r.ss == null) f.push('SS'); if (r.at == null) f.push('AT'); if (f.length) falta.push(`${e.nome} · ${f.join(' + ')}`); });
-    B.push({ id: 'dmr', ic: '📤', t: `DMR / DRI · ${PNL_MES[pm - 1]}`, sub: `Até ${pnlData(dl)} (${pnlQuando(n)})`, n: falta.length, de: ed.length, nivel: !falta.length ? 'ok' : n < 0 ? 'red' : n <= 3 ? 'amber' : 'info', lista: falta, ok: `${ed.length} de ${ed.length} enviadas`, link: 'proc_int' });
+    const falta = nomesSAFT.filter(nm => { const o = s[pnlKey(nm)] || {}; const est = Array.isArray(o) ? o : (o.estados || {}); return !est[pm * 2] && !est[String(pm * 2)]; }).map(nome => ({ nome }));
+    R.blocos.push({ id: 'saft', ic: 'file', t: `SAF-T · ${PNL_MES[pm]}`, sub: `Até ${pnlData(dl)} · ${pnlQuando(n)}`, n: falta.length, de: nomesSAFT.length, nivel: !falta.length ? 'ok' : n < 0 ? 'red' : n <= 3 ? 'amber' : 'info', lista: falta, ok: `Todos os ${nomesSAFT.length} tratados`, link: 'proc_int' });
   }
   /* Independentes — declaração trimestral (janeiro, abril, julho, outubro) */
   const mk = { 0: 'jan', 3: 'abr', 6: 'jul', 9: 'out' }[mi];
@@ -5683,54 +5763,90 @@ function pnlCalcular(D) {
   if (mk && decl.length) {
     const NA = { ABRIL: ['jan'], JULHO: ['jan', 'abr'], OUTUBRO: ['jan', 'abr', 'jul'] };
     const s = D.ssdecl[String(Y)] || {}; const dl = pnlUtil(Y, mi, new Date(Y, mi + 1, 0).getDate()); const n = pnlDias(dl);
-    const falta = decl.map((d, i) => ({ d, i })).filter(x => x.d && !(NA[x.d.mesInicio] || []).includes(mk) && !((s[x.i] || {})[mk])).map(x => x.d.nome);
-    B.push({ id: 'ssdecl', ic: '📋', t: 'Independentes · declaração trimestral', sub: `Até ${pnlData(dl)} (${pnlQuando(n)})`, n: falta.length, de: decl.length, nivel: !falta.length ? 'ok' : n <= 5 ? 'red' : 'amber', lista: falta, ok: 'Todas entregues', link: 'proc_int' });
+    const falta = decl.map((d, i) => ({ d, i })).filter(x => x.d && !(NA[x.d.mesInicio] || []).includes(mk) && !((s[x.i] || {})[mk])).map(x => ({ nome: x.d.nome }));
+    R.blocos.push({ id: 'ssdecl', ic: 'users', t: 'Independentes · declaração', sub: `Até ${pnlData(dl)} · ${pnlQuando(n)}`, n: falta.length, de: decl.length, nivel: !falta.length ? 'ok' : n <= 5 ? 'red' : 'amber', lista: falta, ok: 'Todas entregues', link: 'proc_int' });
   }
-  return B;
+  return R;
 }
 
 /* ---------- desenho ---------- */
 function painelIniciar() {
   let el = $('#painel');
   if (!el) { document.body.insertAdjacentHTML('beforeend', '<div id="painel"></div>'); el = $('#painel'); }
-  el.innerHTML = `<header class="pn-h"><div class="logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-anx"/></svg></div>
-    <div class="pn-tt"><b>Painel do dia</b><small id="pnData"></small></div>
-    <button class="pn-b" id="pnR" title="Atualizar agora">↻</button><button class="pn-b" id="pnA" title="Abrir o AuditNux completo">↗</button></header>
-    <div id="pnResumo"></div><div id="pnCorpo"><div class="pn-load">A ler os dados…</div></div>
-    <footer class="pn-f"><span id="pnAt"></span><span>AuditNux · Centro de Auditoria</span></footer>`;
+  el.innerHTML = `<div class="pn-fundo" aria-hidden="true"></div>
+  <header class="pn-h"><div class="logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-anx"/></svg></div>
+    <div class="pn-tt"><span class="pn-wm"><svg aria-hidden="true"><use href="#i-anx-wm"/></svg></span><small>Painel do dia</small></div>
+    <div class="pn-hora"><b id="pnHora">--:--</b><small id="pnData"></small></div></header>
+  <div id="pnHero"></div><div id="pnKpi"></div>
+  <div class="pn-sec">Acompanhamento</div><div id="pnCorpo"><div class="pn-load"><span class="pn-sp"></span>A ler os dados…</div></div>
+  <div class="pn-sec">Próximos prazos</div><div id="pnCal"></div>
+  <footer class="pn-f"><button class="pn-b" id="pnR" title="Atualizar agora">${pnlI('r', 15)}<span id="pnAt">—</span></button>
+    <button class="pn-b pn-bp" id="pnA" title="Abrir o AuditNux completo">Abrir o AuditNux ${pnlI('seta', 14)}</button></footer>
+  <div class="pn-copy">© <span>${new Date().getFullYear()}</span> AuditNux · Centro de Auditoria</div>`;
   $('#pnR').onclick = () => painelAtualizar(true);
   $('#pnA').onclick = () => pnlAbrir();
-  const relogio = () => { const d = new Date(); const t = d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }); $('#pnData').textContent = t.charAt(0).toUpperCase() + t.slice(1) + ' · ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }); };
-  relogio(); setInterval(relogio, 15000);
+  const relogio = () => { const d = new Date(); $('#pnHora').textContent = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }); $('#pnData').textContent = PNL_DS[d.getDay()] + ', ' + d.getDate() + ' de ' + PNL_MES[d.getMonth()]; };
+  relogio(); setInterval(relogio, 10000);
+  clearInterval(PNL.tick); PNL.tick = setInterval(pnlContagem, 1000);
   painelAtualizar();
   clearInterval(PNL.timer); PNL.timer = setInterval(() => painelAtualizar(), 120000);
   window.addEventListener('focus', () => { if (Date.now() - PNL.t > 30000) painelAtualizar(); });
 }
 function pnlAbrir(v) { const u = location.href.split('?')[0].split('#')[0] + (v ? '#v=' + v : ''); const w = window.open(u, 'auditnux'); try { w && w.focus(); } catch (e) {} }
 async function painelAtualizar(manual) {
-  if (!S.cloud || !S.cloud.on) { $('#pnCorpo').innerHTML = '<div class="pn-load">O painel precisa da ligação à nuvem do AuditNux. Entre com o seu email no AuditNux e volte a abrir o painel.</div>'; return; }
+  if (!S.cloud || !S.cloud.on) { $('#pnCorpo').innerHTML = '<div class="pn-load">O painel precisa da ligação à nuvem do AuditNux. Entre com o seu email no AuditNux e volte a abrir o painel.</div>'; pnlDesenharCal(); return; }
   if (manual) $('#pnR').classList.add('rodar');
   try {
     const mg = await procMig('interno');
-    if (!mg || !mg.ok) { $('#pnCorpo').innerHTML = '<div class="pn-load">Os dados do Processamento mensal ainda não estão no AuditNux.</div>'; return; }
+    if (!mg || !mg.ok) { $('#pnCorpo').innerHTML = '<div class="pn-load">Os dados do Processamento mensal ainda não estão no AuditNux.</div>'; pnlDesenharCal(); return; }
     PNL.dados = await pnlLer(); PNL.t = Date.now(); PNL.erro = '';
   } catch (e) { console.error(e); PNL.erro = e.message || String(e); }
-  $('#pnR').classList.remove('rodar');
+  setTimeout(() => $('#pnR') && $('#pnR').classList.remove('rodar'), 500);
   painelDesenhar();
 }
+function pnlAnel(feitas, total, cor) {
+  const r = 34, c = 2 * Math.PI * r, p = total ? feitas / total : 1;
+  return `<svg class="pn-anel" viewBox="0 0 84 84" aria-hidden="true"><defs><linearGradient id="pnAg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22D3EE"/><stop offset="1" stop-color="#2563EB"/></linearGradient></defs>
+    <circle cx="42" cy="42" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
+    <circle cx="42" cy="42" r="${r}" fill="none" stroke="${cor || 'url(#pnAg)'}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 42 42)" style="transition:stroke-dashoffset 1.2s cubic-bezier(.2,.7,.2,1)"/>
+    <text x="42" y="40" text-anchor="middle" class="pn-anel-n">${Math.round(p * 100)}%</text><text x="42" y="55" text-anchor="middle" class="pn-anel-s">${feitas}/${total}</text></svg>`;
+}
+function pnlContagem() {
+  const el = $('#pnCd'); if (!el || !PNL.alvo) return;
+  const fim = new Date(PNL.alvo); fim.setHours(23, 59, 59, 999); const ms = Math.max(0, fim - new Date());
+  const v = [Math.floor(ms / 864e5), Math.floor(ms % 864e5 / 36e5), Math.floor(ms % 36e5 / 6e4), Math.floor(ms % 6e4 / 1e3)];
+  el.querySelectorAll('b').forEach((b, i) => { const t = String(v[i]).padStart(2, '0'); if (b.textContent !== t) b.textContent = t; });
+}
+function pnlDesenharCal() {
+  const C = pnlCalendario(6);
+  $('#pnCal').innerHTML = `<div class="pn-cal">${C.map(c => { const n = pnlDias(c.ef); return `<div class="pn-cr${n <= 2 ? ' perto' : ''}"><div class="pn-dt"><b>${c.ef.getDate()}</b><small>${PNL_M3[c.ef.getMonth()]}</small></div><div class="pn-cx"><b>${esc(c.t)}</b><small>${esc(c.s)}</small></div><em class="pn-tag t-${c.c.toLowerCase()}">${c.c}</em><span class="pn-q">${n === 0 ? 'hoje' : n === 1 ? 'amanhã' : n + ' d'}</span></div>`; }).join('')}</div>`;
+  /* destaque: o próximo prazo, em contagem decrescente */
+  const p = C[0]; if (!p) return;
+  PNL.alvo = p.ef;
+  const R = PNL.dados ? pnlCalcular(PNL.dados) : null;
+  const iv = R && R.ivaT;
+  $('#pnHero').innerHTML = `<section class="pn-hero"><div class="pn-hl"><span class="pn-k">${pnlI('relogio', 14)} Próximo prazo</span><h2>${esc(p.t)}</h2><p>${esc(p.s)} · ${PNL_DS[p.ef.getDay()]}, ${p.ef.getDate()} de ${PNL_MES[p.ef.getMonth()]}</p>
+    <div class="pn-cd" id="pnCd"><div><b>00</b><small>dias</small></div><div><b>00</b><small>horas</small></div><div><b>00</b><small>min</small></div><div><b>00</b><small>seg</small></div></div></div>
+    ${iv ? `<div class="pn-hr">${pnlAnel(iv.feitas, iv.total, iv.feitas === iv.total ? '#22C55E' : null)}<small>IVA ${iv.q}.º trim.<br>enviadas</small></div>` : ''}</section>`;
+  pnlContagem();
+}
 function painelDesenhar() {
+  pnlDesenharCal();
   if (!PNL.dados) { $('#pnCorpo').innerHTML = `<div class="pn-load">${PNL.erro ? 'Sem ligação: ' + esc(PNL.erro) : 'A ler os dados…'}</div>`; return; }
-  const B = pnlCalcular(PNL.dados);
-  const urg = B.filter(b => b.nivel === 'red' && b.n).length, at = B.filter(b => b.nivel === 'amber' && b.n).length;
-  $('#pnResumo').innerHTML = !urg && !at
-    ? `<div class="pn-sum ok"><span>✓</span><div><b>Tudo em dia</b><small>Nada urgente para hoje</small></div></div>`
-    : `<div class="pn-sum ${urg ? 'red' : 'amber'}"><span>${urg ? '!' : '•'}</span><div><b>${urg ? urg + (urg === 1 ? ' assunto urgente' : ' assuntos urgentes') : at + (at === 1 ? ' assunto a vigiar' : ' assuntos a vigiar')}</b><small>${urg && at ? at + ' a vigiar · ' : ''}toque num cartão para ver as empresas</small></div></div>`;
-  $('#pnCorpo').innerHTML = B.map(b => {
+  const R = pnlCalcular(PNL.dados), B = R.blocos;
+  const urg = B.filter(b => b.nivel === 'red' && b.n).length, vig = B.filter(b => (b.nivel === 'amber' || b.nivel === 'info') && b.n).length;
+  const tot = id => (B.find(b => b.id === id) || {}).n || 0;
+  $('#pnKpi').innerHTML = `<div class="pn-kpis">
+    <div class="pn-kp ${urg ? 'red' : vig ? 'amber' : 'ok'}"><b>${urg ? urg : vig ? vig : pnlI('ok', 22)}</b><small>${urg ? (urg === 1 ? 'assunto urgente' : 'assuntos urgentes') : vig ? 'a vigiar' : 'tudo em dia'}</small></div>
+    <div class="pn-kp"><b>${tot('ivat') + tot('ivam') + tot('atraso')}</b><small>IVA por enviar</small></div>
+    <div class="pn-kp"><b>${tot('planos')}</b><small>prestações AT · 7 dias</small></div></div>`;
+  $('#pnCorpo').innerHTML = B.map((b, k) => {
     const aberto = PNL.abertos[b.id] ?? (b.nivel === 'red' && b.n > 0);
-    const cont = b.n ? `<em class="pn-n ${b.nivel}">${b.n}${b.de ? '<small>/' + b.de + '</small>' : ''}</em>` : `<em class="pn-n ok">✓</em>`;
-    const lista = b.n ? `<ul>${b.lista.slice(0, 40).map(x => `<li>${esc(x)}</li>`).join('')}${b.lista.length > 40 ? `<li class="mais">e mais ${b.lista.length - 40}…</li>` : ''}</ul><button class="pn-ab" data-v="${b.link}">Abrir no AuditNux ↗</button>` : '';
+    const cont = b.n ? `<em class="pn-n ${b.nivel}">${b.n}${b.de ? '<small>/' + b.de + '</small>' : ''}</em>` : `<em class="pn-n ok">${pnlI('ok', 20)}</em>`;
+    const linhas = b.lista.slice(0, 40).map(x => `<li><span class="pn-av">${esc(String(x.nome || '?').replace(/[^A-Za-zÀ-ÿ0-9]/g, '').slice(0, 1).toUpperCase())}</span><div><b>${esc(x.nome || '')}</b>${x.det ? `<small>${esc(x.det)}</small>` : ''}</div>${x.val ? `<em>${esc(x.val)}</em>` : ''}</li>`).join('');
+    const lista = b.n ? `<div><ul>${linhas}${b.lista.length > 40 ? `<li class="mais">e mais ${b.lista.length - 40}…</li>` : ''}</ul><button class="pn-ab" data-v="${b.link}">Ver no AuditNux ${pnlI('seta', 13)}</button></div>` : '';
     const prog = b.de ? `<div class="pn-prog"><i style="width:${Math.round((b.de - b.n) / b.de * 100)}%"></i></div>` : '';
-    return `<section class="pn-c ${b.n ? b.nivel : 'ok'}${aberto && b.n ? ' aberto' : ''}" data-id="${b.id}"><div class="pn-ct"><span class="pn-ic">${b.ic}</span><div><b>${esc(b.t)}</b><small>${esc(b.n ? b.sub : (b.ok || b.sub))}</small></div>${cont}</div>${prog}${b.n ? `<div class="pn-l">${lista}</div>` : ''}</section>`;
+    return `<section class="pn-c ${b.n ? b.nivel : 'ok'}${aberto && b.n ? ' aberto' : ''}" data-id="${b.id}" style="animation-delay:${k * 60}ms"><div class="pn-ct"><span class="pn-ic">${pnlI(b.ic, 18)}</span><div><b>${esc(b.t)}</b><small>${esc(b.n ? b.sub : (b.ok || b.sub))}</small></div>${cont}</div>${prog}${b.n ? `<div class="pn-l">${lista}</div>` : ''}</section>`;
   }).join('');
   $$('#pnCorpo .pn-c').forEach(c => c.querySelector('.pn-ct').onclick = () => { if (!c.querySelector('.pn-l')) return; const o = !c.classList.contains('aberto'); c.classList.toggle('aberto', o); PNL.abertos[c.dataset.id] = o; });
   $$('#pnCorpo .pn-ab').forEach(b => b.onclick = e => { e.stopPropagation(); pnlAbrir(b.dataset.v); });
