@@ -17,13 +17,17 @@ if(window.PROCDB) return;
 const SENT='🔒 cofre bloqueado';
 const CH=300000, BLOB_MIN=60000;
 const DEPTH={interno:{dafilgest:2},decl:{anos:2}};
-function findHost(){ const tryW=w=>{ try{ return w&&w.PROC_HOST&&w.PROC_HOST.ok()?w.PROC_HOST:null; }catch(e){ return null; } };
+let HOSTW=null; /* janela onde vive o AuditNux (e o SDK do Firestore) */
+function findHost(){ const tryW=w=>{ try{ if(w&&w.PROC_HOST&&w.PROC_HOST.ok()){ HOSTW=w; return w.PROC_HOST; } return null; }catch(e){ return null; } };
   let h=null; try{ h=tryW(window.top); }catch(e){} if(h) return h;
   try{ let w=window; for(let i=0;i<8&&w;i++){ h=tryW(w); if(h) return h; if(w.parent===w) break; w=w.parent; } }catch(e){}
   try{ let o=window.opener; for(let i=0;i<4&&o;i++){ h=tryW(o)||tryW(o.top); if(h) return h; o=o.opener; } }catch(e){}
   return null; }
 let HOST=findHost();
 const host=()=>{ if(!HOST) HOST=findHost(); return HOST; };
+/* O Firestore só aceita objetos criados na mesma janela que o SDK («Data must be an object… custom Object object»).
+   Os módulos correm noutra janela (iframe / janela própria): os dados são recriados na janela do AuditNux antes de gravar. */
+const plain=x=>{ host(); try{ if(HOSTW&&HOSTW!==window) return HOSTW.JSON.parse(JSON.stringify(x)); }catch(e){} return x; };
 const dbFromUrl=u=>/declaracoes/.test(String(u))?'decl':/interno/.test(String(u))?'interno':'outro';
 const segsOf=p=>String(p||'').split('/').filter(Boolean);
 const depth=(db,s)=>((DEPTH[db]||{})[s[0]])||1;
@@ -69,7 +73,7 @@ async function blobGet(id){ if(blobMem.has(id)) return blobMem.get(id); let v=aw
   blobMem.set(id,v); return v; }
 async function sha(s){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
 const blobKnown=new Set();
-async function blobPut(s){ const id='blob~'+(await sha(s)).slice(0,40); if(blobKnown.has(id)) return id; const ex=await col().doc(id).get(); if(!ex.exists){ const n=Math.ceil(s.length/CH); for(let k=n-1;k>=0;k--) await col().doc(k?id+'#'+k:id).set(k?{j:s.slice(k*CH,(k+1)*CH)}:{j:s.slice(0,CH),n,len:s.length,blob:1}); } blobKnown.add(id); blobMem.set(id,s); return id; }
+async function blobPut(s){ const id='blob~'+(await sha(s)).slice(0,40); if(blobKnown.has(id)) return id; const ex=await col().doc(id).get(); if(!ex.exists){ const n=Math.ceil(s.length/CH); for(let k=n-1;k>=0;k--) await col().doc(k?id+'#'+k:id).set(plain(k?{j:s.slice(k*CH,(k+1)*CH)}:{j:s.slice(0,CH),n,len:s.length,blob:1})); } blobKnown.add(id); blobMem.set(id,s); return id; }
 const isSenha=k=>/^senha/i.test(k);
 async function resolve(v,k){ if(Array.isArray(v)) return Promise.all(v.map(x=>resolve(x)));
   if(isObj(v)){ if(v.__blob__) return blobGet(v.__blob__); if(v.__enc__!==undefined){ const h=host(); if(!h||h.locked()) return SENT; try{ return await h.dec(v.__enc__); }catch(e){ return SENT; } }
@@ -95,7 +99,7 @@ async function writePart(db,ps,rel,op,prep){ const pid=pidOf(db,ps), ref=col().d
     else if(op==='update') for(const [k,x] of Object.entries(prep||{})){ const sub=rel.concat(segsOf(k)); tree=setAt(tree,sub,x==null?null:keepFix(x,at(old,sub))); }
     else if(op==='remove') tree=setAt(tree,rel,null);
     const json=tree==null?'':JSON.stringify(tree); const n=Math.max(1,Math.ceil(json.length/CH)); const on=d?d.n||1:0; const v=(d?d.v||0:0)+1;
-    const W=(r,x)=>t?t.set(r,x):r.set(x), D=r=>t?t.delete(r):r.delete();
+    const W=(r,x)=>t?t.set(r,plain(x)):r.set(plain(x)), D=r=>t?t.delete(r):r.delete();
     if(tree==null){ if(d){ await D(ref); for(let k=1;k<on;k++) await D(col().doc(pid+'#'+k)); } }
     else { await W(ref,{db,p:ps.join('/'),v,n,j:json.slice(0,CH),em:new Date().toISOString(),por:h.user()}); for(let k=1;k<n;k++) await W(col().doc(pid+'#'+k),{j:json.slice(k*CH,(k+1)*CH),pid}); for(let k=n;k<on;k++) await D(col().doc(pid+'#'+k)); }
     return {tree,v:tree==null?0:v}; };
