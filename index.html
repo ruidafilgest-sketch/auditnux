@@ -760,7 +760,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "11672772536",
   appId: "1:11672772536:web:a31cbf0dc84dc75cfe794d"
 };
-const APP_VERSION = '1.21.0';
+const APP_VERSION='1.22.0';
 /* Conta do gabinete (administradora da plataforma). Tem de ser igual ao email nas regras do Firestore. */
 const ADMIN_EMAIL = 'dafilgest.sistemas@gmail.com';
 const PRESET_ADMIN = { gabinete:'Dafilgest — Gabinete de Contabilidade, Unipessoal, Lda.', responsavel:'Rui Gonçalves', titulo:'Contabilista Certificado — Inscrito na OCC 46003', operadores:['Rui','Beatriz','Filipa'] };
@@ -1653,7 +1653,7 @@ function pdfFrame(doc,sub){ const n=doc.getNumberOfPages(); const W=doc.internal
       let x=12; if(CFG.logo){ try{ doc.addImage(CFG.logo,CFG.logo.includes('png')?'PNG':'JPEG',x,3,0,10); x+=26; }catch(e){} }
       doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text(T(doc.__title),x,7.2); doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(170,190,215);
       doc.text(T(sub||((h.CompanyName||'')+'  ·  NIF '+(h.TaxRegistrationNumber||'')+'  ·  '+(h.StartDate||'')+' a '+(h.EndDate||''))),x,12);
-      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...[34,211,238]); doc.text('AuditNux',W-12,7.2,{align:'right'}); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(170,190,215); doc.text('AUDITORIA SAF-T',W-12,11.2,{align:'right'}); }
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...[34,211,238]); doc.text('AuditNux',W-12,7.2,{align:'right'}); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(170,190,215); doc.text('CENTRO DE AUDITORIA',W-12,11.2,{align:'right'}); }
     doc.setDrawColor(...PC.line); doc.setLineWidth(0.2); doc.line(12,H-13,W-12,H-13); doc.setFontSize(7); doc.setTextColor(...PC.mut);
     doc.text(T([CFG.gabinete,[CFG.responsavel,CFG.titulo].filter(Boolean).join(', ')].filter(Boolean).join('  ·  ')||'AuditNux'),12,H-8.5); doc.text(T(`${CFG.rodape}  ·  ${nowTxt()}`),12,H-5);
     doc.text(`${i} / ${n}`,W-12,H-6.5,{align:'right'}); } }
@@ -1675,7 +1675,7 @@ function cover(doc,title,sub){ const W=doc.internal.pageSize.getWidth(), H=doc.i
   doc.setFillColor(...PC.navy); doc.rect(0,0,W,108,'F'); doc.setFillColor(...PC.acc); doc.rect(0,108,W,1.4,'F');
   for(let i=0;i<14;i++){ doc.setDrawColor(30,50,85); doc.setLineWidth(0.15); doc.line(0,i*8,W,i*8); }
   let x=16; if(CFG.logo){ try{ doc.addImage(CFG.logo,CFG.logo.includes('png')?'PNG':'JPEG',16,14,0,14); }catch(e){} }
-  doc.setTextColor(34,211,238); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('AUDITNUX  ·  CENTRO DE AUDITORIA SAF-T',W-16,20,{align:'right'});
+  doc.setTextColor(34,211,238); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('AUDITNUX  ·  CENTRO DE AUDITORIA',W-16,20,{align:'right'});
   doc.setTextColor(255,255,255); doc.setFontSize(26); doc.text(T(title),16,56); doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(180,200,225); doc.text(T(sub),16,65);
   doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255); doc.text(T(h.CompanyName||''),16,84); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(180,200,225);
   doc.text(T(`NIF ${h.TaxRegistrationNumber}   ·   Período ${h.StartDate} a ${h.EndDate}   ·   ${h.ProductID||''} (cert. ${h.SoftwareCertificateNumber||'-'})`),16,92);
@@ -4757,7 +4757,7 @@ const GUIA_CTX={painel:'painel',importar:'importar',historico:'multi',empresas:'
 const GUIA_NOME={painel:'Painel',importar:'Importar SAF-T',historico:'Multi-empresa',empresas:'Empresas',validacao:'Validação',iva:'Mapa IVA & DP',correcoes:'Correções',documentos:'Documentos',artigos:'Artigos',clientes:'Clientes',analises:'Análises de gestão',evolucao:'Evolução',financeiro:'Financeiro',contabilidade:'Contabilidade',apuramento:'Demonstrações & IRC',relatorios:'Relatórios',definicoes:'Definições'};
 
 function guiaIr(v,tab){
-  if(tab){ if(v==='contabilidade') S.glU.tab=tab; else if(v==='apuramento') S.apTab=tab; else if(v==='financeiro') S.finTab=tab; else if(v==='analises') S.anTab=tab; }
+  if(tab){ if(v==='contabilidade') S.glU.tab=tab; else if(v==='apuramento') S.apTab=tab; else if(v==='financeiro') S.finTab=tab; else if(v==='analises') S.anTab=tab; else if(v==='plurianual'&&S.pl) S.pl.tab=tab; }
   const n=$(`.nav[data-v="${v}"]`); if(n&&n.classList.contains('need')&&!S.R){ toast('Este ecrã precisa de um SAF-T de faturação aberto: importe primeiro o ficheiro.','warn'); return go('importar'); }
   go(v); }
 const guiaNorm=s=>String(s||'').replace(/<[^>]+>/g,' ').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
@@ -5852,6 +5852,422 @@ function painelDesenhar() {
   $$('#pnCorpo .pn-ab').forEach(b => b.onclick = e => { e.stopPropagation(); pnlAbrir(b.dataset.v); });
   $('#pnAt').textContent = 'Atualizado às ' + new Date(PNL.t).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
 }
+
+/* =========================================================================
+   1.22 — ANÁLISE PLURIANUAL (até 5 exercícios do SAF-T de contabilidade)
+   Mesmo período (janeiro a M) ou ano completo · DR e Balanço comparativos ·
+   rácios com tendência · mês a mês · variações por conta · auditoria entre
+   exercícios · pressupostos por ano (existências, amortizações, imposto) ·
+   relatório PDF e Excel para o cliente.
+   Motor: o mesmo de Demonstrações & IRC (apCalc / apDR / apBalanco).
+   ========================================================================= */
+VIEWS.plurianual=['Análise plurianual','Comparativos entre exercícios, mesmo período, rácios, variações por conta, auditoria entre anos e relatório financeiro'];
+if(typeof MENU_TXT!=='undefined') MENU_TXT.plurianual='Análise plurianual';
+if(typeof MENU_G!=='undefined'){ const g=MENU_G.find(x=>x.id==='ctb'); if(g&&!g.v.includes('plurianual')) g.v.push('plurianual'); }
+(function(){ const ref=$('#nav'); if(ref&&!$('.nav[data-v="plurianual"]')) ref.insertAdjacentHTML('beforeend',`<div class="nav" data-v="plurianual"><svg class="i"><use href="#i-chart"/></svg>Análise plurianual</div>`);
+  const n=$('.nav[data-v="plurianual"]'); if(n) n.onclick=()=>go('plurianual');
+  const c=$('.content'); if(c&&!$('#v-plurianual')) c.insertAdjacentHTML('beforeend','<section class="view" id="v-plurianual"></section>'); })();
+if(typeof GUIA_CTX!=='undefined'){ GUIA_CTX.plurianual='pluri'; GUIA_NOME.plurianual='Análise plurianual'; }
+
+S.pl={nif:'',anos:[],modo:'ytd',mes:0,tab:'resumo',ya:'',yb:'',lvl:'3',cls:'all',lim:'',so:1};
+S.plPar={}; S.plC=null;
+const PL_TABS=[['resumo','Resumo executivo'],['dr','Demonstração dos resultados'],['bal','Balanço'],['rac','Rácios & tendências'],['mes','Mês a mês'],['var','Variações por conta'],['aud','Auditoria entre anos'],['par','Pressupostos por ano']];
+const PL_COR=['#64748B','#A78BFA','#60A5FA','#22D3EE','#2563EB'];
+const plMes=m=>GL_MES[m-1].toLowerCase();
+const plPct=v=>v==null||!isFinite(v)?'—':(v*100).toFixed(1).replace('.',',')+'%';
+const plX=v=>v==null||!isFinite(v)?'—':v.toFixed(2).replace('.',',');
+const plD=v=>v==null||!isFinite(v)?'—':Math.round(v)+' dias';
+const plE=v=>v==null||!isFinite(v)?'—':eur(v);
+const plK=v=>v==null||!isFinite(v)?'—':(v<0?'−':'')+(Math.abs(v)>=1e6?(Math.abs(v)/1e6).toFixed(2).replace('.',',')+' M€':(Math.abs(v)/1000).toFixed(1).replace('.',',')+' k€');
+const plVar=(a,b)=>a==null||b==null||!isFinite(a)||!isFinite(b)||Math.abs(b)<0.005?null:(a-b)/Math.abs(b);
+const plFmt=(f,v)=>f==='pct'?plPct(v):f==='x'?plX(v):f==='dias'?plD(v):f==='k'?plK(v):plE(v);
+
+/* ---------- Pressupostos por ano (guardados por empresa, no espaço) ---------- */
+const plLsKey=()=>'auditnux_pluri_'+(S.ws||'local');
+async function plParLer(nif){ if(S.plPar[nif]) return S.plPar[nif]; let o={};
+  try{ if(S.cloud.on){ const d=await wsCol('pluri').doc(nif).get(); if(d.exists) o=(d.data()||{}).p||{}; } else o=(lsGet(plLsKey(),{})||{})[nif]||{}; }catch(e){ console.error(e); }
+  return S.plPar[nif]=o; }
+async function plParGravar(nif){ const o=S.plPar[nif]||{};
+  try{ if(S.cloud.on) await wsCol('pluri').doc(nif).set({nif,p:JSON.parse(JSON.stringify(o)),em:new Date().toISOString(),operador:S.oper||''});
+    else { const all=lsGet(plLsKey(),{})||{}; all[nif]=o; localStorage.setItem(plLsKey(),JSON.stringify(all)); }
+    return true; }catch(e){ toast('Não foi possível guardar os pressupostos: '+esc(e.message),'err'); return false; } }
+async function plApLer(id){ try{ if(S.cloud.on){ const d=await wsCol('apuramentos').doc(id).get(); return d.exists?d.data():null; } return (lsGet(apLsKey(),{data:{}}).data||{})[id]||null; }catch(e){ return null; } }
+
+/* ---------- Cálculo de um exercício ---------- */
+const plNum=v=>v===''||v==null||isNaN(+v)?null:+v;
+async function plAno(Y,to,par,apIdx,amAnt){ to=Math.min(to,12); const enc=to>=12?1:0;
+  const A=apAccFromBal(Y,glBal(Y,1,to,enc)); const data=lastDay(Y.ano+'-'+String(to).padStart(2,'0'));
+  const ap=apNew(); ap.empresa=Y.empresa; ap.nif=Y.nif; ap.ano=String(Y.ano); ap.data=data; ap.accounts=A; apPrefill(ap,true);
+  try{ apIrcAno(ap); }catch(e){} try{ const f=(S.EMP||{})[Y.nif]; if(f){ const d=derramaDe(f,ap.ano); if(d!=null) ap.parametros.derramaMun=d; if(f.pme===false) ap.parametros.isPME=false; } }catch(e){}
+  const org={ex:'saft',pr:'saft',am:'saft',imp:'saft',ap:null}; const p=par||{}; const F=apFlags(A), E=ap.existencias;
+  const meta=(apIdx||[]).find(m=>m.nif===Y.nif&&m.data===data); let sv=null;
+  if(meta){ const st=await plApLer(meta.id); if(st){ sv=apRestore(st); org.ap=meta; ap.parametros=sv.parametros; ap.correcoes=sv.correcoes; ap.prejuizos=sv.prejuizos; ap.autonomas=sv.autonomas; } }
+  const temAF=Math.abs(A.filter(a=>/^4[234]/.test(a.conta)).reduce((s,a)=>s+a.saldo,0))>=0.005;
+  if(!F.cevcAp){ if(plNum(p.aF)!=null){ E.aFinais=plNum(p.aF); org.ex='manual'; } else if(sv){ E.aFinais=sv.existencias.aFinais; org.ex='apur'; }
+    else if(Math.abs(E.aIniciais)<0.005&&Math.abs(E.aCompras)<0.005){ E.aFinais=0; org.ex='na'; } else { E.aFinais=E.aIniciais; org.ex='est'; } }
+  if(!F.varAp){ if(plNum(p.bF)!=null){ E.bFinais=plNum(p.bF); org.pr='manual'; } else if(sv&&sv.existencias.bFinais){ E.bFinais=sv.existencias.bFinais; org.pr='apur'; }
+    else if(Math.abs(E.bIniciais)<0.005){ E.bFinais=0; org.pr='na'; } else { E.bFinais=E.bIniciais; org.pr='est'; } }
+  if(!F.amAp){ if(plNum(p.am)!=null){ E.amort=plNum(p.am); org.am='manual'; } else if(sv&&sv.existencias.amort){ E.amort=sv.existencias.amort; org.am='apur'; }
+    else if(!temAF){ E.amort=0; org.am='na'; } else if(amAnt>0){ E.amort=r2(amAnt*to/12); org.am='est'; } else { E.amort=0; org.am='falta'; } }
+  const r=apCalc(ap); r._E=E; const s812=r2(A.filter(a=>a.conta.startsWith('812')).reduce((s,a)=>s+a.saldo,0)); let imp=null;
+  if(plNum(p.imp)!=null){ imp=plNum(p.imp); org.imp='manual'; } else if(sv) org.imp='apur'; else if(Math.abs(s812)>=0.005){ imp=s812; org.imp='saft'; } else org.imp='est';
+  if(imp!=null){ r.totalImposto=imp; r.resultadoLiquidoFinal=r.resultadoContabilistico-imp; }
+  const D=apDR(A,r), Bl=apBalanco(A,r), R=apRatios(ap,r,Bl,D); const X=plExtra(D,Bl,r,to,A);
+  return {ano:String(Y.ano),to,Y,ap,r,D,Bl,R,X,org,F,enc,data,am64:F.amAp?F.amPosto:E.amort}; }
+
+function plExtra(D,Bl,r,to,A){ const b=Bl.v, dias=to>=12?365:Math.round(to/12*365), fa=12/to; const sp=pre=>A.filter(a=>a.conta.startsWith(pre)).reduce((s,a)=>s+a.saldo,0);
+  const vn=D.vnd, AT=b['=at'], PC=b['=pc'], AC=b['=ac'], CP=b['=cp'], PT=b['=p']; const dv=(a,c)=>c&&Math.abs(c)>=0.005?a/c:null;
+  const fin=b.fin+b.finc, dfl=fin-b.cx, rl=D['=rl'], ebitda=D['=ebitda'], ebit=D['=ebit'];
+  const nfm=(b.inv+b.cli+b.adf+b.est+b.ocr+b.dif)-(b.forn+b.adc+b.estp+b.odp+b.difp);
+  const lucrosRetidos=b.rlg+b.ors+b.rt+b.rlp; const z=AT>0&&PT>0?6.56*((AC-PC)/AT)+3.26*(lucrosRetidos/AT)+6.72*(ebit*fa/AT)+1.05*(CP/PT):null;
+  return {dias,fa,vn,mb:vn-D.cmv,mbP:dv(vn-D.cmv,vn),cmvP:dv(D.cmv,vn),fseP:dv(D.fse,vn),pesP:dv(D.pes,vn),ebitda,ebitdaP:dv(ebitda,vn),ebit,ebitP:dv(ebit,vn),rl,rlP:dv(rl,vn),
+    liqG:dv(AC,PC),liqR:dv(AC-b.inv,PC),liqI:dv(b.cx,PC),fm:AC-PC,nfm,aut:dv(CP,AT),solv:dv(CP,PT),endiv:dv(PT,AT),
+    roe:CP>0?rl/CP:null,roa:dv(rl,AT),rotAt:dv(vn*fa,AT),pmr:vn>0?b.cli/(vn*1.23)*dias:null,pmp:(D.cmv+D.fse)>0?b.forn/((D.cmv+D.fse)*1.23)*dias:null,dInv:D.cmv>0&&b.inv>0?b.inv/D.cmv*dias:null,
+    fin,dfl,dflEbitda:ebitda>0?dfl/(ebitda*fa):null,cob:D.jur>0?ebit/D.jur:null,mlb:rl+D.dep,z,cap:b.cap,cp:CP,at:AT,pt:PT,cx11:r2(sp('11')),soc:r2(-sp('26'))}; }
+
+/* Indicadores: [chave, rótulo, grupo, formato, melhor se maior?, limiar bom, limiar mau, fórmula] */
+const PL_RAT=[
+ ['vn','Volume de negócios','Atividade e margens','eur',true,null,null,'Vendas e prestações de serviços (71+72)'],
+ ['mbP','Margem bruta','Atividade e margens','pct',true,null,null,'(Vendas − CMVMC) ÷ Vendas'],
+ ['ebitdaP','Margem EBITDA','Atividade e margens','pct',true,0.15,0.05,'EBITDA ÷ Vendas'],
+ ['ebitP','Margem operacional (EBIT)','Atividade e margens','pct',true,0.08,0,'EBIT ÷ Vendas'],
+ ['rlP','Margem líquida','Atividade e margens','pct',true,0.05,0,'Resultado líquido ÷ Vendas'],
+ ['fseP','Peso dos FSE','Atividade e margens','pct',false,null,null,'FSE ÷ Vendas'],
+ ['pesP','Peso dos gastos com pessoal','Atividade e margens','pct',false,null,null,'Gastos com pessoal ÷ Vendas'],
+ ['liqG','Liquidez geral','Liquidez','x',true,1.5,1,'Ativo corrente ÷ Passivo corrente'],
+ ['liqR','Liquidez reduzida','Liquidez','x',true,1,0.7,'(Ativo corrente − Inventários) ÷ Passivo corrente'],
+ ['liqI','Liquidez imediata','Liquidez','x',true,0.3,0.1,'Caixa e depósitos ÷ Passivo corrente'],
+ ['fm','Fundo de maneio','Liquidez','eur',true,0,0,'Ativo corrente − Passivo corrente'],
+ ['nfm','Necessidades de fundo de maneio','Liquidez','eur',false,null,null,'Créditos de exploração e inventários − dívidas de exploração'],
+ ['aut','Autonomia financeira','Estrutura e solvência','pct',true,0.35,0.2,'Capital próprio ÷ Ativo'],
+ ['solv','Solvabilidade','Estrutura e solvência','x',true,1,0.5,'Capital próprio ÷ Passivo'],
+ ['endiv','Endividamento','Estrutura e solvência','pct',false,0.5,0.7,'Passivo ÷ Ativo'],
+ ['roe','Rendibilidade do capital próprio (ROE)','Rendibilidade','pct',true,0.15,0,'Resultado líquido ÷ Capital próprio (do período)'],
+ ['roa','Rendibilidade do ativo (ROA)','Rendibilidade','pct',true,0.05,0,'Resultado líquido ÷ Ativo (do período)'],
+ ['rotAt','Rotação do ativo','Rendibilidade','x',true,null,null,'Vendas anualizadas ÷ Ativo'],
+ ['pmr','Prazo médio de recebimento','Prazos e ciclo','dias',false,60,90,'Clientes ÷ (Vendas × 1,23) × dias do período'],
+ ['pmp','Prazo médio de pagamento','Prazos e ciclo','dias',null,null,null,'Fornecedores ÷ ((CMVMC + FSE) × 1,23) × dias do período'],
+ ['dInv','Dias de inventário','Prazos e ciclo','dias',false,null,null,'Inventários ÷ CMVMC × dias do período'],
+ ['dfl','Dívida financeira líquida','Dívida e banca','eur',false,null,null,'Financiamentos obtidos − Caixa e depósitos'],
+ ['dflEbitda','Dívida líquida ÷ EBITDA','Dívida e banca','x',false,3,5,'Dívida financeira líquida ÷ EBITDA anualizado'],
+ ['cob','Cobertura de juros','Dívida e banca','x',true,4,2,'EBIT ÷ Juros suportados'],
+ ['mlb','Meios libertos brutos','Dívida e banca','eur',true,0,0,'Resultado líquido + Depreciações'],
+ ['z','Score de risco (Altman Z″)','Risco','x',true,2.6,1.1,'6,56·FM/A + 3,26·Lucros retidos/A + 6,72·EBIT/A + 1,05·CP/P']];
+function plSt(def,v){ const [k,,,,up,g,b]=def; if(v==null||!isFinite(v)||up==null||g==null) return ''; if(k==='dflEbitda'&&v<0) return 'ok';
+  return up?(v>=g?'ok':v>=b?'warn':'bad'):(v<=g?'ok':v<=b?'warn':'bad'); }
+function plTend(def,a,b){ if(a==null||b==null||!isFinite(a)||!isFinite(b)) return ''; const up=def[4]; const d=a-b; const rel=Math.abs(b)>0.005?Math.abs(d/b):Math.abs(d);
+  if(rel<0.02) return '='; if(up==null) return d>0?'↑':'↓'; return (d>0)===up?'▲':'▼'; }
+
+/* ---------- Carregamento e cálculo de todos os anos escolhidos ---------- */
+async function plCalc(){ const U=S.pl; const X=await glIndex(); const anosDisp=Object.values(X).filter(m=>m.nif===U.nif).map(m=>String(m.ano)).sort();
+  if(!anosDisp.length) return null; let anos=U.anos.filter(a=>anosDisp.includes(a)); if(!anos.length) anos=anosDisp.slice(-3); anos=anos.sort().slice(-5); U.anos=anos;
+  const metas=anos.map(a=>X[U.nif+'_'+a]); const ult=metas[metas.length-1];
+  if(!U.mes||U.mes>12) U.mes=ult.maxP||12;
+  const par=await plParLer(U.nif); try{ await empLoad(); }catch(e){} let apIdx=[]; try{ apIdx=await apList(); }catch(e){}
+  const key=[U.nif,anos.join(','),U.modo,U.mes,JSON.stringify(par),apIdx.length,metas.map(m=>m.carregadoEm).join(',')].join('|');
+  if(S.plC&&S.plC.key===key) return S.plC;
+  const Ys={}; for(const a of anosDisp) if(anos.includes(a)||anos.includes(String(+a+1))) Ys[a]=await glLoad(U.nif+'_'+a);
+  const out=[]; for(const a of anos){ const Y=Ys[a]; if(!Y) continue; const to=U.modo==='ytd'?Math.min(U.mes,12):12; const real=Math.min(to,Y.maxP||12);
+    const Yp=Ys[String(+a-1)]; let amAnt=0; if(Yp&&(Yp.maxP||0)>=12){ const Ap=apAccFromBal(Yp,glBal(Yp,1,12,1)); amAnt=apFlags(Ap).amPosto; const pp=par[Yp.ano+'_12']; if(!amAnt&&pp&&plNum(pp.am)) amAnt=plNum(pp.am); }
+    const k=plAno(Y,to,par[a+'_'+to],apIdx,amAnt); const z=await k; z.incompleto=real<to; z.real=real; z.chave=a+'_'+to; out.push(z); }
+  const res={key,nif:U.nif,empresa:(out[out.length-1]||{}).Y?out[out.length-1].Y.empresa:'',anos,anosDisp,Ys,A:out,to:U.modo==='ytd'?U.mes:12};
+  res.aud=plAuditoria(res); return S.plC=res; }
+const plPerTxt=(C)=>S.pl.modo==='ytd'?(C.to===12?'ano completo':`janeiro a ${plMes(C.to)}`):'ano completo';
+
+/* ---------- Comentário automático ---------- */
+function plComentario(C){ const A=C.A; if(!A.length) return []; const L=A[A.length-1], P=A.length>1?A[A.length-2]:null, F0=A[0]; const out=[]; const b=s=>`<b>${s}</b>`;
+  const per=plPerTxt(C);
+  if(P){ const v=plVar(L.X.vn,P.X.vn); out.push(`Volume de negócios de ${b(eur(L.X.vn))} em ${L.ano} (${per}), ${v==null?'sem base de comparação':v>=0?`mais ${b(plPct(v))} do que em ${P.ano} (${eur(P.X.vn)})`:`menos ${b(plPct(-v))} do que em ${P.ano} (${eur(P.X.vn)})`}.`+(A.length>=3&&F0.X.vn>0&&L.X.vn>0?` Crescimento médio anual desde ${F0.ano}: ${b(plPct(Math.pow(L.X.vn/F0.X.vn,1/(A.length-1))-1))}.`:''));
+    if(L.X.mbP!=null&&P.X.mbP!=null){ const pp=(L.X.mbP-P.X.mbP)*100; out.push(`A margem bruta passou de ${plPct(P.X.mbP)} para ${b(plPct(L.X.mbP))} (${pp>=0?'+':''}${pp.toFixed(1).replace('.',',')} p.p.)${Math.abs(pp)>=5?' — variação relevante, a confirmar com a contagem de existências e a política de preços':''}.`); }
+    out.push(`O EBITDA foi de ${b(eur(L.X.ebitda))} (${plPct(L.X.ebitdaP)} das vendas), contra ${eur(P.X.ebitda)} em ${P.ano}; o resultado líquido ${L.X.rl>=0?'positivo':'negativo'} de ${b(eur(L.X.rl))} compara com ${eur(P.X.rl)}.`);
+    const g=[]; if(L.X.fseP!=null&&P.X.fseP!=null&&Math.abs(L.X.fseP-P.X.fseP)>=0.02) g.push(`FSE de ${plPct(P.X.fseP)} para ${plPct(L.X.fseP)} das vendas`); if(L.X.pesP!=null&&P.X.pesP!=null&&Math.abs(L.X.pesP-P.X.pesP)>=0.02) g.push(`pessoal de ${plPct(P.X.pesP)} para ${plPct(L.X.pesP)}`);
+    if(g.length) out.push(`Estrutura de gastos: ${g.join('; ')}.`);
+    const lq=[]; if(L.X.liqG!=null&&P.X.liqG!=null) lq.push(`liquidez geral ${plX(P.X.liqG)} → ${b(plX(L.X.liqG))}`); if(L.X.aut!=null&&P.X.aut!=null) lq.push(`autonomia financeira ${plPct(P.X.aut)} → ${b(plPct(L.X.aut))}`); if(L.X.dfl!=null) lq.push(`dívida financeira líquida ${b(eur(L.X.dfl))}${L.X.dflEbitda!=null?` (${plX(L.X.dflEbitda)}× o EBITDA anual)`:''}`);
+    if(lq.length) out.push(`Situação financeira: ${lq.join('; ')}.`);
+    const pz=[]; if(L.X.pmr!=null&&P.X.pmr!=null) pz.push(`recebimento ${plD(P.X.pmr)} → ${b(plD(L.X.pmr))}`); if(L.X.pmp!=null&&P.X.pmp!=null) pz.push(`pagamento ${plD(P.X.pmp)} → ${b(plD(L.X.pmp))}`);
+    if(pz.length) out.push(`Prazos médios: ${pz.join('; ')}.`); }
+  else out.push(`Volume de negócios de ${b(eur(L.X.vn))} em ${L.ano} (${per}) e resultado líquido de ${b(eur(L.X.rl))}. Carregue o SAF-T de contabilidade dos anos anteriores para obter os comparativos.`);
+  if(L.X.z!=null) out.push(`Score de risco (Altman Z″) de ${b(plX(L.X.z))}: ${L.X.z>=2.6?'zona segura':L.X.z>=1.1?'zona cinzenta — a acompanhar':'zona de risco financeiro'}${P&&P.X.z!=null?` (${plX(P.X.z)} em ${P.ano})`:''}.`);
+  if(L.X.cp<0) out.push(b('Capital próprio negativo')+' — situação de falência técnica a tratar com os sócios.'); else if(L.X.cap>0&&L.X.cp<L.X.cap/2) out.push(b('Capital próprio inferior a metade do capital social')+' — situação prevista no art.º 35.º do Código das Sociedades Comerciais (perda de metade do capital).');
+  return out; }
+
+/* ---------- Auditoria entre exercícios ---------- */
+function plAuditoria(C){ const it=[]; const add=(sev,ano,t,d)=>it.push({sev,ano,t,d}); const A=C.A;
+  for(const z of A){ const Y=z.Y, Yp=C.Ys[String(+z.ano-1)];
+    if(Yp&&(Yp.maxP||0)>=12){ const X=glCross(Y,Yp); if(X&&X.n){ const tot=r2(X.items.reduce((s,i)=>s+Math.abs(i.v),0)); add('crit',z.ano,`Saldos de abertura de ${z.ano} diferentes do encerramento de ${Yp.ano}`,`${X.n} conta(s), diferença absoluta total de ${eur(tot)}. Ex.: ${esc(X.items.slice(0,3).map(i=>i.m).join(' · '))}`); }
+      else if(X) add('ok',z.ano,`Continuidade de saldos ${Yp.ano} → ${z.ano}`,'Todos os saldos de abertura coincidem com os saldos finais do exercício anterior.'); }
+    else if(!Yp&&A.length>1&&z!==A[0]) add('warn',z.ano,`Sem SAF-T de ${+z.ano-1}`,'Não é possível conferir os saldos de abertura com o encerramento do ano anterior.');
+    let ab67=0; for(const id in Y.acc) if(/^[67]/.test(id)) ab67+=Math.abs(Y.acc[id].o||0); if(ab67>=0.01) add('err',z.ano,`Contas de gastos/rendimentos com saldo de abertura em ${z.ano}`,`Soma absoluta de ${eur(ab67)} nas classes 6 e 7 — o exercício anterior não foi encerrado corretamente.`);
+    let ab=0; for(const id in Y.acc) ab+=Math.abs(Y.acc[id].o||0); if(ab<1&&Yp) add('warn',z.ano,`SAF-T de ${z.ano} sem saldos de abertura`,'O ficheiro não traz saldos de abertura: o balanço deste ano fica incompleto. Exporte o SAF-T com a abertura.');
+    if(z.to>=7){ const B=glBal(Y,1,z.to,0); let s818=0; for(const id in B) if(id.startsWith('818')) s818+=B[id].sf; if(Math.abs(s818)>=0.01) add('warn',z.ano,`Resultado de ${+z.ano-1} ainda por aplicar (conta 818)`,`Saldo de ${eur(-s818)} em ${plMes(z.to)}: a aplicação de resultados (aprovação das contas até 31 de março) ainda não foi registada.`); }
+    if(z.X.cp<0) add('crit',z.ano,`Capital próprio negativo em ${z.ano}`,`Capital próprio de ${eur(z.X.cp)}.`); else if(z.X.cap>0&&z.X.cp<z.X.cap/2) add('err',z.ano,`Perda de metade do capital social (art.º 35.º CSC) em ${z.ano}`,`Capital próprio de ${eur(z.X.cp)} para um capital social de ${eur(z.X.cap)}.`);
+    if(z.X.cx11<-0.005) add('err',z.ano,`Caixa com saldo credor em ${z.ano}`,`Conta 11 com ${eur(z.X.cx11)} — impossível na realidade; indica pagamentos registados sem a entrada correspondente.`);
+    else if(z.X.at>0&&z.X.cx11>Math.max(5000,z.X.at*0.1)) add('warn',z.ano,`Caixa elevada em ${z.ano}`,`Conta 11 com ${eur(z.X.cx11)} (${plPct(z.X.cx11/z.X.at)} do ativo) — confirmar a existência física do numerário.`);
+    if(Math.abs(z.Bl.v.ajp)>=1) add('warn',z.ano,`Ajustamentos de encerramento pendentes em ${z.ano}`,`${eur(z.Bl.v.ajp)} no capital próprio: diferença entre os pressupostos indicados e o balancete (existências/amortizações/imposto ainda não contabilizados).`);
+    if(z.org.ex==='est') add('info',z.ano,`Existência final de ${z.ano} estimada`,'Sem inventário indicado: assumiu-se a existência final igual à inicial (CMVMC = compras). Indique a existência real em «Pressupostos por ano».');
+    if(z.org.am==='est') add('info',z.ano,`Amortizações de ${z.ano} estimadas`,`Ainda não lançadas: estimadas em ${eur(z.ap.existencias.amort)} (duodécimos do ano anterior).`);
+    if(z.org.am==='falta') add('warn',z.ano,`Amortizações de ${z.ano} em falta`,'Há ativos fixos mas as amortizações do período não estão lançadas nem indicadas — o resultado está sobreavaliado.');
+    if(z.incompleto) add('warn',z.ano,`${z.ano} com dados só até ${plMes(z.real)}`,`O período analisado vai até ${plMes(z.to)}, mas o SAF-T deste ano tem movimento normal só até ${plMes(z.real)}.`); }
+  for(let i=1;i<A.length;i++){ const L=A[i], P=A[i-1]; const v=plVar(L.X.vn,P.X.vn);
+    if(v!=null&&Math.abs(v)>=0.25) add('warn',L.ano,`Volume de negócios ${v>0?'+':''}${plPct(v)} face a ${P.ano}`,`De ${eur(P.X.vn)} para ${eur(L.X.vn)}: confirmar o corte de operações, a faturação em falta ou em duplicado e a especialização dos exercícios.`);
+    if(L.X.mbP!=null&&P.X.mbP!=null&&Math.abs(L.X.mbP-P.X.mbP)>=0.05) add('warn',L.ano,`Margem bruta ${((L.X.mbP-P.X.mbP)*100).toFixed(1).replace('.',',')} p.p. face a ${P.ano}`,`De ${plPct(P.X.mbP)} para ${plPct(L.X.mbP)}: rever as existências finais, as compras em trânsito e a classificação de gastos.`);
+    for(const [k,l] of [['fse','Fornecimentos e serviços externos'],['pes','Gastos com o pessoal'],['jur','Juros suportados']]){ const a=L.D[k], b=P.D[k]; const vv=plVar(a,b); if(vv!=null&&Math.abs(vv)>=0.3&&Math.abs(a-b)>=Math.max(2500,(L.X.vn||0)*0.01)) add('info',L.ano,`${l} ${vv>0?'+':''}${plPct(vv)} face a ${P.ano}`,`De ${eur(b)} para ${eur(a)}.`); }
+    const ds=L.X.soc-P.X.soc; if(Math.abs(ds)>=Math.max(5000,(L.X.at||0)*0.05)) add('info',L.ano,`Contas de sócios (26) ${ds>0?'aumentaram':'diminuíram'} ${eur(Math.abs(ds))}`,'Confirmar a natureza (suprimentos, adiantamentos por conta de lucros, empréstimos a sócios) e o tratamento fiscal.');
+    if(L.X.pmr!=null&&P.X.pmr!=null&&L.X.pmr-P.X.pmr>=20) add('warn',L.ano,`Prazo médio de recebimento +${Math.round(L.X.pmr-P.X.pmr)} dias`,`De ${plD(P.X.pmr)} para ${plD(L.X.pmr)}: rever a antiguidade de saldos e as imparidades.`); }
+  const o={crit:0,err:1,warn:2,info:3,ok:4}; return it.sort((a,b)=>o[a.sev]-o[b.sev]||String(b.ano).localeCompare(String(a.ano))); }
+
+/* ---------- Gráficos (SVG, acompanham o tema) ---------- */
+function plBars(cats,series,o={}){ const W=o.w||760,h=o.h||230,L=64,R=10,T=28,B=26; const all=series.flatMap(s=>s.v).filter(v=>v!=null&&isFinite(v)); const lo=Math.min(0,...all), hi=Math.max(0,...all)||1, sp=(hi-lo)||1;
+  const y=v=>T+(hi-v)/sp*(h-T-B); const band=(W-L-R)/cats.length, gap=2, bw=Math.max(3,Math.min(26,(band*0.78-(series.length-1)*gap)/series.length)); let s='';
+  for(let i=0;i<=4;i++){ const v=lo+sp*i/4; s+=`<line x1="${L}" x2="${W-R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)"/><text x="${L-6}" y="${(y(v)+3).toFixed(1)}" font-size="9.5" fill="var(--muted)" text-anchor="end">${plK(v)}</text>`; }
+  cats.forEach((c,i)=>{ const x0=L+i*band+(band-(bw*series.length+gap*(series.length-1)))/2; series.forEach((se,j)=>{ const v=se.v[i]; if(v==null||!isFinite(v)) return; const x=x0+j*(bw+gap), a=Math.min(y(0),y(v)), hh=Math.max(1,Math.abs(y(v)-y(0)));
+      s+=`<rect x="${x.toFixed(1)}" y="${a.toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${se.c}"><title>${esc(se.n)} · ${esc(c)}: ${eur(v)}</title></rect>`; if(o.lab&&j===series.length-1) s+=`<text x="${(x+bw/2).toFixed(1)}" y="${(v>=0?a-4:a+hh+11).toFixed(1)}" font-size="9" font-weight="700" fill="var(--ink2)" text-anchor="middle">${plK(v)}</text>`; });
+    s+=`<text x="${(L+i*band+band/2).toFixed(1)}" y="${h-8}" font-size="10" fill="var(--ink2)" text-anchor="middle">${esc(c)}</text>`; });
+  let lx=L; series.forEach(se=>{ s+=`<rect x="${lx}" y="6" width="10" height="10" rx="2" fill="${se.c}"/><text x="${lx+14}" y="15" font-size="10.5" font-weight="600" fill="var(--ink2)">${esc(se.n)}</text>`; lx+=34+se.n.length*6; });
+  return `<svg viewBox="0 0 ${W} ${h}" width="100%" style="display:block">${s}</svg>`; }
+function plLines(cats,series,o={}){ const W=o.w||760,h=o.h||230,L=64,R=14,T=28,B=26; const all=series.flatMap(s=>s.v).filter(v=>v!=null&&isFinite(v)); const lo=Math.min(0,...all), hi=Math.max(0,...all)||1, sp=(hi-lo)||1;
+  const y=v=>T+(hi-v)/sp*(h-T-B), x=i=>L+(cats.length<2?0:i*(W-L-R)/(cats.length-1)); let s='';
+  for(let i=0;i<=4;i++){ const v=lo+sp*i/4; s+=`<line x1="${L}" x2="${W-R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)"/><text x="${L-6}" y="${(y(v)+3).toFixed(1)}" font-size="9.5" fill="var(--muted)" text-anchor="end">${plK(v)}</text>`; }
+  cats.forEach((c,i)=>{ s+=`<text x="${x(i).toFixed(1)}" y="${h-8}" font-size="10" fill="var(--ink2)" text-anchor="middle">${esc(c)}</text>`; });
+  series.forEach(se=>{ const pts=se.v.map((v,i)=>v==null?null:[x(i),y(v)]).filter(Boolean); if(!pts.length) return; s+=`<polyline points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${se.c}" stroke-width="${se.w||2.2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    pts.forEach((p,i)=>{ s+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.8" fill="${se.c}"><title>${esc(se.n)}: ${eur(se.v[i])}</title></circle>`; }); });
+  let lx=L; series.forEach(se=>{ s+=`<rect x="${lx}" y="8" width="12" height="3" rx="1.5" fill="${se.c}"/><text x="${lx+16}" y="14" font-size="10.5" font-weight="600" fill="var(--ink2)">${esc(se.n)}</text>`; lx+=34+se.n.length*6; });
+  return `<svg viewBox="0 0 ${W} ${h}" width="100%" style="display:block">${s}</svg>`; }
+const plCores=n=>PL_COR.slice(PL_COR.length-n);
+const plTxt=h=>String(h==null?'':h).replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
+
+/* ---------- Vista ---------- */
+const plOrgTxt={saft:'do SAF-T',manual:'indicado',apur:'da análise guardada',est:'estimado',falta:'em falta',na:'não aplicável'};
+const plOrgCls={saft:'ok',manual:'ok',apur:'ok',est:'warn',falta:'crit',na:''};
+RENDER.plurianual=async function(){ const el=$('#v-plurianual'); const U=S.pl;
+  el.innerHTML=`<div class="card"><div class="empty">${ico('chart')} A preparar a análise plurianual…</div></div>`;
+  const X=await glIndex(); const metas=Object.values(X); const UNI=await empUniverse(); S._uni=UNI;
+  const cos=new Map(); for(const m of metas){ const c=cos.get(m.nif)||{nif:m.nif,empresa:m.empresa,anos:[]}; c.anos.push(String(m.ano)); cos.set(m.nif,c); }
+  if(!U.nif||!cos.has(U.nif)){ const pref=(S.glU&&cos.has(S.glU.nif))?S.glU.nif:null; U.nif=pref||([...cos.values()].sort((a,b)=>b.anos.length-a.anos.length)[0]||{}).nif||''; U.anos=[]; }
+  if(!U.nif){ el.innerHTML=`<div class="card hero-empty" style="min-height:46vh"><div>${ico('chart')}<h2>Análise plurianual</h2><p>Compare até cinco exercícios da mesma empresa: o mesmo período (janeiro a um mês) ou o ano completo, Demonstração dos Resultados e Balanço lado a lado, rácios com tendência, mês a mês, variações por conta e auditoria entre anos — com relatório PDF e Excel para entregar ao cliente.</p><p class="hint">Precisa do SAF-T de contabilidade de cada ano (desde janeiro). Carregue vários ficheiros de uma vez em Importar SAF-T.</p><div class="row" style="justify-content:center;gap:10px;margin-top:14px"><button class="btn pri" onclick="go('importar')">${ico('upload')} Importar SAF-T de contabilidade</button><button class="btn" onclick="guiaAbrir('pluri')">${ico('book')} Como fazer</button></div></div></div>`; return; }
+  const co=cos.get(U.nif); co.anos.sort();
+  let C; try{ C=await plCalc(); }catch(e){ console.error(e); el.innerHTML=`<div class="card empty">${ico('alert')} Não foi possível calcular: ${esc(e.message)}</div>`; return; }
+  if(!C||!C.A.length){ el.innerHTML='<div class="card empty">Sem dados para esta empresa.</div>'; return; }
+  const L=C.A[C.A.length-1]; const maxMes=Math.max(...C.A.map(z=>z.Y.maxP||12));
+  const nEst=C.A.filter(z=>['est','falta'].includes(z.org.ex)||['est','falta'].includes(z.org.am)||z.org.pr==='est').length;
+  el.innerHTML=`<div class="card pbar"><div class="toolbar" style="margin:0;flex-wrap:wrap">
+    <label class="fld" style="min-width:300px">Empresa<select class="inp" id="plN">${empOpcoes(U.nif,new Set(cos.keys()),'contabilidade')}</select></label>
+    <div class="fld">Exercícios (até 5)<div class="row" style="gap:4px;margin-top:2px">${co.anos.map(a=>`<button class="btn sm ${U.anos.includes(a)?'pri':''}" data-pa="${a}" title="${(X[U.nif+'_'+a]||{}).maxP<12?'dados até '+plMes((X[U.nif+'_'+a]||{}).maxP||12):'ano completo'}">${a}${(X[U.nif+'_'+a]||{}).maxP<12?' ·':''}</button>`).join('')}</div></div>
+    <div class="fld">Período<div class="row" style="gap:4px;margin-top:2px"><button class="btn sm ${U.modo==='ytd'?'pri':''}" data-pm="ytd" title="O mesmo intervalo de meses em todos os anos — comparação justa">Mesmo período</button><button class="btn sm ${U.modo==='ano'?'pri':''}" data-pm="ano">Ano completo</button></div></div>
+    ${U.modo==='ytd'?`<label class="fld">Janeiro a<select class="inp" id="plM">${GL_MES.map((m,i)=>`<option value="${i+1}" ${i+1===U.mes?'selected':''}>${m}</option>`).join('')}</select></label>`:''}
+    <span class="sp"></span><div class="row" style="gap:6px;margin-top:14px"><button class="btn sm gold" id="plPdf">${ico('pdf')} Relatório PDF</button><button class="btn sm" id="plXl">${ico('down')} Excel completo</button><button class="btn sm" onclick="guiaAbrir('pluri')">${ico('book')}</button></div></div>
+   <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">${C.A.map((z,i)=>`<span class="chip" style="border-color:${plCores(C.A.length)[i]}"><b>${z.ano}</b> ${z.to===12?'ano':'jan–'+plMes(z.to).slice(0,3)}${z.incompleto?` <span class="st-warn">· dados até ${plMes(z.real).slice(0,3)}</span>`:''}${z.org.ap?' · '+ico('save')+' análise guardada':''}</span>`).join('')}
+     ${nEst?`<span class="chip" style="border-color:var(--warn);cursor:pointer" id="plEst">${ico('alert')} <b>${nEst}</b> ano(s) com existências/amortizações estimadas — indicar valores</span>`:`<span class="chip" style="border-color:var(--good)">${ico('check')} Pressupostos completos</span>`}
+     ${U.modo==='ano'&&C.A.some(z=>z.incompleto)?`<span class="chip" style="border-color:var(--warn)">${ico('alert')} Há anos incompletos: use «Mesmo período» para comparar</span>`:''}</div></div>
+   <div class="tabs" id="plTabs" style="margin-top:16px">${PL_TABS.map(([k,l])=>`<div class="tab ${k===U.tab?'on':''}" data-t="${k}">${l}</div>`).join('')}</div><div id="plBody"></div>`;
+  $('#vSub').textContent=`${C.empresa} · ${C.anos.join(' · ')} · ${plPerTxt(C)}`;
+  const re=()=>RENDER.plurianual();
+  $('#plN').onchange=e=>{ U.nif=e.target.value; U.anos=[]; U.mes=0; U.ya=''; U.yb=''; re(); };
+  $$('[data-pa]',el).forEach(b=>b.onclick=()=>{ const a=b.dataset.pa; if(U.anos.includes(a)){ if(U.anos.length>1) U.anos=U.anos.filter(x=>x!==a); } else { U.anos.push(a); U.anos.sort(); if(U.anos.length>5) U.anos.shift(); } U.mes=0; re(); });
+  $$('[data-pm]',el).forEach(b=>b.onclick=()=>{ U.modo=b.dataset.pm; re(); });
+  if($('#plM')) $('#plM').onchange=e=>{ U.mes=+e.target.value; re(); };
+  if($('#plEst')) $('#plEst').onclick=()=>{ U.tab='par'; re(); };
+  $$('#plTabs .tab').forEach(x=>x.onclick=()=>{ U.tab=x.dataset.t; re(); });
+  $('#plPdf').onclick=()=>plPdf(C); $('#plXl').onclick=()=>plXlsx(C);
+  const body=$('#plBody'); ({resumo:plTabResumo,dr:plTabDR,bal:plTabBal,rac:plTabRac,mes:plTabMes,var:plTabVar,aud:plTabAud,par:plTabPar}[U.tab]||plTabResumo)(body,C); };
+
+function plTabResumo(el,C){ const A=C.A, L=A[A.length-1], P=A.length>1?A[A.length-2]:null; const cor=plCores(A.length);
+  const k=(l,key,f,inv)=>{ const v=L.X[key], vp=P?P.X[key]:null; if(!P||v==null||vp==null||!isFinite(v)||!isFinite(vp)) return kpi(l,plFmt(f,v),P?'sem comparação':'');
+    const dd=v-vp, bom=inv?dd<=0:dd>=0; const txt=f==='pct'?(dd*100).toFixed(1).replace('.',',')+' p.p.':f==='x'?plX(Math.abs(dd)):f==='dias'?Math.abs(Math.round(dd))+' dias':(plVar(v,vp)==null?'':plPct(Math.abs(plVar(v,vp))));
+    return kpi(l,plFmt(f,v),`<span class="${Math.abs(dd)<1e-9?'':bom?'st-ok':'st-crit'}">${dd>=0?'▲':'▼'} ${f==='pct'&&dd>=0?'+':''}${txt}</span> vs ${P.ano}`); };
+  const coment=plComentario(C); const sev={crit:0,err:0,warn:0}; C.aud.forEach(i=>{ if(sev[i.sev]!=null) sev[i.sev]++; });
+  let proj=''; if(S.pl.modo==='ytd'&&C.to<12&&P){ const Yp=C.Ys[P.ano]; if(Yp&&(Yp.maxP||0)>=12){ const full=glMonthly(Yp,1,12).reduce((s,m)=>s+m.v,0), ytd=glMonthly(Yp,1,C.to).reduce((s,m)=>s+m.v,0); if(ytd>0){ const pr=L.X.vn*full/ytd;
+      proj=`<div class="card" style="margin-top:16px;border-color:var(--acc)"><h3>${ico('chart')} Projeção do volume de negócios de ${L.ano}</h3><p>Com a sazonalidade de ${P.ano} (janeiro a ${plMes(C.to)} representou ${plPct(ytd/full)} do ano), o volume de negócios de ${L.ano} aponta para <b>${eur(pr)}</b> — ${plVar(pr,full)>=0?'mais':'menos'} <b>${plPct(Math.abs(plVar(pr,full)))}</b> do que os ${eur(full)} de ${P.ano}.</p><p class="hint">Estimativa simples: vendas até ${plMes(C.to)} × (ano completo ÷ mesmo período) do ano anterior. Não substitui um orçamento.</p></div>`; } } }
+  el.innerHTML=`<div class="grid g4">${k('Volume de negócios','vn','eur')}${k('EBITDA','ebitda','eur')}${k('Resultado líquido','rl','eur')}${k('Margem bruta','mbP','pct')}${k('Liquidez geral','liqG','x')}${k('Autonomia financeira','aut','pct')}${k('Dívida financeira líquida','dfl','eur',1)}${k('Prazo médio de recebimento','pmr','dias',1)}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('chart')} Vendas, EBITDA e resultado líquido</h3>${plBars(['Volume de negócios','EBITDA','Resultado líquido'],A.map((z,i)=>({n:z.ano,c:cor[i],v:[z.X.vn,z.X.ebitda,z.X.rl]})),{lab:1,w:640})}</div>
+     <div class="card"><h3>${ico('eye')} Leitura do período · ${esc(plPerTxt(C))}</h3>${coment.map(p=>`<p style="margin:0 0 9px;line-height:1.55">${p}</p>`).join('')}
+       <div class="row" style="gap:6px;margin-top:8px">${sev.crit+sev.err?`<span class="chip" style="border-color:var(--crit);cursor:pointer" data-goaud>${ico('alert')} <b>${sev.crit+sev.err}</b> problema(s) entre anos</span>`:`<span class="chip" style="border-color:var(--good)">${ico('shield')} Sem erros entre anos</span>`}${sev.warn?`<span class="chip" style="border-color:var(--warn);cursor:pointer" data-goaud>${ico('alert')} <b>${sev.warn}</b> ponto(s) de atenção</span>`:''}</div></div></div>${proj}
+   <div class="card" style="margin-top:16px"><h3>${ico('layers')} Quadro-síntese</h3>${plTabela(C,[['vn','Volume de negócios','eur'],['mbP','Margem bruta','pct'],['ebitda','EBITDA','eur'],['ebitdaP','Margem EBITDA','pct'],['rl','Resultado líquido','eur'],['at','Ativo total','eur'],['cp','Capital próprio','eur'],['liqG','Liquidez geral','x'],['aut','Autonomia financeira','pct'],['dfl','Dívida financeira líquida','eur'],['pmr','Prazo médio de recebimento','dias'],['pmp','Prazo médio de pagamento','dias']])}</div>`;
+  $$('[data-goaud]',el).forEach(b=>b.onclick=()=>{ S.pl.tab='aud'; RENDER.plurianual(); }); }
+
+function plTabela(C,rows){ const A=C.A; const P=A.length>1;
+  return `<div class="tbl-wrap"><table class="t"><thead><tr><th>Indicador</th>${A.map(z=>`<th class="num">${z.ano}</th>`).join('')}${P?`<th class="num">Var. ${A[A.length-2].ano}→${A[A.length-1].ano}</th>`:''}${A.length>=3?'<th class="num">Média anual</th>':''}</tr></thead><tbody>${rows.map(([key,l,f])=>{ const v=A.map(z=>z.X[key]);
+    const last=v[v.length-1], prev=v[v.length-2]; let dv=''; if(P){ if(f==='pct') dv=last!=null&&prev!=null?((last-prev)*100).toFixed(1).replace('.',',')+' p.p.':'—'; else if(f==='x'||f==='dias') dv=last!=null&&prev!=null?(last-prev>=0?'+':'')+(f==='x'?plX(last-prev):Math.round(last-prev)+' dias'):'—'; else { const q=plVar(last,prev); dv=q==null?'—':`<span class="${q>=0?'st-ok':'st-crit'}">${q>=0?'+':''}${plPct(q)}</span>`; } }
+    let cagr=''; if(A.length>=3){ const a0=v[0]; cagr=f==='eur'&&a0>0&&last>0?plPct(Math.pow(last/a0,1/(A.length-1))-1):'—'; }
+    return `<tr><td><b>${l}</b></td>${v.map(x=>`<td class="num">${plFmt(f,x)}</td>`).join('')}${P?`<td class="num">${dv}</td>`:''}${A.length>=3?`<td class="num">${cagr}</td>`:''}</tr>`; }).join('')}</tbody></table></div>`; }
+
+function plStmtRows(C,defs,get,base){ const A=C.A; return defs.filter(([k])=>k==='h'||k[0]==='='||A.some(z=>Math.abs(get(z)[k]||0)>=0.005)).map(([k,l])=>{ if(k==='h') return {h:l};
+  return {k,l,tot:k[0]==='=',v:A.map(z=>get(z)[k]||0),b:A.map(z=>base(z))}; }); }
+function plStmtHtml(C,rows,pctLbl){ const A=C.A, P=A.length>1;
+  return `<div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr><th>Rubricas</th>${A.map(z=>`<th class="num">${z.ano}</th><th class="num" style="opacity:.7">%</th>`).join('')}${P?`<th class="num">Var. €</th><th class="num">Var. %</th>`:''}</tr></thead><tbody>${rows.map(r=>{ if(r.h) return `<tr class="glagg"><td colspan="${1+A.length*2+(P?2:0)}"><b>${esc(r.h)}</b></td></tr>`;
+    const last=r.v[r.v.length-1], prev=r.v[r.v.length-2]; const q=P?plVar(last,prev):null; const B=r.tot?'b':'span';
+    return `<tr${r.tot?' class="glagg"':''}><td>${r.tot?'<b>'+esc(r.l)+'</b>':'&nbsp;&nbsp;'+esc(r.l)}</td>${r.v.map((v,i)=>`<td class="num"><${B}>${n2(v)}</${B}></td><td class="num hint">${r.b[i]?plPct(v/r.b[i]):''}</td>`).join('')}${P?`<td class="num">${n2(last-prev)}</td><td class="num ${q==null?'':Math.abs(q)>=0.25?'st-warn':''}">${q==null?'—':(q>=0?'+':'')+plPct(q)}</td>`:''}</tr>`; }).join('')}</tbody></table></div><p class="hint" style="margin-top:8px">${pctLbl}</p>`; }
+function plTabDR(el,C){ const rows=plStmtRows(C,AP_DR,z=>z.D,z=>z.D.vnd);
+  el.innerHTML=`<div class="card"><h3>${ico('scale')} Demonstração dos resultados por naturezas · ${esc(plPerTxt(C))}</h3>${plStmtHtml(C,rows,'% = peso de cada rubrica no volume de negócios. Existências, amortizações e imposto de cada ano segundo os «Pressupostos por ano».')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Principais gastos</h3>${plBars(['CMVMC','FSE','Pessoal','Depreciações','Juros'],C.A.map((z,i)=>({n:z.ano,c:plCores(C.A.length)[i],v:['cmv','fse','pes','dep','jur'].map(k=>z.D[k])})),{lab:1})}</div>`; }
+function plTabBal(el,C){ const rows=plStmtRows(C,AP_BAL,z=>z.Bl.v,z=>z.Bl.v['=at']); const A=C.A;
+  el.innerHTML=`<div class="card"><h3>${ico('scale')} Balanço comparativo · ${C.to===12||S.pl.modo==='ano'?'31 de dezembro':'final de '+plMes(C.to)}</h3>${plStmtHtml(C,rows,'% = estrutura (peso no total do ativo). O balanço fecha sempre; diferenças entre pressupostos e balancete aparecem em «Ajustamentos de encerramento pendentes».')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('chart')} Como se financia o ativo</h3>${plBars(['Ativo não corrente','Ativo corrente','Capital próprio','Passivo não corrente','Passivo corrente'],A.map((z,i)=>({n:z.ano,c:plCores(A.length)[i],v:['=anc','=ac','=cp','=pnc','=pc'].map(k=>z.Bl.v[k])})),{lab:1})}</div>`; }
+
+function plTabRac(el,C){ const A=C.A, P=A.length>1; const st={ok:'Confortável',warn:'A acompanhar',bad:'Risco'}; let grp='';
+  const rows=PL_RAT.map(def=>{ const [k,l,g,f,,,,fo]=def; const v=A.map(z=>z.X[k]); const last=v[v.length-1]; const s=plSt(def,last); const t=P?plTend(def,last,v[v.length-2]):'';
+    const hd=g!==grp?`<tr class="glagg"><td colspan="${A.length+3}"><b>${g}</b></td></tr>`:''; grp=g;
+    return hd+`<tr><td><b>${l}</b><div class="hint">${esc(fo)}</div></td>${v.map((x,i)=>`<td class="num ${plSt(def,x)==='bad'?'st-crit':plSt(def,x)==='warn'?'st-warn':''}">${plFmt(f,x)}</td>`).join('')}<td class="num" style="font-size:15px" title="▲ melhora · ▼ piora · = estável">${t==='▲'?'<span class="st-ok">▲</span>':t==='▼'?'<span class="st-crit">▼</span>':t}</td><td>${s?`<span class="st-${s==='bad'?'crit':s}"><b>${st[s]}</b></span>`:''}</td></tr>`; }).join('');
+  el.innerHTML=`<div class="card"><h3>${ico('percent')} Rácios e tendências · ${esc(plPerTxt(C))}</h3><div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr><th>Indicador</th>${A.map(z=>`<th class="num">${z.ano}</th>`).join('')}<th class="num">Tendência</th><th>Situação ${A[A.length-1].ano}</th></tr></thead><tbody>${rows}</tbody></table></div>
+   <p class="hint" style="margin-top:8px">Os rácios de rendibilidade são do período (não anualizados); a dívida líquida ÷ EBITDA e o score usam o EBITDA/EBIT anualizado. Prazos médios com IVA à taxa normal. Altman Z″ (empresas não cotadas): acima de 2,6 zona segura; 1,1–2,6 zona cinzenta; abaixo de 1,1 risco.</p></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('eye')} Leitura para a banca — ${A[A.length-1].ano}</h3><div class="grid g3">${A[A.length-1].R.cards.map(apCard).join('')}</div></div>`; }
+
+function plTabMes(el,C){ const A=C.A, cor=plCores(A.length); const M=A.map(z=>glMonthly(z.Y,1,12)); const ult=A.map(z=>z.Y.maxP||12);
+  const val=(i,m,k)=>m<=ult[i]?M[i][m-1][k]:null; const P=A.length>1; let ac=A.map(()=>0);
+  const rows=GL_MES.map((nm,mi)=>{ const m=mi+1; const v=A.map((z,i)=>val(i,m,'v')); v.forEach((x,i)=>{ if(x!=null) ac[i]+=x; }); const q=P?plVar(v[v.length-1],v[v.length-2]):null; const qa=P&&v[v.length-1]!=null?plVar(ac[ac.length-1],ac[ac.length-2]):null;
+    return `<tr${S.pl.modo==='ytd'&&m===C.to?' style="box-shadow:inset 0 -2px 0 var(--acc)"':''}><td><b>${nm}</b></td>${v.map(x=>`<td class="num">${x==null?'—':n2(x)}</td>`).join('')}${P?`<td class="num ${q==null?'':q>=0?'st-ok':'st-crit'}">${q==null?'—':(q>=0?'+':'')+plPct(q)}</td><td class="num">${v[v.length-1]==null?'—':n2(ac[ac.length-1])}</td><td class="num ${qa==null?'':qa>=0?'st-ok':'st-crit'}">${qa==null?'—':(qa>=0?'+':'')+plPct(qa)}</td>`:''}</tr>`; }).join('');
+  const resRows=GL_MES.map((nm,mi)=>`<tr><td>${nm}</td>${A.map((z,i)=>{ const x=val(i,mi+1,'res'); return `<td class="num ${x!=null&&x<0?'st-crit':''}">${x==null?'—':n2(x)}</td>`; }).join('')}</tr>`).join('');
+  const cum=A.map((z,i)=>{ let s=0; return GL_MES.map((n,mi)=>{ const x=val(i,mi+1,'v'); if(x==null) return null; s+=x; return s; }); });
+  el.innerHTML=`<div class="card"><h3>${ico('chart')} Volume de negócios mês a mês</h3>${plBars(GL_MES.map(m=>m.slice(0,3)),A.map((z,i)=>({n:z.ano,c:cor[i],v:GL_MES.map((x,mi)=>val(i,mi+1,'v'))})),{h:250})}</div>
+   <div class="grid g2" style="margin-top:16px"><div class="card"><h3>${ico('chart')} Acumulado do ano</h3>${plLines(GL_MES.map(m=>m.slice(0,3)),A.map((z,i)=>({n:z.ano,c:cor[i],v:cum[i],w:i===A.length-1?3:2})),{w:640})}</div>
+    <div class="card"><h3>${ico('layers')} Resultado mensal (rendimentos − gastos lançados)</h3><div class="tbl-wrap" style="max-height:330px"><table class="t"><thead><tr><th>Mês</th>${A.map(z=>`<th class="num">${z.ano}</th>`).join('')}</tr></thead><tbody>${resRows}</tbody></table></div><p class="hint" style="margin-top:6px">Gastos tal como estão lançados em cada mês: o CMVMC e as amortizações costumam ser lançados só no fecho.</p></div></div>
+   <div class="card" style="margin-top:16px"><h3>${ico('layers')} Vendas e prestações de serviços (71+72) — mesmo mês e acumulado</h3><div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr><th>Mês</th>${A.map(z=>`<th class="num">${z.ano}</th>`).join('')}${P?`<th class="num">Var. mês</th><th class="num">Acum. ${A[A.length-1].ano}</th><th class="num">Var. acumulada</th>`:''}</tr></thead><tbody>${rows}</tbody></table></div></div>`; }
+
+function plVarCalc(C){ const U=S.pl, A=C.A; const ya=U.ya&&A.find(z=>z.ano===U.ya)?U.ya:A[A.length-1].ano; const yb=U.yb&&A.find(z=>z.ano===U.yb)&&U.yb!==ya?U.yb:(A.length>1?A[A.length-2].ano:ya); U.ya=ya; U.yb=yb;
+  const za=A.find(z=>z.ano===ya), zb=A.find(z=>z.ano===yb); const Ba=glBal(za.Y,1,za.to,za.enc), Bb=glBal(zb.Y,1,zb.to,zb.enc);
+  const key=id=>U.lvl==='mov'?id:id.slice(0,+U.lvl); const m=new Map(); const put=(B,Y,side)=>{ for(const id in B){ const k=key(id); let r=m.get(k); if(!r){ r={k,d:glDesc(Y,k)||glDesc(Y,id),a:0,b:0}; m.set(k,r); } if(!r.d) r.d=glDesc(Y,k); r[side]+=B[id].sf; } };
+  put(Bb,zb.Y,'b'); put(Ba,za.Y,'a');
+  const lim=plNum(U.lim)!=null?plNum(U.lim):Math.max(500,r2((za.X.vn||0)*0.01)); const cls=U.cls;
+  let rows=[...m.values()].map(r=>{ r.a=r2(r.a); r.b=r2(r.b); r.dv=r2(r.a-r.b); r.q=plVar(r.a,r.b); const f=[]; if(Math.abs(r.b)<0.005&&Math.abs(r.a)>=0.005) f.push('Nova'); else if(Math.abs(r.a)<0.005&&Math.abs(r.b)>=0.005) f.push('Sem saldo'); else if(r.a*r.b<0) f.push('Inverte natureza'); if(r.q!=null&&Math.abs(r.q)>=0.5&&Math.abs(r.dv)>=lim) f.push('Variação > 50%'); r.f=f; return r; })
+    .filter(r=>Math.abs(r.a)>=0.005||Math.abs(r.b)>=0.005).filter(r=>cls==='all'||(cls==='67'?/^[67]/.test(r.k):cls==='15'?/^[1-5]/.test(r.k):r.k[0]===cls));
+  if(U.so) rows=rows.filter(r=>Math.abs(r.dv)>=lim||r.f.includes('Inverte natureza'));
+  rows.sort((x,y)=>Math.abs(y.dv)-Math.abs(x.dv)); return {ya,yb,za,zb,rows,lim}; }
+function plTabVar(el,C){ const U=S.pl, A=C.A; const V=plVarCalc(C);
+  el.innerHTML=`<div class="card"><div class="toolbar" style="margin:0 0 12px;flex-wrap:wrap"><label class="fld">Ano<select class="inp" id="pvA">${A.map(z=>`<option ${z.ano===V.ya?'selected':''}>${z.ano}</option>`).join('')}</select></label><label class="fld">Comparado com<select class="inp" id="pvB">${A.map(z=>`<option ${z.ano===V.yb?'selected':''}>${z.ano}</option>`).join('')}</select></label>
+     <label class="fld">Detalhe<select class="inp" id="pvL">${[['2','Contas com 2 dígitos'],['3','Contas com 3 dígitos'],['4','Contas com 4 dígitos'],['mov','Contas de movimento']].map(([k,l])=>`<option value="${k}" ${U.lvl===k?'selected':''}>${l}</option>`).join('')}</select></label>
+     <label class="fld">Contas<select class="inp" id="pvC">${[['all','Todas'],['67','Gastos e rendimentos (6 e 7)'],['15','Balanço (1 a 5)'],['1','Classe 1'],['2','Classe 2'],['3','Classe 3'],['4','Classe 4'],['5','Classe 5'],['6','Classe 6'],['7','Classe 7'],['8','Classe 8']].map(([k,l])=>`<option value="${k}" ${U.cls===k?'selected':''}>${l}</option>`).join('')}</select></label>
+     <label class="fld">Limiar de materialidade (€)<input class="inp mono" id="pvM" style="width:130px" value="${esc(U.lim===''?'':U.lim)}" placeholder="${n0(V.lim)}"></label>
+     <label class="row" style="gap:6px;margin-top:16px;font-size:13px"><input type="checkbox" id="pvS" ${U.so?'checked':''}> Só variações materiais</label><span class="sp"></span><button class="btn sm" id="pvX" style="margin-top:14px">${ico('down')} Excel</button></div>
+   <p class="hint" style="margin:0 0 10px">${esc(plPerTxt(C))} · saldo acumulado (positivo = devedor; negativo = credor) · limiar por defeito: 1% do volume de negócios de ${V.ya} (mínimo 500 €) · <b>${n0(V.rows.length)}</b> conta(s)</p>
+   <div class="tbl-wrap"><table class="t"><thead><tr><th>Conta</th><th>Descrição</th><th class="num">${V.ya}</th><th class="num">${V.yb}</th><th class="num">Variação €</th><th class="num">Var. %</th><th>Sinal</th></tr></thead><tbody>${V.rows.slice(0,600).map(r=>`<tr><td class="mono"><b>${r.k}</b></td><td>${esc(r.d||'')}</td><td class="num">${n2(r.a)}</td><td class="num">${n2(r.b)}</td><td class="num"><b>${n2(r.dv)}</b></td><td class="num">${r.q==null?'—':(r.q>=0?'+':'')+plPct(r.q)}</td><td>${r.f.map(f=>`<span class="chip" style="padding:1px 7px;border-color:${f==='Inverte natureza'?'var(--crit)':'var(--warn)'}">${f}</span>`).join(' ')}</td></tr>`).join('')||`<tr><td colspan="7" class="hint">Sem variações acima do limiar.</td></tr>`}</tbody></table></div></div>`;
+  const re=()=>plTabVar(el,C);
+  $('#pvA').onchange=e=>{ U.ya=e.target.value; re(); }; $('#pvB').onchange=e=>{ U.yb=e.target.value; re(); }; $('#pvL').onchange=e=>{ U.lvl=e.target.value; re(); }; $('#pvC').onchange=e=>{ U.cls=e.target.value; re(); };
+  $('#pvM').onchange=e=>{ U.lim=e.target.value.replace(/\s/g,'').replace(',','.'); re(); }; $('#pvS').onchange=e=>{ U.so=e.target.checked?1:0; re(); };
+  $('#pvX').onclick=()=>glXlsx(`Variacoes_${glSafe(C.empresa)}_${V.ya}_vs_${V.yb}.xlsx`,'Variações',[`Variações por conta — ${C.empresa} (NIF ${C.nif}) — ${V.ya} vs ${V.yb} — ${plPerTxt(C)}`,'Saldo acumulado: positivo = devedor; negativo = credor. Gerado pelo AuditNux.'],['Conta','Descrição',V.ya,V.yb,'Variação €','Variação %','Sinal'],V.rows.map(r=>[r.k,r.d||'',r.a,r.b,r.dv,r.q==null?'':r2(r.q*100),r.f.join(', ')]),[12,46,16,16,16,12,26]); }
+
+function plTabAud(el,C){ const lab={crit:['Crítico','crit'],err:['Erro','crit'],warn:['Atenção','warn'],info:['Nota','info'],ok:['OK','good']};
+  const cnt=k=>C.aud.filter(i=>i.sev===k).length;
+  el.innerHTML=`<div class="grid g4">${kpi('Críticos e erros',`<span class="${cnt('crit')+cnt('err')?'st-crit':'st-ok'}">${cnt('crit')+cnt('err')}</span>`,'a corrigir antes de entregar contas')}${kpi('Pontos de atenção',`<span class="${cnt('warn')?'st-warn':''}">${cnt('warn')}</span>`,'a explicar ou confirmar')}${kpi('Notas',String(cnt('info')),'variações e pressupostos')}${kpi('Verificações OK',`<span class="st-ok">${cnt('ok')}</span>`,'continuidade entre anos')}</div>
+   <div class="card" style="margin-top:16px"><h3>${ico('shield')} Auditoria entre exercícios</h3><p class="hint" style="margin-top:-4px">Continuidade dos saldos, encerramento e aplicação de resultados, capital próprio (art.º 35.º CSC), caixa, variações anómalas e qualidade dos pressupostos de cada ano.</p>
+   ${C.aud.length?C.aud.map(i=>`<div class="row" style="gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)"><span class="chip" style="min-width:86px;justify-content:center;border-color:var(--${lab[i.sev][1]})"><b class="st-${lab[i.sev][1]==='good'?'ok':lab[i.sev][1]}">${lab[i.sev][0]}</b></span><span class="chip mono">${i.ano}</span><div><b>${esc(i.t)}</b><div class="hint" style="margin-top:2px">${i.d}</div></div></div>`).join(''):'<div class="empty">Sem observações.</div>'}</div>`; }
+
+function plTabPar(el,C){ const U=S.pl, par=S.plPar[U.nif]||(S.plPar[U.nif]={});
+  const cel=(z,campo,key,lancado,valor,org)=>{ const p=par[z.chave]||{}; if(lancado) return `<td class="num">${n2(valor)}<div class="hint">lançado no SAF-T</div></td>`;
+    if(org==='na'&&plNum(p[key])==null) return `<td class="num hint">não aplicável<div><input class="inp mono" style="width:120px;text-align:right;margin-top:4px" data-pk="${z.chave}|${key}" placeholder="indicar"></div></td>`;
+    return `<td class="num"><input class="inp mono" style="width:130px;text-align:right" data-pk="${z.chave}|${key}" value="${plNum(p[key])!=null?String(p[key]).replace('.',','):''}" placeholder="${n2(valor)}"><div class="hint st-${plOrgCls[org]||''}">${plOrgTxt[org]||''}</div></td>`; };
+  el.innerHTML=`<div class="card"><h3>${ico('wrench')} Pressupostos por ano · ${esc(plPerTxt(C))}</h3><p class="hint" style="margin-top:-4px">Valores que o SAF-T não tem enquanto o exercício não está fechado. Deixe em branco para usar o valor a cinzento (por baixo diz de onde vem). Ficam guardados para esta empresa e este período, para toda a equipa.</p>
+   <div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr style="white-space:normal"><th style="white-space:normal">Ano / período</th><th class="num" style="white-space:normal">Existência final<br>mercadorias e matérias</th><th class="num" style="white-space:normal">Existência final<br>produtos</th><th class="num" style="white-space:normal">Amortizações<br>do período</th><th class="num" style="white-space:normal">Imposto<br>do período</th><th class="num" style="white-space:normal">Resultado<br>líquido</th><th></th></tr></thead><tbody>
+   ${C.A.map(z=>{ const E=z.ap.existencias; const p=par[z.chave]||{}; return `<tr><td><b>${z.ano}</b><div class="hint">${z.to===12?'ano completo':'janeiro a '+plMes(z.to)}${z.org.ap?' · análise guardada de '+apDataPT(z.data):''}</div></td>
+     ${cel(z,'aF','aF',z.F.cevcAp,E.aFinais,z.org.ex)}${cel(z,'bF','bF',z.F.varAp,E.bFinais,z.org.pr)}${cel(z,'am','am',z.F.amAp,z.F.amAp?z.F.amPosto:E.amort,z.org.am)}
+     <td class="num"><input class="inp mono" style="width:130px;text-align:right" data-pk="${z.chave}|imp" value="${plNum(p.imp)!=null?String(p.imp).replace('.',','):''}" placeholder="${n2(z.r.totalImposto)}"><div class="hint">${z.org.imp==='saft'?'lançado no SAF-T (812)':z.org.imp==='est'?'estimado (IRC + derrama)':plOrgTxt[z.org.imp]}</div></td>
+     <td class="num"><b class="${z.r.resultadoLiquidoFinal<0?'st-crit':''}">${n2(z.r.resultadoLiquidoFinal)}</b></td><td><button class="btn sm" data-apgo="${z.ano}" title="Abrir este ano em Demonstrações & IRC (IRC completo, correções, prejuízos)">${ico('scale')}</button></td></tr>`; }).join('')}</tbody></table></div>
+   <div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="ppLimpa">${ico('undo')} Limpar valores indicados</button><button class="btn pri" id="ppOk">${ico('save')} Guardar e recalcular</button></div>
+   <p class="hint" style="margin-top:10px">Regras quando fica em branco: existência final = existência inicial (CMVMC = compras do período); amortizações = duodécimos das do ano anterior; imposto = o lançado na 812 ou, se não houver, IRC estimado com as taxas do ano e a derrama da ficha. Se houver uma análise guardada em Demonstrações &amp; IRC para a mesma data, os valores dela têm prioridade.</p></div>`;
+  $('#ppOk').onclick=async()=>{ $$('[data-pk]',el).forEach(i=>{ const [ch,k]=i.dataset.pk.split('|'); const v=i.value.trim().replace(/\s/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); const o=par[ch]||(par[ch]={}); if(v===''||isNaN(+v)) delete o[k]; else o[k]=+v; if(!Object.keys(o).length) delete par[ch]; });
+    if(await plParGravar(U.nif)){ toast(`${ico('save')} Pressupostos guardados — análise recalculada`,'ok'); S.plC=null; RENDER.plurianual(); } };
+  $('#ppLimpa').onclick=async()=>{ if(!confirm('Apagar os valores indicados à mão para estes anos? Voltam a ser usadas as regras automáticas.')) return; for(const z of C.A) delete par[z.chave]; if(await plParGravar(U.nif)){ S.plC=null; RENDER.plurianual(); } };
+  $$('[data-apgo]',el).forEach(b=>b.onclick=async()=>{ const z=C.A.find(x=>x.ano===b.dataset.apgo); const Y=z.Y; await apGoFromContab(Y,z.to,z.enc); }); }
+
+/* ---------- Excel completo (várias folhas) ---------- */
+async function plXlsx(C){ let XL; try{ XL=await xlsxLib(); }catch(e){ return toast(esc(e.message),'err'); } const A=C.A, wb=XL.utils.book_new(); const anos=A.map(z=>z.ano);
+  const tit=t=>[[`${t} — ${C.empresa} (NIF ${C.nif})`],[`Exercícios ${anos.join(', ')} · ${plPerTxt(C)} · gerado pelo AuditNux em ${nowTxt()}`],[]];
+  const sheet=(nome,aoa,w,fmt)=>{ fmt=fmt||(()=>null); const ws=XL.utils.aoa_to_sheet(aoa); ws['!cols']=w.map(x=>({wch:x})); { for(const addr in ws){ if(addr[0]==='!') continue; const c=ws[addr]; if(c.t==='n') c.z=fmt(addr,c)||'#,##0.00'; } } XL.utils.book_append_sheet(wb,ws,nome.slice(0,31)); };
+  const stm=(defs,get)=>{ const out=[]; for(const r of plStmtRows(C,defs,get,()=>1)){ if(r.h){ out.push([r.h.toUpperCase()]); continue; } const last=r.v[r.v.length-1], prev=r.v[r.v.length-2]; out.push([(r.tot?'':'   ')+r.l,...r.v.map(v=>r2(v)),...(A.length>1?[r2(last-prev),plVar(last,prev)==null?'':r2(plVar(last,prev)*10000)/10000]:[])]); } return out; };
+  const pctCol=(n)=>(addr)=>XL.utils.decode_cell(addr).c===n?'0.0%':null;
+  sheet('Resumo',[...tit('Resumo da análise plurianual'),['Indicador',...anos,...(A.length>1?['Variação %']:[])],...[['vn','Volume de negócios'],['ebitda','EBITDA'],['ebit','EBIT'],['rl','Resultado líquido'],['at','Ativo total'],['cp','Capital próprio'],['pt','Passivo total'],['fm','Fundo de maneio'],['dfl','Dívida financeira líquida'],['mlb','Meios libertos brutos']].map(([k,l])=>{ const v=A.map(z=>r2(z.X[k]||0)); const q=plVar(v[v.length-1],v[v.length-2]); return [l,...v,...(A.length>1?[q==null?'':r2(q*10000)/10000]:[])]; }),[],['Leitura do período'],...plComentario(C).map(p=>[plTxt(p)])],[44,...anos.map(()=>16),14],pctCol(1+anos.length));
+  sheet('Demonstração resultados',[...tit('Demonstração dos resultados por naturezas'),['Rubricas',...anos,...(A.length>1?['Variação €','Variação %']:[])],...stm(AP_DR,z=>z.D)],[62,...anos.map(()=>16),16,12],pctCol(2+anos.length));
+  sheet('Balanço',[...tit('Balanço'),['Rubricas',...anos,...(A.length>1?['Variação €','Variação %']:[])],...stm(AP_BAL,z=>z.Bl.v)],[62,...anos.map(()=>16),16,12],pctCol(2+anos.length));
+  const rac=[...tit('Rácios e indicadores'),['Grupo','Indicador','Fórmula',...anos,'Situação '+anos[anos.length-1]]]; const fm={}; const st={ok:'Confortável',warn:'A acompanhar',bad:'Risco'};
+  PL_RAT.forEach(def=>{ const [k,l,g,f,,,,fo]=def; rac.push([g,l,fo,...A.map(z=>{ const v=z.X[k]; return v==null||!isFinite(v)?'':f==='dias'?Math.round(v):r2(v*10000)/10000; }),st[plSt(def,A[A.length-1].X[k])]||'']); fm[rac.length-1]=f; });
+  sheet('Rácios',rac,[22,40,58,...anos.map(()=>13),16],(addr)=>{ const d=XL.utils.decode_cell(addr); const f=fm[d.r]; return f==='pct'?'0.0%':f==='x'?'0.00':f==='dias'?'0':'#,##0.00'; });
+  const M=A.map(z=>glMonthly(z.Y,1,12)); sheet('Mês a mês',[...tit('Vendas e prestações de serviços mês a mês (71+72)'),['Mês',...anos.map(a=>'Vendas '+a),...anos.map(a=>'Resultado '+a)],...GL_MES.map((m,mi)=>[m,...A.map((z,i)=>mi+1<=(z.Y.maxP||12)?M[i][mi].v:''),...A.map((z,i)=>mi+1<=(z.Y.maxP||12)?M[i][mi].res:'')])],[14,...anos.map(()=>16),...anos.map(()=>16)]);
+  if(A.length>1){ const V=plVarCalc(C); sheet('Variações por conta',[...tit(`Variações por conta ${V.ya} vs ${V.yb}`),['Conta','Descrição',V.ya,V.yb,'Variação €','Variação %','Sinal'],...V.rows.map(r=>[r.k,r.d||'',r.a,r.b,r.dv,r.q==null?'':r2(r.q*10000)/10000,r.f.join(', ')])],[12,46,16,16,16,12,26],pctCol(5)); }
+  const lab={crit:'Crítico',err:'Erro',warn:'Atenção',info:'Nota',ok:'OK'}; sheet('Auditoria entre anos',[...tit('Auditoria entre exercícios'),['Gravidade','Ano','Verificação','Detalhe'],...C.aud.map(i=>[lab[i.sev],i.ano,plTxt(i.t),plTxt(i.d)])],[12,8,60,100]);
+  sheet('Pressupostos',[...tit('Pressupostos de cada ano'),['Ano','Período','Existência final mercadorias/MP','Origem','Existência final produtos','Origem','Amortizações do período','Origem','Imposto do período','Origem'],...A.map(z=>[z.ano,z.to===12?'ano completo':'janeiro a '+plMes(z.to),z.ap.existencias.aFinais,plOrgTxt[z.org.ex],z.ap.existencias.bFinais,plOrgTxt[z.org.pr],z.F.amAp?z.F.amPosto:z.ap.existencias.amort,plOrgTxt[z.org.am],r2(z.r.totalImposto),z.org.imp==='saft'?'lançado na 812':plOrgTxt[z.org.imp]])],[8,22,18,20,18,20,18,20,18,20]);
+  const out=XL.write(wb,{bookType:'xlsx',type:'array'}); download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`Analise_plurianual_${glSafe(C.empresa)}_${anos[0]}-${anos[anos.length-1]}.xlsx`);
+  toast(`${ico('check')} Excel com ${wb.SheetNames.length} folhas exportado`,'ok'); }
+
+/* ---------- Relatório PDF ---------- */
+function plPdfBars(doc,x,y,w,h,cats,series){ const all=series.flatMap(s=>s.v).filter(v=>v!=null&&isFinite(v)); const lo=Math.min(0,...all), hi=Math.max(0,...all)||1, sp=(hi-lo)||1; const Y=v=>y+(hi-v)/sp*h;
+  doc.setLineWidth(0.15); for(let i=0;i<=4;i++){ const v=lo+sp*i/4; doc.setDrawColor(...PC.line); doc.line(x,Y(v),x+w,Y(v)); doc.setFontSize(6); doc.setTextColor(...PC.mut); doc.text(T(plK(v)),x-1.5,Y(v)+1,{align:'right'}); }
+  const band=w/cats.length, gap=1, bw=Math.min(9,(band*0.78-(series.length-1)*gap)/series.length);
+  cats.forEach((c,i)=>{ const x0=x+i*band+(band-(bw*series.length+gap*(series.length-1)))/2; series.forEach((s,j)=>{ const v=s.v[i]; if(v==null||!isFinite(v)) return; const xx=x0+j*(bw+gap), a=Math.min(Y(0),Y(v)), hh=Math.max(0.3,Math.abs(Y(v)-Y(0))); doc.setFillColor(...s.c); doc.rect(xx,a,bw,hh,'F'); });
+    doc.setFontSize(7); doc.setTextColor(...PC.ink2); doc.text(T(c),x+i*band+band/2,y+h+4.5,{align:'center'}); });
+  let lx=x; series.forEach(s=>{ doc.setFillColor(...s.c); doc.rect(lx,y-6,3,3,'F'); doc.setFontSize(7.5); doc.setTextColor(...PC.ink); doc.setFont('helvetica','bold'); doc.text(T(s.n),lx+4.2,y-3.6); doc.setFont('helvetica','normal'); lx+=14+s.n.length*1.4; }); }
+function plPdfRich(doc,y,html,size,strip){ const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), x0=14, maxW=W-26, lh=size*0.47; let bold=false; const words=[];
+  for(const part of String(html).split(/(<\/?b>)/)){ if(part==='<b>'){ bold=true; continue; } if(part==='</b>'){ bold=false; continue; } strip(part).split(/([ \n\t]+)/).forEach(w=>{ if(w) words.push({w:T(w),b:bold,sp:/^[ \n\t]+$/.test(w)}); }); }
+  doc.setFontSize(size); doc.setTextColor(...PC.ink); doc.setFillColor(...PC.acc); if(y>H-24){ doc.addPage(); y=26; } doc.circle(x0-3.2,y-1.2,0.7,'F'); let x=x0;
+  for(const o of words){ doc.setFont('helvetica',o.b?'bold':'normal'); const ww=doc.getTextWidth(o.w); if(o.sp){ if(x>x0) x+=ww; continue; }
+    if(x+ww>x0+maxW){ y+=lh; x=x0; if(y>H-20){ doc.addPage(); y=26; } } doc.text(o.w,x,y); x+=ww; }
+  doc.setFont('helvetica','normal'); return y+lh+2; }
+const PL_PDFC=[[148,163,184],[167,139,250],[96,165,250],[8,145,178],[37,99,235]];
+function plPdf(C){ const A=C.A, L=A[A.length-1], P=A.length>1?A[A.length-2]:null; const doc=pdfNew('Relatório de Análise Financeira'); if(!doc) return; const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(); const cor=PL_PDFC.slice(PL_PDFC.length-A.length);
+  const per=plPerTxt(C), anos=A.map(z=>z.ano); const strip=h=>plTxt(h).replace(/−/g,'-').replace(/″/g,"''").replace(/×/g,'x').replace(/÷/g,'/').replace(/[▲▼]/g,'');
+  // capa
+  doc.__cover=true; doc.setFillColor(...PC.navy); doc.rect(0,0,W,118,'F'); doc.setFillColor(...PC.acc); doc.rect(0,118,W,1.4,'F'); if(CFG.logo){ try{ doc.addImage(CFG.logo,CFG.logo.includes('png')?'PNG':'JPEG',16,14,0,14); }catch(e){} }
+  doc.setTextColor(34,211,238); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('AUDITNUX  ·  CENTRO DE AUDITORIA',W-16,20,{align:'right'});
+  doc.setTextColor(255,255,255); doc.setFontSize(27); doc.text(T('Análise Económico-Financeira'),16,54); doc.setFontSize(14); doc.setTextColor(180,220,240); doc.text(T(`Exercícios ${anos.join(' · ')}  —  ${per}`),16,65);
+  doc.setFontSize(17); doc.setTextColor(255,255,255); doc.text(doc.splitTextToSize(T(C.empresa),W-32),16,88); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(180,200,225); doc.text(T(`NIF ${C.nif}  ·  ${CFG.gabinete||''}`),16,104);
+  let y=132; const dvt=(k)=>{ if(!P) return ''; const q=plVar(L.X[k],P.X[k]); return q==null?'':(q>=0?'+':'')+plPct(q)+' vs '+P.ano; };
+  y=kpiBoxes(doc,y,[{l:'Volume de negócios '+L.ano,v:eur(L.X.vn),d:dvt('vn')},{l:'EBITDA '+L.ano,v:eur(L.X.ebitda),d:dvt('ebitda')},{l:'Resultado líquido '+L.ano,v:eur(L.X.rl),d:dvt('rl'),c:L.X.rl<0?PC.crit:PC.ok},{l:'Autonomia financeira',v:plPct(L.X.aut)},{l:'Liquidez geral',v:plX(L.X.liqG)},{l:'Dívida financeira líquida',v:eur(L.X.dfl)}],3);
+  y+=4; doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...PC.ink); doc.text(T('Sumário executivo'),12,y); doc.setFont('helvetica','normal'); y+=6;
+  for(const p of plComentario(C)) y=plPdfRich(doc,y,p,9.2,strip);
+  // gráficos
+  doc.addPage(); y=26; y=pdfH(doc,y,'Evolução: vendas, EBITDA e resultado líquido'); plPdfBars(doc,30,y+10,W-44,58,['Volume de negócios','EBITDA','Resultado líquido'],A.map((z,i)=>({n:z.ano,c:cor[i],v:[z.X.vn,z.X.ebitda,z.X.rl]}))); y+=80;
+  const Ms=A.map(z=>glMonthly(z.Y,1,12)); y=pdfH(doc,y,'Volume de negócios mês a mês'); plPdfBars(doc,30,y+10,W-44,58,GL_MES.map(m=>m.slice(0,3)),A.map((z,i)=>({n:z.ano,c:cor[i],v:GL_MES.map((m,mi)=>mi+1<=(z.Y.maxP||12)?Ms[i][mi].v:null)}))); y+=80;
+  y=pdfH(doc,y,'Quadro-síntese'); const sint=[['vn','Volume de negócios','eur'],['mbP','Margem bruta','pct'],['ebitda','EBITDA','eur'],['ebitdaP','Margem EBITDA','pct'],['rl','Resultado líquido','eur'],['at','Ativo total','eur'],['cp','Capital próprio','eur'],['dfl','Dívida financeira líquida','eur']];
+  y=pdfTable(doc,y,['Indicador',...anos,...(P?['Var.']:[])],sint.map(([k,l,f])=>{ const v=A.map(z=>z.X[k]); const last=v[v.length-1], prev=v[v.length-2]; const d=!P?[]:[f==='pct'?(last!=null&&prev!=null?((last-prev)*100).toFixed(1).replace('.',',')+' p.p.':''):(plVar(last,prev)==null?'':(plVar(last,prev)>=0?'+':'')+plPct(plVar(last,prev)))]; return [{content:l,styles:{fontStyle:'bold'}},...v.map(x=>({content:f==='pct'?plPct(x):n2(x),styles:{halign:'right'}})),...d.map(x=>({content:x,styles:{halign:'right',fontStyle:'bold'}}))]; }),{});
+  // DR e Balanço
+  const stmt=(defs,get,base)=>plStmtRows(C,defs,get,base).map(r=>{ if(r.h) return [{content:T(r.h),colSpan:1+A.length+(P?2:0),styles:{fontStyle:'bold',fillColor:[232,238,246]}}]; const last=r.v[r.v.length-1], prev=r.v[r.v.length-2]; const q=P?plVar(last,prev):null; const b=r.tot?'bold':'normal';
+    return [{content:(r.tot?'':'   ')+r.l,styles:{fontStyle:b}},...r.v.map(v=>({content:n2(v),styles:{halign:'right',fontStyle:b}})),...(P?[{content:n2(last-prev),styles:{halign:'right',fontStyle:b}},{content:q==null?'':(q>=0?'+':'')+plPct(q),styles:{halign:'right',fontStyle:'bold',textColor:q!=null&&Math.abs(q)>=0.25?PC.warn:PC.ink}}]:[])]; });
+  const cw={}; A.forEach((z,i)=>cw[i+1]={cellWidth:A.length>3?20:24}); if(P){ cw[A.length+1]={cellWidth:22}; cw[A.length+2]={cellWidth:15}; }
+  doc.addPage(); y=26; y=pdfH(doc,y,`Demonstração dos resultados por naturezas — ${per}`); y=pdfTable(doc,y,['Rubricas',...anos,...(P?['Var. €','Var. %']:[])],stmt(AP_DR,z=>z.D,z=>z.D.vnd),{columnStyles:cw,styles:{fontSize:7.2,cellPadding:1.3}});
+  doc.addPage(); y=26; y=pdfH(doc,y,`Balanço — ${C.to===12||S.pl.modo==='ano'?'31 de dezembro':'final de '+plMes(C.to)}`); y=pdfTable(doc,y,['Rubricas',...anos,...(P?['Var. €','Var. %']:[])],stmt(AP_BAL,z=>z.Bl.v,z=>z.Bl.v['=at']),{columnStyles:cw,styles:{fontSize:6.9,cellPadding:1.1}});
+  // rácios
+  doc.addPage(); y=26; y=pdfH(doc,y,'Rácios e tendências'); const st={ok:'Confortável',warn:'A acompanhar',bad:'Risco'}; let grp=''; const body=[]; const meta=[];
+  PL_RAT.forEach(def=>{ const [k,l,g,f]=def; if(g!==grp){ body.push([{content:T(g),colSpan:A.length+3,styles:{fontStyle:'bold',fillColor:[232,238,246]}}]); meta.push(null); grp=g; } const v=A.map(z=>z.X[k]); const s=plSt(def,v[v.length-1]); const t=P?plTend(def,v[v.length-1],v[v.length-2]):'';
+    body.push([{content:l,styles:{fontStyle:'bold'}},...v.map(x=>({content:plFmt(f,x).replace(/−/g,'-'),styles:{halign:'right'}})),{content:t==='▲'?'melhora':t==='▼'?'piora':t==='='?'estável':t==='↑'?'sobe':t==='↓'?'desce':'',styles:{halign:'center',textColor:t==='▲'?PC.ok:t==='▼'?PC.crit:PC.mut,fontStyle:'bold'}},{content:st[s]||'',styles:{fontStyle:'bold',textColor:s==='ok'?PC.ok:s==='warn'?PC.warn:PC.crit}}]); meta.push(def); });
+  y=pdfTable(doc,y,['Indicador',...anos,'Tendência','Situação '+L.ano],body,{styles:{fontSize:7.3,cellPadding:1.3}});
+  y=pdfP(doc,y,'Rendibilidades do período (não anualizadas). Dívida líquida / EBITDA e score de risco com EBITDA/EBIT anualizados. Prazos médios com IVA à taxa normal. Altman Z\'\' (não cotadas): acima de 2,6 zona segura; 1,1 a 2,6 zona cinzenta; abaixo de 1,1 risco.',7,PC.mut);
+  // auditoria
+  if(C.aud.length){ doc.addPage(); y=26; y=pdfH(doc,y,'Auditoria entre exercícios'); const lab={crit:'Crítico',err:'Erro',warn:'Atenção',info:'Nota',ok:'OK'}; const sc={crit:PC.crit,err:PC.err,warn:PC.warn,info:PC.info,ok:PC.ok};
+    y=pdfTable(doc,y,['Gravidade','Ano','Verificação e detalhe'],C.aud.map(i=>[{content:lab[i.sev],styles:{fontStyle:'bold',textColor:sc[i.sev]}},i.ano,{content:strip(i.t)+'\n'+strip(i.d)}]),{columnStyles:{0:{cellWidth:20},1:{cellWidth:12}},styles:{fontSize:7.3}}); }
+  // pressupostos e assinatura
+  if(y>H-90){ doc.addPage(); y=26; } y=pdfH(doc,y,'Pressupostos e bases de preparação');
+  y=pdfTable(doc,y,['Ano','Período','Exist. final merc./MP','Exist. final produtos','Amortizações','Imposto'],A.map(z=>[{content:z.ano,styles:{fontStyle:'bold'}},z.to===12?'ano completo':'jan. a '+plMes(z.to),n2(z.ap.existencias.aFinais)+'\n'+(z.F.cevcAp?'do SAF-T':plOrgTxt[z.org.ex]),n2(z.ap.existencias.bFinais)+'\n'+(z.F.varAp?'do SAF-T':plOrgTxt[z.org.pr]),n2(z.F.amAp?z.F.amPosto:z.ap.existencias.amort)+'\n'+(z.F.amAp?'do SAF-T':plOrgTxt[z.org.am]),n2(z.r.totalImposto)+'\n'+(z.org.imp==='saft'?'lançado (812)':plOrgTxt[z.org.imp])]),{styles:{fontSize:7.2},columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}}});
+  y=pdfP(doc,y,'Fonte: SAF-T de contabilidade de cada exercício (saldos acumulados, incluindo as regularizações de fim de ano e excluindo o apuramento de resultados). Demonstrações no modelo SNC; o balanço fecha sempre, com as diferenças entre pressupostos e balancete identificadas no capital próprio. Os valores estimados estão assinalados e devem ser confirmados antes de qualquer utilização externa.',7.5,PC.mut);
+  if(y>H-50){ doc.addPage(); y=30; } y+=14; doc.setDrawColor(...PC.line); doc.line(W-96,y,W-12,y); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...PC.ink); doc.text(T(CFG.responsavel||''),W-54,y+5,{align:'center'}); doc.setFontSize(7.8); doc.text(T(CFG.titulo||'Contabilista Certificado'),W-54,y+9.5,{align:'center'}); doc.setFont('helvetica','normal');
+  pdfFrame(doc,`${C.empresa}  ·  NIF ${C.nif}  ·  ${anos.join(' · ')}  ·  ${per}`); doc.save(`AuditNux_Analise_Financeira_${glSafe(C.empresa)}_${anos[0]}-${anos[anos.length-1]}.pdf`); }
+
+/* ---------- Ligações: Contabilidade e Guia ---------- */
+const _rContabPl=RENDER.contabilidade; RENDER.contabilidade=async function(){ await _rContabPl.apply(this,arguments); const b=$('#glApT'); if(!b||$('#glPl')) return;
+  const nif=S.glU.nif; const X=S.GLX||{}; const n=Object.values(X).filter(m=>m.nif===nif).length;
+  b.insertAdjacentHTML('beforebegin',`<button class="btn sm ${n>1?'gold':''}" id="glPl" title="Comparar exercícios: mesmo período, DR, balanço, rácios, mês a mês, variações por conta e auditoria entre anos">${ico('chart')} Análise plurianual${n>1?` · ${n} anos`:''}</button>`);
+  $('#glPl').onclick=()=>{ if(S.pl.nif!==nif){ S.pl.nif=nif; S.pl.anos=[]; S.pl.mes=0; } go('plurianual'); }; };
+const _glDeletePl=glDelete; glDelete=async function(){ S.plC=null; return _glDeletePl.apply(this,arguments); };
+if(typeof GUIA!=='undefined'){ const i=GUIA.findIndex(c=>c.id==='irc');
+  GUIA.splice(i<0?GUIA.length:i+1,0,{id:'pluri',n:'15A',t:'Análise plurianual e relatório financeiro',ic:'chart',v:'plurianual',
+   intro:'Depois de carregar o SAF-T de contabilidade de vários anos da mesma empresa, este ecrã compara até cinco exercícios: no mesmo período (janeiro a um mês) ou no ano completo.',
+   tp:[{t:'Comparar anos de uma empresa',q:'Um cliente pede comparativos ou uma análise financeira a 3 anos.',p:['Carregue o SAF-T de contabilidade de cada ano (em <b>Importar SAF-T</b> pode escolher vários ficheiros de uma vez).','Clique em <b>Análise plurianual</b> (menu Contabilidade) ou no botão dourado <b>Análise plurianual</b> no ecrã Contabilidade.','Escolha a <b>Empresa</b> e clique nos <b>Exercícios</b> a comparar (até 5).','Em <b>Período</b> escolha <b>Mesmo período</b> e o mês (ex.: janeiro a setembro em todos os anos) ou <b>Ano completo</b>.','Veja os separadores: Resumo executivo, Demonstração dos resultados, Balanço, Rácios, Mês a mês, Variações por conta e Auditoria entre anos.'],ir:['plurianual']},
+    {t:'Indicar existências finais, amortizações e imposto',q:'Antes de entregar a análise: os anos ainda não fechados não têm estes valores no SAF-T.',p:['Clique no separador <b>Pressupostos por ano</b> (ou no aviso amarelo <b>ano(s) com existências/amortizações estimadas</b>).','Em cada ano escreva a <b>existência final</b>, as <b>amortizações do período</b> e, se quiser, o <b>imposto</b>. Em branco ficam as regras automáticas (indicadas por baixo de cada valor).','Clique em <b>Guardar e recalcular</b>. Os valores ficam guardados para a equipa toda.','Para o IRC completo de um ano (correções, prejuízos, tributações autónomas) clique no botão da balança dessa linha: abre em <b>Demonstrações & IRC</b>; se guardar lá a análise, os valores passam a ser usados aqui.'],ir:['plurianual','par']},
+    {t:'Entregar ao cliente: PDF e Excel',q:'Relatório profissional da análise.',p:['Clique em <b>Relatório PDF</b>: capa, sumário executivo, gráficos, quadro-síntese, DR e Balanço comparativos, rácios com tendência, auditoria entre anos, pressupostos e assinatura.','Clique em <b>Excel completo</b>: um livro com as folhas Resumo, Demonstração dos resultados, Balanço, Rácios, Mês a mês, Variações por conta, Auditoria e Pressupostos.','Em <b>Variações por conta</b> há também um Excel só dessa lista.'],ir:['plurianual']}]}); }
+
+/* ---------- Proteção ao voltar a carregar o SAF-T de contabilidade do mesmo ano ---------- */
+function plRecargaInfo(R){ const H=R.header||{}, G=R.gl||{}; const nif=String(H.TaxRegistrationNumber||'').trim(); const ano=String(H.FiscalYear||(H.StartDate||'').slice(0,4)||'');
+  const pc={}; let fecho=false; for(const t of (G.tx||[])){ if(t.p>=1&&t.p<=12&&t.tt!=='A') pc[t.p]=(pc[t.p]||0)+1; else if(t.p>12||t.tt==='A') fecho=true; }
+  const cs=Object.values(pc).sort((a,b)=>a-b); const med=cs.length?cs[Math.floor(cs.length/2)]:0; let maxP=0; for(const p in pc) if(pc[p]>=Math.max(5,med*0.05)&&+p>maxP) maxP=+p;
+  if(!maxP) maxP=Math.max(0,...Object.keys(pc).map(Number)); const ps=Object.keys(pc).map(Number); const prim=ps.length?Math.min(...ps):1;
+  return {id:nif+'_'+ano,ano,empresa:H.CompanyName||nif,maxP:maxP||12,ini:Math.max(+String(H.StartDate||'').slice(5,7)||1,prim),fecho}; }
+const _glLoadedPl=glLoaded; glLoaded=async function(R,file,batch){ let n=null, old=null; try{ n=plRecargaInfo(R); old=(await glIndex())[n.id]; }catch(e){ console.error(e); }
+  if(n&&old){ const mes=m=>GL_MES[Math.max(1,Math.min(12,m))-1].toLowerCase(); const om=+String(old.start||'').slice(5,7)||1; const mot=[];
+    if(n.ini>1&&n.ini>om) mot.push(`o ficheiro novo só tem movimentos a partir de ${mes(n.ini)}: janeiro${n.ini>2?' a '+mes(n.ini-1):''} ficaria sem dados`);
+    if((old.maxP||0)>n.maxP) mot.push(`o ficheiro novo tem dados só até ${mes(n.maxP)} e o que está guardado vai até ${mes(old.maxP)}`);
+    if(old.closed&&!n.fecho) mot.push('o que está guardado inclui o encerramento do exercício (regularizações e apuramento de resultados) e o ficheiro novo não');
+    if(mot.length){ const quando=old.carregadoEm?new Date(old.carregadoEm).toLocaleDateString('pt-PT'):'';
+      const ok=confirm(`ATENÇÃO — ${n.empresa} · exercício ${n.ano}\n\nJá existe contabilidade guardada para este exercício (ficheiro «${old.ficheiro||'—'}», dados até ${mes(old.maxP||12)}${quando?', carregado em '+quando:''}${old.operador?' por '+old.operador:''}).\n\nO ficheiro novo SUBSTITUI o exercício inteiro e:\n• ${mot.join('\n• ')}\n\nOK = substituir mesmo assim\nCancelar = manter os dados que estão guardados`);
+      if(!ok){ const msg=`${n.empresa} ${n.ano}: mantidos os dados guardados (o ficheiro «${file&&file.name||''}» não foi gravado).`;
+        if(batch) throw new Error('Não substituído — '+msg); toast(`${ico('shield')} ${esc(msg)}`,'ok'); go('contabilidade'); return null; } } }
+  S.plC=null; return _glLoadedPl.apply(this,arguments); };
 </script>
 </body>
 </html>
